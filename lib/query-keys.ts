@@ -77,6 +77,29 @@ export const queryKeys = {
     list: (options?: FrappeListOptions) => ["Lead", "list", options] as const,
     doc: (name: string) => ["Lead", "doc", name] as const,
   },
+
+  // NEW: Address Keys
+  address: {
+    all: () => ["Address"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Address", "list", options] as const,
+    doc: (name: string) => ["Address", "doc", name] as const,
+    // Special key for fetching by Dynamic Link
+    listByLink: (linkDoctype: string, linkName: string) =>
+      ["Address", "list", "link", linkDoctype, linkName] as const,
+  },
+
+  // NEW: Contact Keys
+  contact: {
+    all: () => ["Contact"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Contact", "list", options] as const,
+    doc: (name: string) => ["Contact", "doc", name] as const,
+    // Special key for fetching by Dynamic Link
+    listByLink: (linkDoctype: string, linkName: string) =>
+      ["Contact", "list", "link", linkDoctype, linkName] as const,
+  },
+
   opportunity: {
     all: () => ["Opportunity"] as const,
     list: (options?: FrappeListOptions) =>

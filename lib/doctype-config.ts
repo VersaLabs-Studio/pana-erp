@@ -125,6 +125,25 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     defaultSortField: "creation",
     defaultSortOrder: "desc",
   },
+
+  // NEW: Address Configuration
+  Address: {
+    apiPath: "crm/address",
+    module: "CRM",
+    labelField: "address_title",
+    searchFields: ["address_title", "address_line1", "city"],
+    isSettings: false,
+  },
+
+  // NEW: Contact Configuration
+  Contact: {
+    apiPath: "crm/contact",
+    module: "CRM",
+    labelField: "full_name",
+    searchFields: ["full_name", "email_id", "mobile_no"],
+    isSettings: false,
+  },
+
   Opportunity: {
     apiPath: "crm/opportunity",
     module: "CRM",
