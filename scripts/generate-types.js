@@ -42,7 +42,10 @@ const CONFIG = {
 const KNOWN_DOCTYPES = [
   "Item",
   "Item Group",
+  "Lead",
   "Customer",
+  "Address",
+  "Contact",
   "Supplier",
   "Sales Order",
   "Purchase Order",
@@ -570,39 +573,76 @@ async function main() {
 
   console.log(`\n📄 Generating TypeScript interfaces...\n`);
 
-  // Generate TypeScript interfaces
-  let typesContent = `// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
-// Generated at: ${new Date().toISOString()}
-// Source: Frappe DocType Metadata API
-// Script: scripts/generate-types.js
+  // Helper to merge content
+  function mergeContent(existingContent, newSections, headerTemplate) {
+    const sections = new Map();
 
-`;
+    if (existingContent && existingContent.trim() !== "") {
+      // Split by JSDoc blocks that contain @doctype
+      // We look for the start of a JSDoc block
+      const blocks = existingContent.split(/\n(?=\/\*\*)/);
 
-  for (const dt of docTypeData) {
-    typesContent += generateInterface(dt.name, dt.fields);
-    typesContent += "\n";
+      let currentDoctype = null;
+      let currentBlock = [];
+
+      for (const block of blocks) {
+        const doctypeMatch = block.match(/@doctype\s+(\w+)/);
+        if (doctypeMatch) {
+          // If we had a previous doctype, save it
+          if (currentDoctype) {
+            sections.set(currentDoctype, currentBlock.join("\n").trim());
+          }
+          currentDoctype = doctypeMatch[1];
+          currentBlock = [block];
+        } else if (currentDoctype) {
+          currentBlock.push(block);
+        }
+      }
+      // Save last one
+      if (currentDoctype) {
+        sections.set(currentDoctype, currentBlock.join("\n").trim());
+      }
+    }
+
+    // Update/Add new content
+    for (const { name, content } of newSections) {
+      sections.set(name, content.trim());
+    }
+
+    // Reconstruct file
+    let header = headerTemplate.trim();
+    if (existingContent) {
+      const firstBlockIndex = existingContent.indexOf("/**");
+      if (firstBlockIndex > 0) {
+        header = existingContent.slice(0, firstBlockIndex).trim();
+      }
+    }
+
+    return header + "\n\n" + Array.from(sections.values()).join("\n\n") + "\n";
   }
 
-  // Generate Zod schemas
-  let schemasContent = `// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
+  // Prepare new sections
+  const newTypeSections = docTypeData.map((dt) => ({
+    name: dt.name,
+    content: generateInterface(dt.name, dt.fields),
+  }));
+
+  const newSchemaSections = docTypeData.map((dt) => ({
+    name: dt.name,
+    content: generateZodSchema(dt.name, dt.fields),
+  }));
+
+  const typesHeader = `// AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // Generated at: ${new Date().toISOString()}
 // Source: Frappe DocType Metadata API
-// Script: scripts/generate-types.js
+// Script: scripts/generate-types.js`;
 
-import { z } from "zod";
+  const schemasHeader = `${typesHeader}
 
-`;
-
-  for (const dt of docTypeData) {
-    schemasContent += generateZodSchema(dt.name, dt.fields);
-    schemasContent += "\n";
-  }
+import { z } from "zod";`;
 
   if (dryRun) {
-    console.log("=== types/doctype-types.ts ===");
-    console.log(typesContent.slice(0, 2000) + "...\n");
-    console.log("=== lib/schemas/doctype-schemas.ts ===");
-    console.log(schemasContent.slice(0, 2000) + "...\n");
+    console.log("=== DRY RUN: Generation complete (sections calculated) ===");
   } else {
     // Ensure directories exist
     const typesDir = path.dirname(CONFIG.outputTypesPath);
@@ -615,11 +655,36 @@ import { z } from "zod";
       fs.mkdirSync(schemasDir, { recursive: true });
     }
 
-    // Write files
-    fs.writeFileSync(CONFIG.outputTypesPath, typesContent);
+    // Read existing content
+    let existingTypesContent = "";
+    if (fs.existsSync(CONFIG.outputTypesPath)) {
+      existingTypesContent = fs.readFileSync(CONFIG.outputTypesPath, "utf-8");
+    }
+
+    let existingSchemasContent = "";
+    if (fs.existsSync(CONFIG.outputSchemasPath)) {
+      existingSchemasContent = fs.readFileSync(
+        CONFIG.outputSchemasPath,
+        "utf-8"
+      );
+    }
+
+    // Merge and write
+    const finalTypesContent = mergeContent(
+      existingTypesContent,
+      newTypeSections,
+      typesHeader
+    );
+    const finalSchemasContent = mergeContent(
+      existingSchemasContent,
+      newSchemaSections,
+      schemasHeader
+    );
+
+    fs.writeFileSync(CONFIG.outputTypesPath, finalTypesContent);
     console.log(`  ✅ Written: ${CONFIG.outputTypesPath}`);
 
-    fs.writeFileSync(CONFIG.outputSchemasPath, schemasContent);
+    fs.writeFileSync(CONFIG.outputSchemasPath, finalSchemasContent);
     console.log(`  ✅ Written: ${CONFIG.outputSchemasPath}`);
   }
 

@@ -10,7 +10,7 @@ interface DataFieldProps {
   /** Field label */
   label: string;
   /** Field name (for htmlFor) */
-  name: string;
+  name?: string;
   /** Whether the field is required */
   required?: boolean;
   /** Error message to display */
@@ -49,10 +49,11 @@ export function DataField({
   className,
   children,
 }: DataFieldProps) {
+  const fieldId = name || label.toLowerCase().replace(/\s+/g, "-");
   return (
     <div className={cn("space-y-2", className)}>
       <Label
-        htmlFor={name}
+        htmlFor={fieldId}
         className={cn("text-sm font-medium", error && "text-destructive")}
       >
         {label}
@@ -116,7 +117,7 @@ export function TextDataField({
       className={className}
     >
       <Input
-        id={name}
+        id={name || label.toLowerCase().replace(/\s+/g, "-")}
         name={name}
         type={type}
         placeholder={placeholder}

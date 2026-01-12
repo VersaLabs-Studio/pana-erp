@@ -12,10 +12,14 @@ import React from "react";
 interface PageHeaderProps {
   /** Back navigation URL */
   backUrl?: string;
+  /** Alias for backUrl */
+  backHref?: string;
   /** Custom back handler */
   onBack?: () => void;
   /** Small label above title */
   label?: string;
+  /** Alias for label */
+  subtitle?: string;
   /** Main title */
   title: string;
   /** Status badge */
@@ -33,8 +37,10 @@ interface PageHeaderProps {
     loading?: boolean;
     disabled?: boolean;
   };
-  /** Additional actions (dropdown menu, etc.) */
+  /** Additional actions */
   children?: React.ReactNode;
+  /** Alias for children */
+  actions?: React.ReactNode;
   /** Additional CSS classes */
   className?: string;
 }
@@ -48,22 +54,29 @@ const statusVariants = {
 
 export function PageHeader({
   backUrl,
+  backHref,
   onBack,
   label,
+  subtitle,
   title,
   status,
   hasChanges,
   primaryAction,
   children,
+  actions,
   className,
 }: PageHeaderProps) {
   const router = useRouter();
 
+  const finalBackUrl = backUrl || backHref;
+  const finalLabel = label || subtitle;
+  const finalChildren = children || actions;
+
   const handleBack = () => {
     if (onBack) {
       onBack();
-    } else if (backUrl) {
-      router.push(backUrl);
+    } else if (finalBackUrl) {
+      router.push(finalBackUrl);
     } else {
       router.back();
     }
@@ -97,9 +110,9 @@ export function PageHeader({
 
         {/* Title container - truncates on overflow */}
         <div className="flex flex-col min-w-0">
-          {label && (
+          {finalLabel && (
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate hidden sm:block">
-              {label}
+              {finalLabel}
             </span>
           )}
           <h1 className="text-base sm:text-lg font-bold leading-none truncate">
@@ -134,7 +147,7 @@ export function PageHeader({
       {/* Right section - shrink-0 prevents squishing, gap reduced on mobile */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* Children (additional actions) - can be hidden on mobile if needed */}
-        <div className="hidden sm:flex items-center gap-2">{children}</div>
+        <div className="hidden sm:flex items-center gap-2">{finalChildren}</div>
 
         {/* Primary action - always visible but text-only on mobile */}
         {primaryAction && (

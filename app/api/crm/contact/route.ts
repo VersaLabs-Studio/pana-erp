@@ -1,10 +1,9 @@
-// app/api/crm/address/route.ts
+// app/api/crm/contact/route.ts
 import { createListHandler, createCreateHandler } from "@/lib/api-factory";
 
-// GET list, POST create
-export const GET = createListHandler("Address", {
-  allowedFields: ["name", "address_title", "address_line1", "city", "country"],
+export const GET = createListHandler("Contact", {
+  allowedFields: ["name", "full_name", "email_id", "mobile_no", "company_name"],
   defaultSort: { field: "creation", order: "desc" },
 });
 
-export const POST = createCreateHandler("Address");
+export const POST = createCreateHandler("Contact");

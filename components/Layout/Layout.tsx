@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   Users,
+  User,
   Box,
   Truck,
   Settings,
@@ -69,6 +70,22 @@ const navigation = [
       { title: "Items", href: "/stock/item", icon: Box },
       { title: "Stock Entries", href: "/stock/stock-entries", icon: FileText },
       { title: "Delivery Notes", href: "/stock/delivery-notes", icon: Truck },
+      {
+        title: "Purchase Receipts",
+        href: "/stock/purchase-receipts",
+        icon: Receipt,
+      },
+    ],
+  },
+  {
+    title: "Purchasing",
+    icon: ShoppingCart,
+    items: [
+      {
+        title: "Purchase Orders",
+        href: "/purchasing/purchase-orders",
+        icon: FileText,
+      },
     ],
   },
   {
@@ -137,16 +154,13 @@ const navigation = [
     icon: Users,
     items: [
       { title: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
-      { title: "Customers", href: "/crm/customers", icon: Users },
-      { title: "Leads", href: "/crm/leads", icon: Target },
+      { title: "Leads", href: "/crm/lead", icon: Target },
       { title: "Opportunities", href: "/crm/opportunities", icon: TrendingUp },
       { title: "Quotations", href: "/crm/quotations", icon: FileText },
       { title: "Sales Orders", href: "/crm/sales-orders", icon: ShoppingCart },
-      {
-        title: "Purchase Orders",
-        href: "/crm/purchase-orders",
-        icon: ShoppingCart,
-      },
+      { title: "Customers", href: "/crm/customer", icon: Users },
+      { title: "Contacts", href: "/crm/contact", icon: User },
+      { title: "Addresses", href: "/crm/addresses", icon: MapPin },
       { title: "Activities", href: "/crm/activities", icon: ClipboardList },
       {
         title: "Communications",

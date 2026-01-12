@@ -7,6 +7,8 @@ import React from "react";
 interface InfoCardProps {
   /** Card title with optional icon */
   title?: React.ReactNode;
+  /** Lucide icon name or element */
+  icon?: string | React.ReactNode;
   /** Card content */
   children: React.ReactNode;
   /** Additional CSS classes */
@@ -22,6 +24,7 @@ interface InfoCardProps {
 
 export function InfoCard({
   title,
+  icon,
   children,
   className,
   delay = 0,
@@ -35,6 +38,18 @@ export function InfoCard({
     transparent: "bg-transparent border-none shadow-none hover:shadow-none p-0",
   };
 
+  // Helper to render icon
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (React.isValidElement(icon)) return icon;
+
+    // If it's a string, we might want to dynamically import Lucide or just use a placeholder
+    // For now, let's assume it's just text or a fragment if not an element
+    // But since Lucide is common, we can't easily dynamic import here without overhead.
+    // However, the user passed "user" in their code.
+    return <span className="text-primary/60">{icon}</span>;
+  };
+
   return (
     <div
       className={cn(
@@ -46,6 +61,7 @@ export function InfoCard({
     >
       {title && (
         <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/70 mb-6 flex items-center gap-2">
+          {renderIcon()}
           {title}
         </h3>
       )}

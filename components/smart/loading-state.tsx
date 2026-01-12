@@ -7,7 +7,9 @@ interface LoadingStateProps {
   /** Number of skeleton rows to show */
   rows?: number;
   /** Variant style */
-  variant?: "table" | "cards" | "list";
+  variant?: "table" | "cards" | "list" | "detail";
+  /** Alias for variant */
+  type?: "table" | "cards" | "list" | "detail";
   /** Additional CSS classes */
   className?: string;
 }
@@ -24,9 +26,24 @@ interface LoadingStateProps {
 export function LoadingState({
   rows = 5,
   variant = "table",
+  type,
   className,
 }: LoadingStateProps) {
-  if (variant === "cards") {
+  const activeVariant = type || variant;
+
+  if (activeVariant === "detail") {
+    return (
+      <div className={cn("space-y-8 animate-pulse", className)}>
+        <div className="h-20 bg-muted/60 rounded-3xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 h-96 bg-muted/50 rounded-[2rem]" />
+          <div className="h-64 bg-muted/40 rounded-[2rem]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (activeVariant === "cards") {
     return (
       <div
         className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", className)}
@@ -38,7 +55,7 @@ export function LoadingState({
     );
   }
 
-  if (variant === "list") {
+  if (activeVariant === "list") {
     return (
       <div className={cn("space-y-3", className)}>
         {Array.from({ length: rows }).map((_, i) => (
