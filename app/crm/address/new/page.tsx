@@ -1,151 +1,150 @@
-// app/crm/addresses/new/page.tsx
+// app/crm/address/new/page.tsx
+// Pana ERP v3.0 - Create Address Page
+// @ts-nocheck
+
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useEffect } from "react";
-import { useFrappeCreate } from "@/hooks/generic";
-import { PageHeader } from "@/components/smart";
-import { InfoCard } from "@/components/ui/info-card";
-import { Form } from "@/components/ui/form";
-import { FormInput, FormSelect, FormSwitch } from "@/components/form";
 import { Button } from "@/components/ui/button";
-import type { AddressCreateRequest } from "@/types/doctype-types";
+import { Form } from "@/components/ui/form";
+import { Loader2, Plus } from "lucide-react";
 
-const addressFormSchema = z.object({
-  address_title: z.string().min(1, "Title is required"),
-  address_type: z.enum([
-    "Billing",
-    "Shipping",
-    "Office",
-    "Personal",
-    "Plant",
-    "Postal",
-    "Shop",
-    "Subsidiary",
-    "Warehouse",
-    "Current",
-    "Permanent",
-    "Other",
-  ]),
-  address_line1: z.string().min(1, "Address Line 1 is required"),
-  address_line2: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-  state: z.string().optional(),
-  country: z.string().min(1, "Country is required"),
-  pincode: z.string().optional(),
-  email_id: z.string().email().optional().or(z.literal("")),
-  phone: z.string().optional(),
-  is_primary_address: z.boolean().default(false),
-  is_shipping_address: z.boolean().default(false),
-  links: z
-    .array(
-      z.object({
-        link_doctype: z.string(),
-        link_name: z.string(),
-      })
-    )
-    .optional(),
-});
+// v3.0 Imports
+import { useFrappeCreate } from "@/hooks/generic";
+import { PageHeader, LoadingState } from "@/components/smart";
+import { InfoCard } from "@/components/ui/info-card";
+import {
+  FormInput,
+  FormSelect,
+  FormSwitch,
+  FormFrappeSelect,
+} from "@/components/form";
+import {
+  AddressCreateSchema,
+  type AddressFormData,
+} from "@/lib/schemas/doctype-schemas";
+import type { Address } from "@/types/doctype-types";
 
-export default function NewAddressPage() {
+const ADDRESS_TYPE_OPTIONS = [
+  { value: "Billing", label: "Billing" },
+  { value: "Shipping", label: "Shipping" },
+  { value: "Office", label: "Office" },
+  { value: "Personal", label: "Personal" },
+  { value: "Plant", label: "Plant" },
+  { value: "Postal", label: "Postal" },
+  { value: "Shop", label: "Shop" },
+  { value: "Subsidiary", label: "Subsidiary" },
+  { value: "Warehouse", label: "Warehouse" },
+  { value: "Current", label: "Current" },
+  { value: "Permanent", label: "Permanent" },
+  { value: "Other", label: "Other" },
+];
+
+export default function CreateAddressPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [initialLinkSet, setInitialLinkSet] = useState(false);
+
   const linkDoctype = searchParams.get("link_doctype");
   const linkName = searchParams.get("link_name");
 
-  const createMutation = useFrappeCreate<any, any>("Address", {
-    onSuccess: () => {
-      if (linkDoctype && linkName) {
-        router.push(`/crm/customer/${encodeURIComponent(linkName)}`);
-      } else {
-        router.push("/crm/addresses");
-      }
-    },
-  });
+  // Create mutation
+  const createMutation = useFrappeCreate<{ data: Address }, AddressFormData>(
+    "Address",
+    {
+      onSuccess: (data) => {
+        // If we have a link, go back to the linked entity
+        if (linkDoctype && linkName) {
+          router.push(
+            `/crm/${linkDoctype.toLowerCase()}/${encodeURIComponent(linkName)}`
+          );
+        } else {
+          router.push(`/crm/address/${encodeURIComponent(data.data.name)}`);
+        }
+      },
+      successMessage: "Address created successfully",
+    }
+  );
 
-  const form = useForm<z.infer<typeof addressFormSchema>>({
-    resolver: zodResolver(addressFormSchema),
+  // Form setup
+  const form = useForm<AddressFormData>({
+    resolver: zodResolver(AddressCreateSchema),
     defaultValues: {
       address_type: "Billing",
-      country: "Ethiopia",
+      address_title: "",
+      address_line1: "",
+      address_line2: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "",
+      county: "",
+      email_id: "",
+      phone: "",
+      fax: "",
+      is_primary_address: 0,
+      is_shipping_address: 0,
+      disabled: 0,
       links: [],
-      is_primary_address: false,
-      is_shipping_address: false,
     },
   });
 
+  // Populate link data if passed in URL
   useEffect(() => {
-    if (linkDoctype && linkName) {
+    if (linkDoctype && linkName && !initialLinkSet) {
       form.setValue("links", [
         { link_doctype: linkDoctype, link_name: linkName },
       ]);
-      if (!form.getValues("address_title")) {
-        form.setValue("address_title", `${linkName} - Address`);
-      }
+      setInitialLinkSet(true);
     }
-  }, [linkDoctype, linkName, form]);
+  }, [linkDoctype, linkName, form, initialLinkSet]);
 
-  const onSubmit = async (data: any) => {
-    const payload = {
-      ...data,
-      is_primary_address: data.is_primary_address ? 1 : 0,
-      is_shipping_address: data.is_shipping_address ? 1 : 0,
-    };
-    await createMutation.mutateAsync(payload);
+  // Submit handler
+  const onSubmit = async (data: AddressFormData) => {
+    await createMutation.mutateAsync(data);
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="New Address"
-        subtitle={
-          linkName ? `Adding address for ${linkName}` : "Add address details"
-        }
-        backHref="/crm/addresses"
+        subtitle="Add a physical location"
+        backHref="/crm/address"
       />
+
+      {createMutation.isPending && <LoadingState type="detail" />}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Form - 2 columns */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Address Details */}
               <InfoCard title="Address Details" icon="map-pin">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormInput
                     control={form.control}
                     name="address_title"
-                    label="Title"
-                    required
-                  />
-                  <FormSelect
-                    control={form.control}
-                    name="address_type"
-                    label="Type"
-                    options={[
-                      { label: "Billing", value: "Billing" },
-                      { label: "Shipping", value: "Shipping" },
-                      { label: "Office", value: "Office" },
-                      { label: "Personal", value: "Personal" },
-                      { label: "Plant", value: "Plant" },
-                      { label: "Postal", value: "Postal" },
-                      { label: "Shop", value: "Shop" },
-                      { label: "Subsidiary", value: "Subsidiary" },
-                      { label: "Warehouse", value: "Warehouse" },
-                      { label: "Other", value: "Other" },
-                    ]}
+                    label="Address Title"
+                    placeholder="e.g. Headquarters, Home"
+                    className="md:col-span-2"
                   />
                   <FormInput
                     control={form.control}
                     name="address_line1"
                     label="Address Line 1"
                     required
+                    placeholder="Street Address"
                     className="md:col-span-2"
                   />
                   <FormInput
                     control={form.control}
                     name="address_line2"
                     label="Address Line 2"
+                    placeholder="Apartment, Suite, Unit, etc."
                     className="md:col-span-2"
                   />
                   <FormInput
@@ -153,75 +152,122 @@ export default function NewAddressPage() {
                     name="city"
                     label="City"
                     required
+                    placeholder="City / Town"
                   />
                   <FormInput
                     control={form.control}
                     name="state"
-                    label="State"
+                    label="State / Province"
+                    placeholder="State"
                   />
                   <FormInput
                     control={form.control}
                     name="country"
                     label="Country"
                     required
+                    placeholder="Select Country"
                   />
                   <FormInput
                     control={form.control}
                     name="pincode"
                     label="Postal Code"
+                    placeholder="ZIP / Postal Code"
                   />
+                </div>
+              </InfoCard>
+
+              {/* Contact Info */}
+              <InfoCard title="Contact Details" icon="contact">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormInput
                     control={form.control}
                     name="email_id"
                     label="Email"
                     type="email"
+                    placeholder="email@example.com"
                   />
                   <FormInput
                     control={form.control}
                     name="phone"
                     label="Phone"
+                    placeholder="+1 234 567 890"
+                  />
+                  <FormInput
+                    control={form.control}
+                    name="fax"
+                    label="Fax"
+                    placeholder="+1 234 567 891"
                   />
                 </div>
               </InfoCard>
-
-              <div className="flex gap-8">
-                <FormSwitch
-                  control={form.control}
-                  name="is_primary_address"
-                  label="Is Primary"
-                  description="Default billing address"
-                />
-                <FormSwitch
-                  control={form.control}
-                  name="is_shipping_address"
-                  label="Is Shipping"
-                  description="Default shipping address"
-                />
-              </div>
             </div>
 
+            {/* Sidebar - 1 column */}
             <div className="space-y-6">
-              <InfoCard title="Actions" variant="gradient">
+              {/* Classification */}
+              <InfoCard title="Classification" variant="gradient">
+                <div className="space-y-4">
+                  <FormSelect
+                    control={form.control}
+                    name="address_type"
+                    label="Address Type"
+                    required
+                    options={ADDRESS_TYPE_OPTIONS}
+                  />
+                  <div className="pt-2 space-y-3">
+                    <FormSwitch
+                      control={form.control}
+                      name="is_primary_address"
+                      label="Primary Address"
+                      description="Default address for this contact"
+                    />
+                    <FormSwitch
+                      control={form.control}
+                      name="is_shipping_address"
+                      label="Shipping Address"
+                      description="Default shipping address"
+                    />
+                  </div>
+                </div>
+              </InfoCard>
+
+              {/* Actions */}
+              <InfoCard title="Actions">
                 <div className="space-y-3">
                   <Button
                     type="submit"
                     className="w-full rounded-xl"
                     disabled={createMutation.isPending}
                   >
-                    {createMutation.isPending
-                      ? "Creating..."
-                      : "Create Address"}
+                    {createMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Address"
+                    )}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full rounded-xl"
-                    onClick={() => router.back()}
+                    onClick={() => router.push("/crm/address")}
                   >
                     Cancel
                   </Button>
                 </div>
               </InfoCard>
+
+              {/* Debug Info */}
+              {linkDoctype && linkName && (
+                <div className="p-3 bg-primary/5 rounded-xl text-xs text-muted-foreground">
+                  <p className="font-medium">Linking to:</p>
+                  <p>
+                    {linkDoctype}: {linkName}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </form>

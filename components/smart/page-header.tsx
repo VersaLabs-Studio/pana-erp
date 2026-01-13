@@ -4,9 +4,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Search, ArrowLeft, Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import React from "react";
 
 interface PageHeaderProps {
@@ -41,6 +42,11 @@ interface PageHeaderProps {
   children?: React.ReactNode;
   /** Alias for children */
   actions?: React.ReactNode;
+  /** Search support */
+  showSearch?: boolean;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -64,6 +70,10 @@ export function PageHeader({
   primaryAction,
   children,
   actions,
+  showSearch,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
   className,
 }: PageHeaderProps) {
   const router = useRouter();
@@ -140,6 +150,27 @@ export function PageHeader({
             <span className="text-xs font-semibold text-amber-600">
               Unsaved
             </span>
+          </div>
+        )}
+
+        {/* Search Bar Implementation */}
+        {showSearch && (
+          <div className="hidden lg:flex items-center relative ml-2 group animate-in fade-in slide-in-from-left-4 duration-500">
+            <Search className="absolute left-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input
+              value={searchValue}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              placeholder={searchPlaceholder || "Search..."}
+              className="pl-9 pr-8 h-9 w-[240px] rounded-full bg-secondary/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all"
+            />
+            {searchValue && (
+              <button
+                onClick={() => onSearchChange?.("")}
+                className="absolute right-3 p-0.5 hover:bg-muted rounded-full transition-colors"
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
           </div>
         )}
       </div>

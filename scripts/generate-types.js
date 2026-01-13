@@ -586,13 +586,13 @@ async function main() {
       let currentBlock = [];
 
       for (const block of blocks) {
-        const doctypeMatch = block.match(/@doctype\s+(\w+)/);
+        const doctypeMatch = block.match(/@doctype\s+([^\n*]+)/);
         if (doctypeMatch) {
           // If we had a previous doctype, save it
           if (currentDoctype) {
             sections.set(currentDoctype, currentBlock.join("\n").trim());
           }
-          currentDoctype = doctypeMatch[1];
+          currentDoctype = doctypeMatch[1].trim();
           currentBlock = [block];
         } else if (currentDoctype) {
           currentBlock.push(block);

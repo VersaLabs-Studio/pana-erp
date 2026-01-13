@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 interface LoadingStateProps {
   /** Number of skeleton rows to show */
   rows?: number;
+  /** Alias for rows */
+  count?: number;
   /** Variant style */
   variant?: "table" | "cards" | "list" | "detail";
   /** Alias for variant */
@@ -25,10 +27,12 @@ interface LoadingStateProps {
  */
 export function LoadingState({
   rows = 5,
+  count,
   variant = "table",
   type,
   className,
 }: LoadingStateProps) {
+  const activeRows = count || rows;
   const activeVariant = type || variant;
 
   if (activeVariant === "detail") {
@@ -48,7 +52,7 @@ export function LoadingState({
       <div
         className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", className)}
       >
-        {Array.from({ length: rows }).map((_, i) => (
+        {Array.from({ length: activeRows }).map((_, i) => (
           <CardSkeleton key={i} delay={i * 75} />
         ))}
       </div>
@@ -58,7 +62,7 @@ export function LoadingState({
   if (activeVariant === "list") {
     return (
       <div className={cn("space-y-3", className)}>
-        {Array.from({ length: rows }).map((_, i) => (
+        {Array.from({ length: activeRows }).map((_, i) => (
           <ListItemSkeleton key={i} delay={i * 50} />
         ))}
       </div>
@@ -77,7 +81,7 @@ export function LoadingState({
       </div>
 
       {/* Row skeletons */}
-      {Array.from({ length: rows }).map((_, i) => (
+      {Array.from({ length: activeRows }).map((_, i) => (
         <TableRowSkeleton key={i} delay={i * 50} />
       ))}
     </div>

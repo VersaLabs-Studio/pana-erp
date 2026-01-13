@@ -125,6 +125,27 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     defaultSortField: "creation",
     defaultSortOrder: "desc",
   },
+  "Lead Source": {
+    apiPath: "crm/lead-source",
+    module: "CRM",
+    labelField: "source_name",
+    searchFields: ["source_name"],
+    isSettings: true,
+  },
+  Territory: {
+    apiPath: "crm/territory",
+    module: "CRM",
+    labelField: "territory_name",
+    searchFields: ["territory_name"],
+    isSettings: true,
+  },
+  "Industry Type": {
+    apiPath: "crm/industry-type",
+    module: "CRM",
+    labelField: "industry",
+    searchFields: ["industry"],
+    isSettings: true,
+  },
 
   // NEW: Address Configuration
   Address: {
@@ -251,6 +272,13 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     module: "Assets",
     labelField: "asset_category_name",
     searchFields: ["asset_category_name"],
+    isSettings: true,
+  },
+  "Country": {
+    apiPath: "crm/country",
+    module: "CRM",
+    labelField: "country_name",
+    searchFields: ["country_name", "code"],
     isSettings: true,
   },
 };

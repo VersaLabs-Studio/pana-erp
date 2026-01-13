@@ -2,6 +2,7 @@
 // Pana ERP v3.0 - Generic Options Query Hook for Dropdowns
 
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { getApiPath, getLabelField } from "@/lib/doctype-config";
 
 /**
  * Options structure for dropdown data
@@ -27,7 +28,7 @@ export interface DropdownOption {
 export function useFrappeOptions(
   doctype: string,
   options?: {
-    /** Field to use as display label (default: "name") */
+    /** Field to use as display label (default: config's labelField or "name") */
     labelField?: string;
     /** Field to use as value (default: "name") */
     valueField?: string;
@@ -41,9 +42,9 @@ export function useFrappeOptions(
     "queryKey" | "queryFn"
   >
 ) {
-  const labelField = options?.labelField || "name";
+  const labelField = options?.labelField || getLabelField(doctype);
   const valueField = options?.valueField || "name";
-  const apiPath = doctypeToApiPath(doctype);
+  const apiPath = getApiPath(doctype);
 
   return useQuery({
     queryKey: [doctype, "options", options],
@@ -78,27 +79,6 @@ export function useFrappeOptions(
     staleTime: 5 * 60 * 1000, // 5 minutes - options change less frequently
     ...queryOptions,
   });
-}
-
-/**
- * Convert DocType name to API path
- */
-function doctypeToApiPath(doctype: string): string {
-  const moduleMap: Record<string, string> = {
-    Item: "stock/item",
-    "Item Group": "stock/settings/item-group",
-    Warehouse: "stock/settings/warehouse",
-    UOM: "stock/settings/uom",
-    Brand: "stock/settings/brand",
-    Customer: "crm/customer",
-    Supplier: "purchasing/supplier",
-  };
-
-  if (moduleMap[doctype]) {
-    return moduleMap[doctype];
-  }
-
-  return doctype.toLowerCase().replace(/\s+/g, "-");
 }
 
 export default useFrappeOptions;
