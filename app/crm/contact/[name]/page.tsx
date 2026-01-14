@@ -15,6 +15,7 @@ import {
   User,
   MapPin,
   Building2,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,11 +27,9 @@ import {
 
 // v3.0 Imports
 import { useFrappeDoc, useFrappeDelete } from "@/hooks/generic";
-import {
-  PageHeader,
-  LoadingState,
-  ConfirmDialog,
-} from "@/components/smart";
+import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
+import { getApiPath } from "@/lib/doctype-config";
+import Link from "next/link";
 import { InfoCard } from "@/components/ui/info-card";
 import { DataPoint } from "@/components/ui/info-card"; // CRITICAL: Use DataPoint
 import type { Contact } from "@/types/doctype-types";
@@ -42,7 +41,11 @@ export default function ContactDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch contact data
-  const { data: contact, isLoading, error } = useFrappeDoc<Contact>("Contact", name);
+  const {
+    data: contact,
+    isLoading,
+    error,
+  } = useFrappeDoc<Contact>("Contact", name);
 
   // Delete mutation
   const deleteMutation = useFrappeDelete("Contact", {
@@ -67,7 +70,10 @@ export default function ContactDetailPage() {
     );
   }
 
-  const displayName = contact.full_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim() || "Contact";
+  const displayName =
+    contact.full_name ||
+    `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
+    "Contact";
 
   return (
     <div className="space-y-6">
@@ -80,7 +86,9 @@ export default function ContactDetailPage() {
             <Button
               variant="outline"
               className="rounded-full"
-              onClick={() => router.push(`/crm/contact/${encodeURIComponent(name)}/edit`)}
+              onClick={() =>
+                router.push(`/crm/contact/${encodeURIComponent(name)}/edit`)
+              }
             >
               <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
@@ -163,13 +171,17 @@ export default function ContactDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
-                <Badge variant={contact.status === "Open" ? "default" : "outline"}>
+                <Badge
+                  variant={contact.status === "Open" ? "default" : "outline"}
+                >
                   {contact.status}
                 </Badge>
               </div>
               {contact.is_primary_contact === 1 && (
                 <div className="p-3 bg-primary/10 rounded-xl text-center">
-                  <p className="text-sm font-medium text-primary">Primary Contact</p>
+                  <p className="text-sm font-medium text-primary">
+                    Primary Contact
+                  </p>
                 </div>
               )}
             </div>
@@ -179,16 +191,38 @@ export default function ContactDetailPage() {
           {contact.links && contact.links.length > 0 && (
             <InfoCard title="Linked To" icon="link">
               <div className="space-y-3">
-                {contact.links.map((link, idx) => {
-                  const linkName = (link as { link_doctype: string; link_name: string }).link_name;
-                  const linkDoctype = (link as { link_doctype: string; link_name: string }).link_doctype;
+                {(contact.links as any[]).map((link, idx) => {
+                  const linkName = link.link_name;
+                  const linkDoctype = link.link_doctype;
+                  const apiPath = getApiPath(linkDoctype);
+                  const href = `/${apiPath}/${encodeURIComponent(linkName)}`;
+
                   return (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{linkDoctype}</span>
+                    <div
+                      key={idx}
+                      className="group flex items-center justify-between p-4 bg-secondary/20 rounded-2xl hover:bg-secondary/40 transition-all duration-300 border border-transparent hover:border-primary/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+                          <Building2 className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-0.5">
+                            {linkDoctype}
+                          </p>
+                          <p className="font-semibold text-sm">{linkName}</p>
+                        </div>
                       </div>
-                      <Badge variant="outline">{linkName}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full hover:bg-primary hover:text-primary-foreground transform active:scale-90 transition-all"
+                        asChild
+                      >
+                        <Link href={href}>
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
                   );
                 })}
