@@ -39,21 +39,114 @@ const CONFIG = {
 };
 
 // Known DocTypes for --all flag
+// Comprehensive list of standard ERPNext/Frappe DocTypes
 const KNOWN_DOCTYPES = [
+  // --- CORE & SETUP ---
+  "User",
+  "Company",
+  "Currency",
+  "Country",
+  "Territory",
+  "Department",
+  "Designation",
+  "Branch",
+  "Employee",
+  "Salutation",
+  "Gender",
+  "Letter Head",
+  "Print Heading",
+  "Terms and Conditions",
+
+  // --- SELLING (CRM & SALES) ---
+  "Lead",
+  "Lead Source",
+  "Industry Type",
+  "Opportunity",
+  "Customer",
+  "Customer Group",
+  "Contact",
+  "Address",
+  "Quotation",
+  "Sales Order",
+  "Sales Partner",
+  "Sales Person",
+  "Blanket Order",
+  "Installation Note",
+
+  // --- BUYING (PURCHASING) ---
+  "Supplier",
+  "Supplier Group",
+  "Material Request",
+  "Request for Quotation",
+  "Supplier Quotation",
+  "Purchase Order",
+  "Purchase Receipt",
+  "Purchase Invoice",
+
+  // --- STOCK (INVENTORY) ---
   "Item",
   "Item Group",
-  "Lead",
-  "Customer",
-  "Address",
-  "Contact",
-  "Supplier",
-  "Sales Order",
-  "Purchase Order",
-  "Stock Entry",
-  "Delivery Note",
-  "Purchase Receipt",
+  "Item Price",
+  "Product Bundle",
   "Warehouse",
   "UOM",
+  "Brand",
+  "Stock Entry",
+  "Delivery Note",
+  "Stock Reconciliation",
+  "Batch",
+  "Serial No",
+  "Quality Inspection",
+  "Landed Cost Voucher",
+  "Stock Ledger Entry",
+
+  // --- ACCOUNTING ---
+  "Account",
+  "Cost Center",
+  "Journal Entry",
+  "Payment Entry",
+  "Sales Invoice",
+  "Payment Terms Template",
+  "Mode of Payment",
+  "Fiscal Year",
+  "Period Closing Voucher",
+  "Asset",
+  "Asset Category",
+  "Asset Movement",
+
+  // --- MANUFACTURING ---
+  "Work Order",
+  "BOM",
+  "Workstation",
+  "Operation",
+  "Production Plan",
+  "Job Card",
+  "Downtime Entry",
+
+  // --- HR & PAYROLL ---
+  // Note: These require the 'hrms' app which may not be installed on all instances
+  // "Leave Application",
+  // "Leave Type",
+  // "Attendance",
+  // "Salary Structure",
+  // "Salary Slip",
+  // "Payroll Entry",
+  // "Expense Claim",
+  // "Job Applicant",
+  // "Shift Type",
+
+  // --- PROJECTS ---
+  "Project",
+  "Task",
+  "Activity Type",
+  "Timesheet",
+  "Project Type",
+
+  // --- SUPPORT ---
+  "Issue",
+  "Warranty Claim",
+  "Maintenance Visit",
+  "Maintenance Schedule",
 ];
 
 // Frappe field type to TypeScript type mapping
@@ -164,62 +257,115 @@ const STANDARD_FIELDS = [
 ];
 
 /**
- * Make HTTP request to Frappe API
+ * Make HTTP request to Frappe API with retries
  */
-function frappeRequest(endpoint) {
+function frappeRequest(endpoint, retries = 3, delay = 1000) {
   return new Promise((resolve, reject) => {
     if (!CONFIG.apiUrl) {
       reject(new Error("NEXT_PUBLIC_ERP_API_URL is not set"));
       return;
     }
 
-    const url = new URL(endpoint, CONFIG.apiUrl);
-    const protocol = url.protocol === "https:" ? https : http;
-    const token = `${CONFIG.apiKey}:${CONFIG.apiSecret}`;
+    const executeRequest = (currentAttempt) => {
+      const url = new URL(endpoint, CONFIG.apiUrl);
+      const protocol = url.protocol === "https:" ? https : http;
+      const token = `${CONFIG.apiKey}:${CONFIG.apiSecret}`;
 
-    const options = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === "https:" ? 443 : 80),
-      path: url.pathname + url.search,
-      method: "GET",
-      headers: {
-        Authorization: `token ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: {
+          Authorization: `token ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      };
+
+      const req = protocol.request(options, (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            if (res.statusCode >= 400) {
+              // Don't retry on 404 or other client errors unless they are transient
+              if (res.statusCode === 404) {
+                return reject(
+                  new Error(
+                    `API Error ${res.statusCode}: ${JSON.stringify(json)}`
+                  )
+                );
+              }
+
+              if (currentAttempt < retries) {
+                console.warn(
+                  `  ⚠️  Attempt ${currentAttempt} failed with status ${res.statusCode}. Retrying...`
+                );
+                setTimeout(
+                  () => executeRequest(currentAttempt + 1),
+                  delay * currentAttempt
+                );
+                return;
+              }
+
+              reject(
+                new Error(
+                  `API Error ${res.statusCode}: ${JSON.stringify(json)}`
+                )
+              );
+            } else {
+              resolve(json);
+            }
+          } catch (e) {
+            if (currentAttempt < retries) {
+              setTimeout(
+                () => executeRequest(currentAttempt + 1),
+                delay * currentAttempt
+              );
+              return;
+            }
+            reject(new Error(`Failed to parse response: ${data}`));
+          }
+        });
+      });
+
+      req.on("error", (e) => {
+        if (currentAttempt < retries) {
+          console.warn(
+            `  ⚠️  Attempt ${currentAttempt} failed: ${e.message}. Retrying...`
+          );
+          setTimeout(
+            () => executeRequest(currentAttempt + 1),
+            delay * currentAttempt
+          );
+          return;
+        }
+        reject(new Error(`Request failed: ${e.message}`));
+      });
+
+      req.setTimeout(30000, () => {
+        req.destroy();
+        if (currentAttempt < retries) {
+          console.warn(
+            `  ⚠️  Attempt ${currentAttempt} timed out. Retrying...`
+          );
+          setTimeout(
+            () => executeRequest(currentAttempt + 1),
+            delay * currentAttempt
+          );
+          return;
+        }
+        reject(new Error("Request timed out (30s)"));
+      });
+
+      req.end();
     };
 
-    const req = protocol.request(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => {
-        data += chunk;
-      });
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(data);
-          if (res.statusCode >= 400) {
-            reject(
-              new Error(`API Error ${res.statusCode}: ${JSON.stringify(json)}`)
-            );
-          } else {
-            resolve(json);
-          }
-        } catch (e) {
-          reject(new Error(`Failed to parse response: ${data}`));
-        }
-      });
-    });
-
-    req.on("error", (e) => {
-      reject(new Error(`Request failed: ${e.message}`));
-    });
-
-    req.setTimeout(10000, () => {
-      req.destroy();
-      reject(new Error("Request timed out"));
-    });
-
-    req.end();
+    executeRequest(1);
   });
 }
 
@@ -551,6 +697,7 @@ async function main() {
 
   // Fetch metadata for each DocType
   const docTypeData = [];
+  const errors = [];
 
   for (const doctype of doctypes) {
     try {
@@ -562,6 +709,7 @@ async function main() {
       console.log(`  ✅ ${doctype} (${meta.fields?.length || 0} fields)`);
     } catch (error) {
       console.error(`  ❌ ${doctype}: ${error.message}`);
+      errors.push({ doctype, message: error.message });
       // Continue with other doctypes
     }
   }
@@ -569,6 +717,11 @@ async function main() {
   if (docTypeData.length === 0) {
     console.error("\n❌ No DocTypes were successfully fetched. Aborting.");
     process.exit(1);
+  }
+
+  if (errors.length > 0) {
+    console.log(`\n⚠️  Completed with ${errors.length} errors:`);
+    errors.forEach((e) => console.log(`  - ${e.doctype}: ${e.message}`));
   }
 
   console.log(`\n📄 Generating TypeScript interfaces...\n`);

@@ -165,6 +165,36 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     isSettings: false,
   },
 
+  // CRM Settings/Options DocTypes
+  "Customer Group": {
+    apiPath: "crm/customer-group",
+    module: "CRM",
+    labelField: "customer_group_name",
+    searchFields: ["customer_group_name"],
+    isSettings: true,
+  },
+  Country: {
+    apiPath: "crm/country",
+    module: "CRM",
+    labelField: "country_name",
+    searchFields: ["country_name", "code"],
+    isSettings: true,
+  },
+  Salutation: {
+    apiPath: "crm/salutation",
+    module: "CRM",
+    labelField: "salutation",
+    searchFields: ["salutation"],
+    isSettings: true,
+  },
+  Gender: {
+    apiPath: "crm/gender",
+    module: "CRM",
+    labelField: "gender",
+    searchFields: ["gender"],
+    isSettings: true,
+  },
+
   Opportunity: {
     apiPath: "crm/opportunity",
     module: "CRM",
@@ -272,13 +302,6 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     module: "Assets",
     labelField: "asset_category_name",
     searchFields: ["asset_category_name"],
-    isSettings: true,
-  },
-  "Country": {
-    apiPath: "crm/country",
-    module: "CRM",
-    labelField: "country_name",
-    searchFields: ["country_name", "code"],
     isSettings: true,
   },
 };
