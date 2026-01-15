@@ -3,10 +3,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Calculator, FileText, LayoutGrid } from "lucide-react";
+import { Calculator, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/smart";
-import { InfoCard } from "@/components/ui/info-card";
 
 const settingsItems = [
   {
