@@ -76,7 +76,9 @@ export const UserSchema = z.object({
   user_type: z.string().optional(),
   last_active: z.string().optional(),
   login_before: z.number().int().optional(),
-  bypass_restrict_ip_check_if_2fa_enabled: z.union([z.literal(0), z.literal(1)]).optional(),
+  bypass_restrict_ip_check_if_2fa_enabled: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   last_login: z.string().optional(),
   last_known_versions: z.string().optional(),
   social_logins: z.array(z.unknown()).optional(),
@@ -95,8 +97,7 @@ export const UserSchema = z.object({
 export const UserCreateSchema = UserSchema.pick({
   email: true,
   first_name: true,
-}).extend({
-});
+}).extend({});
 
 export const UserUpdateSchema = UserSchema.partial().omit({
   name: true,
@@ -137,7 +138,9 @@ export const CompanySchema = z.object({
   lft: z.number().int().optional(),
   rgt: z.number().int().optional(),
   old_parent: z.string().optional(),
-  create_chart_of_accounts_based_on: z.enum(["Standard Template", "Existing Company"]).optional(),
+  create_chart_of_accounts_based_on: z
+    .enum(["Standard Template", "Existing Company"])
+    .optional(),
   existing_company: z.string().optional(),
   chart_of_accounts: z.string().optional(),
   default_bank_account: z.string().optional(),
@@ -146,7 +149,9 @@ export const CompanySchema = z.object({
   default_payable_account: z.string().optional(),
   write_off_account: z.string().optional(),
   unrealized_profit_loss_account: z.string().optional(),
-  allow_account_creation_against_child_company: z.union([z.literal(0), z.literal(1)]).optional(),
+  allow_account_creation_against_child_company: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   default_expense_account: z.string().optional(),
   default_income_account: z.string().optional(),
   default_discount_account: z.string().optional(),
@@ -160,12 +165,24 @@ export const CompanySchema = z.object({
   round_off_for_opening: z.string().optional(),
   default_deferred_revenue_account: z.string().optional(),
   default_deferred_expense_account: z.string().optional(),
-  book_advance_payments_in_separate_party_account: z.union([z.literal(0), z.literal(1)]).optional(),
-  reconcile_on_advance_payment_date: z.union([z.literal(0), z.literal(1)]).optional(),
-  reconciliation_takes_effect_on: z.enum(["Advance Payment Date", "Oldest Of Invoice Or Advance", "Reconciliation Date"]).optional(),
+  book_advance_payments_in_separate_party_account: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  reconcile_on_advance_payment_date: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  reconciliation_takes_effect_on: z
+    .enum([
+      "Advance Payment Date",
+      "Oldest Of Invoice Or Advance",
+      "Reconciliation Date",
+    ])
+    .optional(),
   default_advance_received_account: z.string().optional(),
   default_advance_paid_account: z.string().optional(),
-  auto_exchange_rate_revaluation: z.union([z.literal(0), z.literal(1)]).optional(),
+  auto_exchange_rate_revaluation: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   auto_err_frequency: z.enum(["Daily", "Weekly", "Monthly"]).optional(),
   submit_err_jv: z.union([z.literal(0), z.literal(1)]).optional(),
   exception_budget_approver_role: z.string().optional(),
@@ -187,7 +204,9 @@ export const CompanySchema = z.object({
   credit_limit: z.number().optional(),
   transactions_annual_history: z.string().optional(),
   enable_perpetual_inventory: z.union([z.literal(0), z.literal(1)]).optional(),
-  enable_provisional_accounting_for_non_stock_items: z.union([z.literal(0), z.literal(1)]).optional(),
+  enable_provisional_accounting_for_non_stock_items: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   default_inventory_account: z.string().optional(),
   stock_adjustment_account: z.string().optional(),
   default_in_transit_warehouse: z.string().optional(),
@@ -234,7 +253,20 @@ export const CurrencySchema = z.object({
   smallest_currency_fraction_value: z.number().optional(),
   symbol: z.string().optional(),
   symbol_on_right: z.union([z.literal(0), z.literal(1)]).optional(),
-  number_format: z.enum(["#,###.##", "#.###,##", "# ###.##", "# ###,##", "#'###.##", "#, ###.##", "#,##,###.##", "#,###.###", "#.###", "#,###"]).optional(),
+  number_format: z
+    .enum([
+      "#,###.##",
+      "#.###,##",
+      "# ###.##",
+      "# ###,##",
+      "#'###.##",
+      "#, ###.##",
+      "#,##,###.##",
+      "#,###.###",
+      "#.###",
+      "#,###",
+    ])
+    .optional(),
   name: z.string().min(1, "ID is required"),
   owner: z.string().optional(),
   creation: z.string().optional(),
@@ -245,8 +277,7 @@ export const CurrencySchema = z.object({
 
 export const CurrencyCreateSchema = CurrencySchema.pick({
   currency_name: true,
-}).extend({
-});
+}).extend({});
 
 export const CurrencyUpdateSchema = CurrencySchema.partial().omit({
   name: true,
@@ -278,8 +309,7 @@ export const CountrySchema = z.object({
 
 export const CountryCreateSchema = CountrySchema.pick({
   country_name: true,
-}).extend({
-});
+}).extend({});
 
 export const CountryUpdateSchema = CountrySchema.partial().omit({
   name: true,
@@ -314,6 +344,7 @@ export const TerritorySchema = z.object({
 
 export const TerritoryCreateSchema = TerritorySchema.pick({
   territory_name: true,
+  parent_territory: true,
 }).extend({
   is_group: z.union([z.literal(0), z.literal(1)]).optional(),
 });
@@ -414,8 +445,7 @@ export const BranchSchema = z.object({
 
 export const BranchCreateSchema = BranchSchema.pick({
   branch: true,
-}).extend({
-});
+}).extend({});
 
 export const BranchUpdateSchema = BranchSchema.partial().omit({
   name: true,
@@ -461,7 +491,9 @@ export const EmployeeSchema = z.object({
   cell_number: z.string().optional(),
   personal_email: z.string().optional(),
   company_email: z.string().optional(),
-  prefered_contact_email: z.enum(["Company Email", "Personal Email", "User ID"]).optional(),
+  prefered_contact_email: z
+    .enum(["Company Email", "Personal Email", "User ID"])
+    .optional(),
   prefered_email: z.string().optional(),
   unsubscribed: z.union([z.literal(0), z.literal(1)]).optional(),
   current_address: z.string().optional(),
@@ -479,9 +511,13 @@ export const EmployeeSchema = z.object({
   bank_name: z.string().optional(),
   bank_ac_no: z.string().optional(),
   iban: z.string().optional(),
-  marital_status: z.enum(["Single", "Married", "Divorced", "Widowed"]).optional(),
+  marital_status: z
+    .enum(["Single", "Married", "Divorced", "Widowed"])
+    .optional(),
   family_background: z.string().optional(),
-  blood_group: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
+  blood_group: z
+    .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
+    .optional(),
   health_details: z.string().optional(),
   passport_number: z.string().optional(),
   valid_upto: z.string().optional(),
@@ -517,8 +553,7 @@ export const EmployeeCreateSchema = EmployeeSchema.pick({
   date_of_joining: true,
   status: true,
   company: true,
-}).extend({
-});
+}).extend({});
 
 export const EmployeeUpdateSchema = EmployeeSchema.partial().omit({
   name: true,
@@ -677,18 +712,25 @@ export const TermsAndConditionsSchema = z.object({
 
 export const TermsAndConditionsCreateSchema = TermsAndConditionsSchema.pick({
   title: true,
+  terms: true,
 }).extend({
   disabled: z.union([z.literal(0), z.literal(1)]).optional(),
+  selling: z.union([z.literal(0), z.literal(1)]).optional(),
+  buying: z.union([z.literal(0), z.literal(1)]).optional(),
+  terms: z.string().optional(),
 });
 
-export const TermsAndConditionsUpdateSchema = TermsAndConditionsSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const TermsAndConditionsUpdateSchema =
+  TermsAndConditionsSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type TermsAndConditionsSchemaType = z.infer<typeof TermsAndConditionsSchema>;
+export type TermsAndConditionsSchemaType = z.infer<
+  typeof TermsAndConditionsSchema
+>;
 
 /**
  * Lead Zod Schema
@@ -709,7 +751,14 @@ export const LeadSchema = z.object({
   status: z.string().min(1, "Status is required"),
   customer: z.string().optional(),
   type: z.enum(["Client", "Channel Partner", "Consultant"]).optional(),
-  request_type: z.enum(["Product Enquiry", "Request for Information", "Suggestions", "Other"]).optional(),
+  request_type: z
+    .enum([
+      "Product Enquiry",
+      "Request for Information",
+      "Suggestions",
+      "Other",
+    ])
+    .optional(),
   email_id: z.string().optional(),
   website: z.string().optional(),
   mobile_no: z.string().optional(),
@@ -717,7 +766,9 @@ export const LeadSchema = z.object({
   phone: z.string().optional(),
   phone_ext: z.string().optional(),
   company_name: z.string().optional(),
-  no_of_employees: z.enum(["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]).optional(),
+  no_of_employees: z
+    .enum(["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"])
+    .optional(),
   annual_revenue: z.number().optional(),
   industry: z.string().optional(),
   market_segment: z.string().optional(),
@@ -728,7 +779,9 @@ export const LeadSchema = z.object({
   state: z.string().optional(),
   country: z.string().optional(),
   contact_html: z.string().optional(),
-  qualification_status: z.enum(["Unqualified", "In Process", "Qualified"]).optional(),
+  qualification_status: z
+    .enum(["Unqualified", "In Process", "Qualified"])
+    .optional(),
   qualified_by: z.string().optional(),
   qualified_on: z.string().optional(),
   campaign_name: z.string().optional(),
@@ -784,8 +837,7 @@ export const LeadSourceSchema = z.object({
 
 export const LeadSourceCreateSchema = LeadSourceSchema.pick({
   source_name: true,
-}).extend({
-});
+}).extend({});
 
 export const LeadSourceUpdateSchema = LeadSourceSchema.partial().omit({
   name: true,
@@ -813,8 +865,7 @@ export const IndustryTypeSchema = z.object({
 
 export const IndustryTypeCreateSchema = IndustryTypeSchema.pick({
   industry: true,
-}).extend({
-});
+}).extend({});
 
 export const IndustryTypeUpdateSchema = IndustryTypeSchema.partial().omit({
   name: true,
@@ -842,7 +893,9 @@ export const OpportunitySchema = z.object({
   sales_stage: z.string().optional(),
   expected_closing: z.string().optional(),
   probability: z.number().optional(),
-  no_of_employees: z.enum(["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]).optional(),
+  no_of_employees: z
+    .enum(["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"])
+    .optional(),
   annual_revenue: z.number().optional(),
   customer_group: z.string().optional(),
   industry: z.string().optional(),
@@ -900,8 +953,7 @@ export const OpportunityCreateSchema = OpportunitySchema.pick({
   status: true,
   company: true,
   transaction_date: true,
-}).extend({
-});
+}).extend({});
 
 export const OpportunityUpdateSchema = OpportunitySchema.partial().omit({
   name: true,
@@ -938,6 +990,7 @@ export const CustomerGroupSchema = z.object({
 
 export const CustomerGroupCreateSchema = CustomerGroupSchema.pick({
   customer_group_name: true,
+  parent_customer_group: true,
 }).extend({
   is_group: z.union([z.literal(0), z.literal(1)]).optional(),
 });
@@ -1030,10 +1083,20 @@ export const AddressSchema = z.object({
 });
 
 export const AddressCreateSchema = AddressSchema.pick({
+  address_title: true,
   address_type: true,
   address_line1: true,
+  address_line2: true,
   city: true,
+  state: true,
   country: true,
+  pincode: true,
+  email_id: true,
+  phone: true,
+  fax: true,
+  is_primary_address: true,
+  is_shipping_address: true,
+  links: true,
 }).extend({
   disabled: z.union([z.literal(0), z.literal(1)]).optional(),
 });
@@ -1148,7 +1211,10 @@ export const QuotationSchema = z.object({
 export const QuotationCreateSchema = QuotationSchema.pick({
   naming_series: true,
   quotation_to: true,
+  party_name: true,
+  customer_name: true,
   transaction_date: true,
+  valid_till: true,
   order_type: true,
   company: true,
   currency: true,
@@ -1158,7 +1224,25 @@ export const QuotationCreateSchema = QuotationSchema.pick({
   plc_conversion_rate: true,
   items: true,
   status: true,
+  // Address & Contact
+  customer_address: true,
+  contact_person: true,
+  // Taxes & Terms
+  taxes_and_charges: true,
+  taxes: true,
+  tc_name: true,
+  terms: true,
 }).extend({
+  // Make some fields optional for flexible creation
+  party_name: z.string().optional(),
+  customer_name: z.string().optional(),
+  valid_till: z.string().optional(),
+  customer_address: z.string().optional(),
+  contact_person: z.string().optional(),
+  taxes_and_charges: z.string().optional(),
+  taxes: z.array(z.unknown()).optional(),
+  tc_name: z.string().optional(),
+  terms: z.string().optional(),
 });
 
 export const QuotationUpdateSchema = QuotationSchema.partial().omit({
@@ -1256,11 +1340,21 @@ export const SalesOrderSchema = z.object({
   tc_name: z.string().optional(),
   terms: z.string().optional(),
   status: z.string().min(1, "Status is required"),
-  delivery_status: z.enum(["Not Delivered", "Fully Delivered", "Partly Delivered", "Closed", "Not Applicable"]).optional(),
+  delivery_status: z
+    .enum([
+      "Not Delivered",
+      "Fully Delivered",
+      "Partly Delivered",
+      "Closed",
+      "Not Applicable",
+    ])
+    .optional(),
   per_delivered: z.number().optional(),
   per_billed: z.number().optional(),
   per_picked: z.number().optional(),
-  billing_status: z.enum(["Not Billed", "Fully Billed", "Partly Billed", "Closed"]).optional(),
+  billing_status: z
+    .enum(["Not Billed", "Fully Billed", "Partly Billed", "Closed"])
+    .optional(),
   sales_partner: z.string().optional(),
   amount_eligible_for_commission: z.number().optional(),
   commission_rate: z.number().optional(),
@@ -1303,8 +1397,7 @@ export const SalesOrderCreateSchema = SalesOrderSchema.pick({
   plc_conversion_rate: true,
   items: true,
   status: true,
-}).extend({
-});
+}).extend({});
 
 export const SalesOrderUpdateSchema = SalesOrderSchema.partial().omit({
   name: true,
@@ -1439,8 +1532,7 @@ export const BlanketOrderCreateSchema = BlanketOrderSchema.pick({
   to_date: true,
   company: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
 export const BlanketOrderUpdateSchema = BlanketOrderSchema.partial().omit({
   name: true,
@@ -1491,15 +1583,15 @@ export const InstallationNoteCreateSchema = InstallationNoteSchema.pick({
   status: true,
   company: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
-export const InstallationNoteUpdateSchema = InstallationNoteSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const InstallationNoteUpdateSchema =
+  InstallationNoteSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
 export type InstallationNoteSchemaType = z.infer<typeof InstallationNoteSchema>;
 
@@ -1537,8 +1629,12 @@ export const SupplierSchema = z.object({
   email_id: z.string().optional(),
   payment_terms: z.string().optional(),
   accounts: z.array(z.unknown()).optional(),
-  allow_purchase_invoice_creation_without_purchase_order: z.union([z.literal(0), z.literal(1)]).optional(),
-  allow_purchase_invoice_creation_without_purchase_receipt: z.union([z.literal(0), z.literal(1)]).optional(),
+  allow_purchase_invoice_creation_without_purchase_order: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  allow_purchase_invoice_creation_without_purchase_receipt: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   is_frozen: z.union([z.literal(0), z.literal(1)]).optional(),
   disabled: z.union([z.literal(0), z.literal(1)]).optional(),
   warn_rfqs: z.union([z.literal(0), z.literal(1)]).optional(),
@@ -1632,9 +1728,25 @@ export const MaterialRequestSchema = z.object({
   items: z.array(z.unknown()),
   tc_name: z.string().optional(),
   terms: z.string().optional(),
-  status: z.enum(["Draft", "Submitted", "Stopped", "Cancelled", "Pending", "Partially Ordered", "Partially Received", "Ordered", "Issued", "Transferred", "Received"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Submitted",
+      "Stopped",
+      "Cancelled",
+      "Pending",
+      "Partially Ordered",
+      "Partially Received",
+      "Ordered",
+      "Issued",
+      "Transferred",
+      "Received",
+    ])
+    .optional(),
   per_ordered: z.number().optional(),
-  transfer_status: z.enum(["Not Started", "In Transit", "Completed"]).optional(),
+  transfer_status: z
+    .enum(["Not Started", "In Transit", "Completed"])
+    .optional(),
   per_received: z.number().optional(),
   letter_head: z.string().optional(),
   select_print_heading: z.string().optional(),
@@ -1654,15 +1766,16 @@ export const MaterialRequestCreateSchema = MaterialRequestSchema.pick({
   company: true,
   transaction_date: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
-export const MaterialRequestUpdateSchema = MaterialRequestSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const MaterialRequestUpdateSchema = MaterialRequestSchema.partial().omit(
+  {
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  }
+);
 
 export type MaterialRequestSchemaType = z.infer<typeof MaterialRequestSchema>;
 
@@ -1713,17 +1826,19 @@ export const RequestForQuotationCreateSchema = RequestForQuotationSchema.pick({
   suppliers: true,
   items: true,
   message_for_supplier: true,
-}).extend({
-});
+}).extend({});
 
-export const RequestForQuotationUpdateSchema = RequestForQuotationSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const RequestForQuotationUpdateSchema =
+  RequestForQuotationSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type RequestForQuotationSchemaType = z.infer<typeof RequestForQuotationSchema>;
+export type RequestForQuotationSchemaType = z.infer<
+  typeof RequestForQuotationSchema
+>;
 
 /**
  * Supplier Quotation Zod Schema
@@ -1821,17 +1936,19 @@ export const SupplierQuotationCreateSchema = SupplierQuotationSchema.pick({
   currency: true,
   conversion_rate: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
-export const SupplierQuotationUpdateSchema = SupplierQuotationSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const SupplierQuotationUpdateSchema =
+  SupplierQuotationSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type SupplierQuotationSchemaType = z.infer<typeof SupplierQuotationSchema>;
+export type SupplierQuotationSchemaType = z.infer<
+  typeof SupplierQuotationSchema
+>;
 
 /**
  * Purchase Order Zod Schema
@@ -1963,8 +2080,7 @@ export const PurchaseOrderCreateSchema = PurchaseOrderSchema.pick({
   conversion_rate: true,
   items: true,
   status: true,
-}).extend({
-});
+}).extend({});
 
 export const PurchaseOrderUpdateSchema = PurchaseOrderSchema.partial().omit({
   name: true,
@@ -2100,15 +2216,16 @@ export const PurchaseReceiptCreateSchema = PurchaseReceiptSchema.pick({
   items: true,
   base_net_total: true,
   status: true,
-}).extend({
-});
+}).extend({});
 
-export const PurchaseReceiptUpdateSchema = PurchaseReceiptSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const PurchaseReceiptUpdateSchema = PurchaseReceiptSchema.partial().omit(
+  {
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  }
+);
 
 export type PurchaseReceiptSchemaType = z.infer<typeof PurchaseReceiptSchema>;
 
@@ -2132,8 +2249,12 @@ export const PurchaseInvoiceSchema = z.object({
   is_return: z.union([z.literal(0), z.literal(1)]).optional(),
   return_against: z.string().optional(),
   update_outstanding_for_self: z.union([z.literal(0), z.literal(1)]).optional(),
-  update_billed_amount_in_purchase_order: z.union([z.literal(0), z.literal(1)]).optional(),
-  update_billed_amount_in_purchase_receipt: z.union([z.literal(0), z.literal(1)]).optional(),
+  update_billed_amount_in_purchase_order: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  update_billed_amount_in_purchase_receipt: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   apply_tds: z.union([z.literal(0), z.literal(1)]).optional(),
   tax_withholding_category: z.string().optional(),
   amended_from: z.string().optional(),
@@ -2143,7 +2264,9 @@ export const PurchaseInvoiceSchema = z.object({
   project: z.string().optional(),
   currency: z.string().optional(),
   conversion_rate: z.number().optional(),
-  use_transaction_date_exchange_rate: z.union([z.literal(0), z.literal(1)]).optional(),
+  use_transaction_date_exchange_rate: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   buying_price_list: z.string().optional(),
   price_list_currency: z.string().optional(),
   plc_conversion_rate: z.number().optional(),
@@ -2183,7 +2306,9 @@ export const PurchaseInvoiceSchema = z.object({
   base_in_words: z.string().optional(),
   grand_total: z.number().optional(),
   rounding_adjustment: z.number().optional(),
-  use_company_roundoff_cost_center: z.union([z.literal(0), z.literal(1)]).optional(),
+  use_company_roundoff_cost_center: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   rounded_total: z.number().optional(),
   in_words: z.string().optional(),
   total_advance: z.number().optional(),
@@ -2202,8 +2327,12 @@ export const PurchaseInvoiceSchema = z.object({
   clearance_date: z.string().optional(),
   cash_bank_account: z.string().optional(),
   paid_amount: z.number().optional(),
-  allocate_advances_automatically: z.union([z.literal(0), z.literal(1)]).optional(),
-  only_include_allocated_payments: z.union([z.literal(0), z.literal(1)]).optional(),
+  allocate_advances_automatically: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  only_include_allocated_payments: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   get_advances: z.unknown().optional(),
   advances: z.array(z.unknown()).optional(),
   advance_tax: z.array(z.unknown()).optional(),
@@ -2224,11 +2353,26 @@ export const PurchaseInvoiceSchema = z.object({
   billing_address: z.string().optional(),
   billing_address_display: z.string().optional(),
   payment_terms_template: z.string().optional(),
-  ignore_default_payment_terms_template: z.union([z.literal(0), z.literal(1)]).optional(),
+  ignore_default_payment_terms_template: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   payment_schedule: z.array(z.unknown()).optional(),
   tc_name: z.string().optional(),
   terms: z.string().optional(),
-  status: z.enum(["Draft", "Return", "Debit Note Issued", "Submitted", "Paid", "Partly Paid", "Unpaid", "Overdue", "Cancelled", "Internal Transfer"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Return",
+      "Debit Note Issued",
+      "Submitted",
+      "Paid",
+      "Partly Paid",
+      "Unpaid",
+      "Overdue",
+      "Cancelled",
+      "Internal Transfer",
+    ])
+    .optional(),
   per_received: z.number().optional(),
   credit_to: z.string().min(1, "Credit To is required"),
   party_account_currency: z.string().optional(),
@@ -2267,15 +2411,16 @@ export const PurchaseInvoiceCreateSchema = PurchaseInvoiceSchema.pick({
   posting_date: true,
   items: true,
   credit_to: true,
-}).extend({
-});
+}).extend({});
 
-export const PurchaseInvoiceUpdateSchema = PurchaseInvoiceSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const PurchaseInvoiceUpdateSchema = PurchaseInvoiceSchema.partial().omit(
+  {
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  }
+);
 
 export type PurchaseInvoiceSchemaType = z.infer<typeof PurchaseInvoiceSchema>;
 
@@ -2310,7 +2455,15 @@ export const ItemSchema = z.object({
   uoms: z.array(z.unknown()).optional(),
   shelf_life_in_days: z.number().int().optional(),
   end_of_life: z.string().optional(),
-  default_material_request_type: z.enum(["Purchase", "Material Transfer", "Material Issue", "Manufacture", "Customer Provided"]).optional(),
+  default_material_request_type: z
+    .enum([
+      "Purchase",
+      "Material Transfer",
+      "Material Issue",
+      "Manufacture",
+      "Customer Provided",
+    ])
+    .optional(),
   valuation_method: z.enum(["FIFO", "Moving Average", "LIFO"]).optional(),
   warranty_period: z.string().optional(),
   weight_per_unit: z.number().optional(),
@@ -2352,10 +2505,16 @@ export const ItemSchema = z.object({
   max_discount: z.number().optional(),
   customer_items: z.array(z.unknown()).optional(),
   taxes: z.array(z.unknown()).optional(),
-  inspection_required_before_purchase: z.union([z.literal(0), z.literal(1)]).optional(),
+  inspection_required_before_purchase: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   quality_inspection_template: z.string().optional(),
-  inspection_required_before_delivery: z.union([z.literal(0), z.literal(1)]).optional(),
-  include_item_in_manufacturing: z.union([z.literal(0), z.literal(1)]).optional(),
+  inspection_required_before_delivery: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  include_item_in_manufacturing: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   is_sub_contracted_item: z.union([z.literal(0), z.literal(1)]).optional(),
   default_bom: z.string().optional(),
   customer_code: z.string().optional(),
@@ -2464,8 +2623,7 @@ export const ItemPriceCreateSchema = ItemPriceSchema.pick({
   uom: true,
   price_list: true,
   price_list_rate: true,
-}).extend({
-});
+}).extend({});
 
 export const ItemPriceUpdateSchema = ItemPriceSchema.partial().omit({
   name: true,
@@ -2584,8 +2742,7 @@ export const UomSchema = z.object({
 
 export const UomCreateSchema = UomSchema.pick({
   uom_name: true,
-}).extend({
-});
+}).extend({});
 
 export const UomUpdateSchema = UomSchema.partial().omit({
   name: true,
@@ -2638,7 +2795,19 @@ export const StockEntrySchema = z.object({
   naming_series: z.string().min(1, "Series is required"),
   stock_entry_type: z.string().min(1, "Stock Entry Type is required"),
   outgoing_stock_entry: z.string().optional(),
-  purpose: z.enum(["Material Issue", "Material Receipt", "Material Transfer", "Material Transfer for Manufacture", "Material Consumption for Manufacture", "Manufacture", "Repack", "Send to Subcontractor", "Disassemble"]).optional(),
+  purpose: z
+    .enum([
+      "Material Issue",
+      "Material Receipt",
+      "Material Transfer",
+      "Material Transfer for Manufacture",
+      "Material Consumption for Manufacture",
+      "Manufacture",
+      "Repack",
+      "Send to Subcontractor",
+      "Disassemble",
+    ])
+    .optional(),
   add_to_transit: z.union([z.literal(0), z.literal(1)]).optional(),
   work_order: z.string().optional(),
   purchase_order: z.string().optional(),
@@ -2704,8 +2873,7 @@ export const StockEntryCreateSchema = StockEntrySchema.pick({
   stock_entry_type: true,
   company: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
 export const StockEntryUpdateSchema = StockEntrySchema.partial().omit({
   name: true,
@@ -2849,8 +3017,7 @@ export const DeliveryNoteCreateSchema = DeliveryNoteSchema.pick({
   plc_conversion_rate: true,
   items: true,
   status: true,
-}).extend({
-});
+}).extend({});
 
 export const DeliveryNoteUpdateSchema = DeliveryNoteSchema.partial().omit({
   name: true,
@@ -2897,17 +3064,19 @@ export const StockReconciliationCreateSchema = StockReconciliationSchema.pick({
   posting_date: true,
   posting_time: true,
   items: true,
-}).extend({
-});
+}).extend({});
 
-export const StockReconciliationUpdateSchema = StockReconciliationSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const StockReconciliationUpdateSchema =
+  StockReconciliationSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type StockReconciliationSchemaType = z.infer<typeof StockReconciliationSchema>;
+export type StockReconciliationSchemaType = z.infer<
+  typeof StockReconciliationSchema
+>;
 
 /**
  * Batch Zod Schema
@@ -2969,7 +3138,9 @@ export const SerialNoSchema = z.object({
   warehouse: z.string().optional(),
   purchase_rate: z.number().optional(),
   customer: z.string().optional(),
-  status: z.enum(["Active", "Inactive", "Consumed", "Delivered", "Expired"]).optional(),
+  status: z
+    .enum(["Active", "Inactive", "Consumed", "Delivered", "Expired"])
+    .optional(),
   item_name: z.string().optional(),
   description: z.string().optional(),
   item_group: z.string().optional(),
@@ -2980,7 +3151,9 @@ export const SerialNoSchema = z.object({
   employee: z.string().optional(),
   warranty_expiry_date: z.string().optional(),
   amc_expiry_date: z.string().optional(),
-  maintenance_status: z.enum(["Under Warranty", "Out of Warranty", "Under AMC", "Out of AMC"]).optional(),
+  maintenance_status: z
+    .enum(["Under Warranty", "Out of Warranty", "Under AMC", "Out of AMC"])
+    .optional(),
   warranty_period: z.number().int().optional(),
   company: z.string().min(1, "Company is required"),
   work_order: z.string().optional(),
@@ -3061,14 +3234,17 @@ export const QualityInspectionCreateSchema = QualityInspectionSchema.pick({
   description: z.string().optional(),
 });
 
-export const QualityInspectionUpdateSchema = QualityInspectionSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const QualityInspectionUpdateSchema =
+  QualityInspectionSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type QualityInspectionSchemaType = z.infer<typeof QualityInspectionSchema>;
+export type QualityInspectionSchemaType = z.infer<
+  typeof QualityInspectionSchema
+>;
 
 /**
  * Landed Cost Voucher Zod Schema
@@ -3084,7 +3260,9 @@ export const LandedCostVoucherSchema = z.object({
   items: z.array(z.unknown()),
   taxes: z.array(z.unknown()),
   total_taxes_and_charges: z.number(),
-  distribute_charges_based_on: z.string().min(1, "Distribute Charges Based On is required"),
+  distribute_charges_based_on: z
+    .string()
+    .min(1, "Distribute Charges Based On is required"),
   amended_from: z.string().optional(),
   landed_cost_help: z.string().optional(),
   name: z.string().min(1, "ID is required"),
@@ -3104,17 +3282,19 @@ export const LandedCostVoucherCreateSchema = LandedCostVoucherSchema.pick({
   taxes: true,
   total_taxes_and_charges: true,
   distribute_charges_based_on: true,
-}).extend({
-});
+}).extend({});
 
-export const LandedCostVoucherUpdateSchema = LandedCostVoucherSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const LandedCostVoucherUpdateSchema =
+  LandedCostVoucherSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type LandedCostVoucherSchemaType = z.infer<typeof LandedCostVoucherSchema>;
+export type LandedCostVoucherSchemaType = z.infer<
+  typeof LandedCostVoucherSchema
+>;
 
 /**
  * Stock Ledger Entry Zod Schema
@@ -3128,7 +3308,9 @@ export const StockLedgerEntrySchema = z.object({
   posting_time: z.string().optional(),
   posting_datetime: z.string().optional(),
   is_adjustment_entry: z.union([z.literal(0), z.literal(1)]).optional(),
-  auto_created_serial_and_batch_bundle: z.union([z.literal(0), z.literal(1)]).optional(),
+  auto_created_serial_and_batch_bundle: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   voucher_type: z.string().optional(),
   voucher_no: z.string().optional(),
   voucher_detail_no: z.string().optional(),
@@ -3161,12 +3343,13 @@ export const StockLedgerEntrySchema = z.object({
   docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const StockLedgerEntryUpdateSchema = StockLedgerEntrySchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const StockLedgerEntryUpdateSchema =
+  StockLedgerEntrySchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
 export type StockLedgerEntrySchemaType = z.infer<typeof StockLedgerEntrySchema>;
 
@@ -3181,7 +3364,9 @@ export const AccountSchema = z.object({
   account_number: z.string().optional(),
   is_group: z.union([z.literal(0), z.literal(1)]).optional(),
   company: z.string().min(1, "Company is required"),
-  root_type: z.enum(["Asset", "Liability", "Income", "Expense", "Equity"]).optional(),
+  root_type: z
+    .enum(["Asset", "Liability", "Income", "Expense", "Equity"])
+    .optional(),
   report_type: z.enum(["Balance Sheet", "Profit and Loss"]).optional(),
   account_currency: z.string().optional(),
   parent_account: z.string().min(1, "Parent Account is required"),
@@ -3297,7 +3482,9 @@ export const JournalEntrySchema = z.object({
   bill_no: z.string().optional(),
   bill_date: z.string().optional(),
   due_date: z.string().optional(),
-  write_off_based_on: z.enum(["Accounts Receivable", "Accounts Payable"]).optional(),
+  write_off_based_on: z
+    .enum(["Accounts Receivable", "Accounts Payable"])
+    .optional(),
   get_outstanding_invoices: z.unknown().optional(),
   write_off_amount: z.number().optional(),
   pay_to_recd_from: z.string().optional(),
@@ -3324,8 +3511,7 @@ export const JournalEntryCreateSchema = JournalEntrySchema.pick({
   company: true,
   posting_date: true,
   accounts: true,
-}).extend({
-});
+}).extend({});
 
 export const JournalEntryUpdateSchema = JournalEntrySchema.partial().omit({
   name: true,
@@ -3351,8 +3537,12 @@ export const PaymentEntrySchema = z.object({
   party_type: z.string().optional(),
   party: z.string().optional(),
   party_name: z.string().optional(),
-  book_advance_payments_in_separate_party_account: z.union([z.literal(0), z.literal(1)]).optional(),
-  reconcile_on_advance_payment_date: z.union([z.literal(0), z.literal(1)]).optional(),
+  book_advance_payments_in_separate_party_account: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  reconcile_on_advance_payment_date: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   bank_account: z.string().optional(),
   party_bank_account: z.string().optional(),
   contact_person: z.string().optional(),
@@ -3360,11 +3550,15 @@ export const PaymentEntrySchema = z.object({
   party_balance: z.number().optional(),
   paid_from: z.string().min(1, "Account Paid From is required"),
   paid_from_account_type: z.string().optional(),
-  paid_from_account_currency: z.string().min(1, "Account Currency (From) is required"),
+  paid_from_account_currency: z
+    .string()
+    .min(1, "Account Currency (From) is required"),
   paid_from_account_balance: z.number().optional(),
   paid_to: z.string().min(1, "Account Paid To is required"),
   paid_to_account_type: z.string().optional(),
-  paid_to_account_currency: z.string().min(1, "Account Currency (To) is required"),
+  paid_to_account_currency: z
+    .string()
+    .min(1, "Account Currency (To) is required"),
   paid_to_account_balance: z.number().optional(),
   paid_amount: z.number(),
   paid_amount_after_tax: z.number().optional(),
@@ -3386,7 +3580,9 @@ export const PaymentEntrySchema = z.object({
   write_off_difference_amount: z.unknown().optional(),
   purchase_taxes_and_charges_template: z.string().optional(),
   sales_taxes_and_charges_template: z.string().optional(),
-  apply_tax_withholding_amount: z.union([z.literal(0), z.literal(1)]).optional(),
+  apply_tax_withholding_amount: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   tax_withholding_category: z.string().optional(),
   taxes: z.array(z.unknown()).optional(),
   base_total_taxes_and_charges: z.number().optional(),
@@ -3434,8 +3630,7 @@ export const PaymentEntryCreateSchema = PaymentEntrySchema.pick({
   received_amount: true,
   target_exchange_rate: true,
   base_received_amount: true,
-}).extend({
-});
+}).extend({});
 
 export const PaymentEntryUpdateSchema = PaymentEntrySchema.partial().omit({
   name: true,
@@ -3469,8 +3664,12 @@ export const SalesInvoiceSchema = z.object({
   is_return: z.union([z.literal(0), z.literal(1)]).optional(),
   return_against: z.string().optional(),
   update_outstanding_for_self: z.union([z.literal(0), z.literal(1)]).optional(),
-  update_billed_amount_in_sales_order: z.union([z.literal(0), z.literal(1)]).optional(),
-  update_billed_amount_in_delivery_note: z.union([z.literal(0), z.literal(1)]).optional(),
+  update_billed_amount_in_sales_order: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  update_billed_amount_in_delivery_note: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   is_debit_note: z.union([z.literal(0), z.literal(1)]).optional(),
   amended_from: z.string().optional(),
   cost_center: z.string().optional(),
@@ -3507,7 +3706,9 @@ export const SalesInvoiceSchema = z.object({
   base_in_words: z.string().optional(),
   grand_total: z.number(),
   rounding_adjustment: z.number().optional(),
-  use_company_roundoff_cost_center: z.union([z.literal(0), z.literal(1)]).optional(),
+  use_company_roundoff_cost_center: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   rounded_total: z.number().optional(),
   in_words: z.string().optional(),
   total_advance: z.number().optional(),
@@ -3515,7 +3716,9 @@ export const SalesInvoiceSchema = z.object({
   disable_rounded_total: z.union([z.literal(0), z.literal(1)]).optional(),
   apply_discount_on: z.enum(["Grand Total", "Net Total"]).optional(),
   base_discount_amount: z.number().optional(),
-  is_cash_or_non_trade_discount: z.union([z.literal(0), z.literal(1)]).optional(),
+  is_cash_or_non_trade_discount: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   additional_discount_account: z.string().optional(),
   additional_discount_percentage: z.number().optional(),
   discount_amount: z.number().optional(),
@@ -3533,13 +3736,19 @@ export const SalesInvoiceSchema = z.object({
   base_change_amount: z.number().optional(),
   change_amount: z.number().optional(),
   account_for_change_amount: z.string().optional(),
-  allocate_advances_automatically: z.union([z.literal(0), z.literal(1)]).optional(),
-  only_include_allocated_payments: z.union([z.literal(0), z.literal(1)]).optional(),
+  allocate_advances_automatically: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
+  only_include_allocated_payments: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   get_advances: z.unknown().optional(),
   advances: z.array(z.unknown()).optional(),
   write_off_amount: z.number().optional(),
   base_write_off_amount: z.number().optional(),
-  write_off_outstanding_amount_automatically: z.union([z.literal(0), z.literal(1)]).optional(),
+  write_off_outstanding_amount_automatically: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   write_off_account: z.string().optional(),
   write_off_cost_center: z.string().optional(),
   redeem_loyalty_points: z.union([z.literal(0), z.literal(1)]).optional(),
@@ -3562,7 +3771,9 @@ export const SalesInvoiceSchema = z.object({
   company_address: z.string().optional(),
   company_address_display: z.string().optional(),
   company_contact_person: z.string().optional(),
-  ignore_default_payment_terms_template: z.union([z.literal(0), z.literal(1)]).optional(),
+  ignore_default_payment_terms_template: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   payment_terms_template: z.string().optional(),
   payment_schedule: z.array(z.unknown()).optional(),
   tc_name: z.string().optional(),
@@ -3588,7 +3799,23 @@ export const SalesInvoiceSchema = z.object({
   auto_repeat: z.string().optional(),
   to_date: z.string().optional(),
   update_auto_repeat_reference: z.unknown().optional(),
-  status: z.enum(["Draft", "Return", "Credit Note Issued", "Submitted", "Paid", "Partly Paid", "Unpaid", "Unpaid and Discounted", "Partly Paid and Discounted", "Overdue and Discounted", "Overdue", "Cancelled", "Internal Transfer"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Return",
+      "Credit Note Issued",
+      "Submitted",
+      "Paid",
+      "Partly Paid",
+      "Unpaid",
+      "Unpaid and Discounted",
+      "Partly Paid and Discounted",
+      "Overdue and Discounted",
+      "Overdue",
+      "Cancelled",
+      "Internal Transfer",
+    ])
+    .optional(),
   inter_company_invoice_reference: z.string().optional(),
   campaign: z.string().optional(),
   represents_company: z.string().optional(),
@@ -3619,8 +3846,7 @@ export const SalesInvoiceCreateSchema = SalesInvoiceSchema.pick({
   base_grand_total: true,
   grand_total: true,
   debit_to: true,
-}).extend({
-});
+}).extend({});
 
 export const SalesInvoiceUpdateSchema = SalesInvoiceSchema.partial().omit({
   name: true,
@@ -3638,7 +3864,9 @@ export type SalesInvoiceSchemaType = z.infer<typeof SalesInvoiceSchema>;
  */
 export const PaymentTermsTemplateSchema = z.object({
   template_name: z.string().optional(),
-  allocate_payment_based_on_payment_terms: z.union([z.literal(0), z.literal(1)]).optional(),
+  allocate_payment_based_on_payment_terms: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   terms: z.array(z.unknown()),
   name: z.string().min(1, "ID is required"),
   owner: z.string().optional(),
@@ -3648,19 +3876,23 @@ export const PaymentTermsTemplateSchema = z.object({
   docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const PaymentTermsTemplateCreateSchema = PaymentTermsTemplateSchema.pick({
-  terms: true,
-}).extend({
-});
+export const PaymentTermsTemplateCreateSchema = PaymentTermsTemplateSchema.pick(
+  {
+    terms: true,
+  }
+).extend({});
 
-export const PaymentTermsTemplateUpdateSchema = PaymentTermsTemplateSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const PaymentTermsTemplateUpdateSchema =
+  PaymentTermsTemplateSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type PaymentTermsTemplateSchemaType = z.infer<typeof PaymentTermsTemplateSchema>;
+export type PaymentTermsTemplateSchemaType = z.infer<
+  typeof PaymentTermsTemplateSchema
+>;
 
 /**
  * Mode of Payment Zod Schema
@@ -3682,8 +3914,7 @@ export const ModeOfPaymentSchema = z.object({
 
 export const ModeOfPaymentCreateSchema = ModeOfPaymentSchema.pick({
   mode_of_payment: true,
-}).extend({
-});
+}).extend({});
 
 export const ModeOfPaymentUpdateSchema = ModeOfPaymentSchema.partial().omit({
   name: true,
@@ -3745,7 +3976,9 @@ export const PeriodClosingVoucherSchema = z.object({
   period_end_date: z.string().min(1, "Period End Date is required"),
   amended_from: z.string().optional(),
   closing_account_head: z.string().min(1, "Closing Account Head is required"),
-  gle_processing_status: z.enum(["In Progress", "Completed", "Failed"]).optional(),
+  gle_processing_status: z
+    .enum(["In Progress", "Completed", "Failed"])
+    .optional(),
   remarks: z.string().min(1, "Remarks is required"),
   error_message: z.string().optional(),
   name: z.string().min(1, "ID is required"),
@@ -3756,24 +3989,28 @@ export const PeriodClosingVoucherSchema = z.object({
   docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const PeriodClosingVoucherCreateSchema = PeriodClosingVoucherSchema.pick({
-  company: true,
-  fiscal_year: true,
-  period_start_date: true,
-  period_end_date: true,
-  closing_account_head: true,
-  remarks: true,
-}).extend({
-});
+export const PeriodClosingVoucherCreateSchema = PeriodClosingVoucherSchema.pick(
+  {
+    company: true,
+    fiscal_year: true,
+    period_start_date: true,
+    period_end_date: true,
+    closing_account_head: true,
+    remarks: true,
+  }
+).extend({});
 
-export const PeriodClosingVoucherUpdateSchema = PeriodClosingVoucherSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const PeriodClosingVoucherUpdateSchema =
+  PeriodClosingVoucherSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type PeriodClosingVoucherSchemaType = z.infer<typeof PeriodClosingVoucherSchema>;
+export type PeriodClosingVoucherSchemaType = z.infer<
+  typeof PeriodClosingVoucherSchema
+>;
 
 /**
  * Asset Zod Schema
@@ -3816,7 +4053,9 @@ export const AssetSchema = z.object({
   opening_number_of_booked_depreciations: z.number().int().optional(),
   is_fully_depreciated: z.union([z.literal(0), z.literal(1)]).optional(),
   finance_books: z.array(z.unknown()).optional(),
-  depreciation_method: z.enum(["Straight Line", "Double Declining Balance", "Manual"]).optional(),
+  depreciation_method: z
+    .enum(["Straight Line", "Double Declining Balance", "Manual"])
+    .optional(),
   value_after_depreciation: z.number().optional(),
   total_number_of_depreciations: z.number().int().optional(),
   frequency_of_depreciation: z.number().int().optional(),
@@ -3829,7 +4068,23 @@ export const AssetSchema = z.object({
   insurance_end_date: z.string().optional(),
   comprehensive_insurance: z.string().optional(),
   maintenance_required: z.union([z.literal(0), z.literal(1)]).optional(),
-  status: z.enum(["Draft", "Submitted", "Cancelled", "Partially Depreciated", "Fully Depreciated", "Sold", "Scrapped", "In Maintenance", "Out of Order", "Issue", "Receipt", "Capitalized", "Work In Progress"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Submitted",
+      "Cancelled",
+      "Partially Depreciated",
+      "Fully Depreciated",
+      "Sold",
+      "Scrapped",
+      "In Maintenance",
+      "Out of Order",
+      "Issue",
+      "Receipt",
+      "Capitalized",
+      "Work In Progress",
+    ])
+    .optional(),
   booked_fixed_asset: z.union([z.literal(0), z.literal(1)]).optional(),
   purchase_amount: z.number().optional(),
   default_finance_book: z.string().optional(),
@@ -3849,8 +4104,7 @@ export const AssetCreateSchema = AssetSchema.pick({
   asset_name: true,
   location: true,
   purchase_date: true,
-}).extend({
-});
+}).extend({});
 
 export const AssetUpdateSchema = AssetSchema.partial().omit({
   name: true,
@@ -3883,8 +4137,7 @@ export const AssetCategorySchema = z.object({
 export const AssetCategoryCreateSchema = AssetCategorySchema.pick({
   asset_category_name: true,
   accounts: true,
-}).extend({
-});
+}).extend({});
 
 export const AssetCategoryUpdateSchema = AssetCategorySchema.partial().omit({
   name: true,
@@ -3921,8 +4174,7 @@ export const AssetMovementCreateSchema = AssetMovementSchema.pick({
   purpose: true,
   transaction_date: true,
   assets: true,
-}).extend({
-});
+}).extend({});
 
 export const AssetMovementUpdateSchema = AssetMovementSchema.partial().omit({
   name: true,
@@ -3958,7 +4210,9 @@ export const WorkOrderSchema = z.object({
   use_multi_level_bom: z.union([z.literal(0), z.literal(1)]).optional(),
   skip_transfer: z.union([z.literal(0), z.literal(1)]).optional(),
   from_wip_warehouse: z.union([z.literal(0), z.literal(1)]).optional(),
-  update_consumed_material_cost_in_project: z.union([z.literal(0), z.literal(1)]).optional(),
+  update_consumed_material_cost_in_project: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   source_warehouse: z.string().optional(),
   wip_warehouse: z.string().optional(),
   fg_warehouse: z.string().min(1, "Target Warehouse is required"),
@@ -4032,10 +4286,14 @@ export const BomSchema = z.object({
   is_active: z.union([z.literal(0), z.literal(1)]).optional(),
   is_default: z.union([z.literal(0), z.literal(1)]).optional(),
   allow_alternative_item: z.union([z.literal(0), z.literal(1)]).optional(),
-  set_rate_of_sub_assembly_item_based_on_bom: z.union([z.literal(0), z.literal(1)]).optional(),
+  set_rate_of_sub_assembly_item_based_on_bom: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   project: z.string().optional(),
   image: z.string().optional(),
-  rm_cost_as_per: z.enum(["Valuation Rate", "Last Purchase Rate", "Price List"]).optional(),
+  rm_cost_as_per: z
+    .enum(["Valuation Rate", "Last Purchase Rate", "Price List"])
+    .optional(),
   buying_price_list: z.string().optional(),
   price_list_currency: z.string().optional(),
   plc_conversion_rate: z.number().optional(),
@@ -4115,7 +4373,9 @@ export const WorkstationSchema = z.object({
   plant_floor: z.string().optional(),
   production_capacity: z.number().int(),
   warehouse: z.string().optional(),
-  status: z.enum(["Production", "Off", "Idle", "Problem", "Maintenance", "Setup"]).optional(),
+  status: z
+    .enum(["Production", "Off", "Idle", "Problem", "Maintenance", "Setup"])
+    .optional(),
   on_status_image: z.string().optional(),
   off_status_image: z.string().optional(),
   hour_rate_electricity: z.number().optional(),
@@ -4159,7 +4419,9 @@ export type WorkstationSchemaType = z.infer<typeof WorkstationSchema>;
 export const OperationSchema = z.object({
   workstation: z.string().optional(),
   is_corrective_operation: z.union([z.literal(0), z.literal(1)]).optional(),
-  create_job_card_based_on_batch_size: z.union([z.literal(0), z.literal(1)]).optional(),
+  create_job_card_based_on_batch_size: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   quality_inspection_template: z.string().optional(),
   batch_size: z.number().int().optional(),
   sub_operations: z.array(z.unknown()).optional(),
@@ -4196,7 +4458,9 @@ export const ProductionPlanSchema = z.object({
   customer: z.string().optional(),
   warehouse: z.string().optional(),
   project: z.string().optional(),
-  sales_order_status: z.enum(["To Deliver and Bill", "To Bill", "To Deliver"]).optional(),
+  sales_order_status: z
+    .enum(["To Deliver and Bill", "To Bill", "To Deliver"])
+    .optional(),
   from_date: z.string().optional(),
   to_date: z.string().optional(),
   from_delivery_date: z.string().optional(),
@@ -4211,7 +4475,9 @@ export const ProductionPlanSchema = z.object({
   prod_plan_references: z.array(z.unknown()).optional(),
   combine_sub_items: z.union([z.literal(0), z.literal(1)]).optional(),
   sub_assembly_warehouse: z.string().optional(),
-  skip_available_sub_assembly_item: z.union([z.literal(0), z.literal(1)]).optional(),
+  skip_available_sub_assembly_item: z
+    .union([z.literal(0), z.literal(1)])
+    .optional(),
   get_sub_assembly_items: z.unknown().optional(),
   sub_assembly_items: z.array(z.unknown()).optional(),
   download_materials_required: z.unknown().optional(),
@@ -4226,7 +4492,18 @@ export const ProductionPlanSchema = z.object({
   mr_items: z.array(z.unknown()).optional(),
   total_planned_qty: z.number().optional(),
   total_produced_qty: z.number().optional(),
-  status: z.enum(["Draft", "Submitted", "Not Started", "In Process", "Completed", "Closed", "Cancelled", "Material Requested"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Submitted",
+      "Not Started",
+      "In Process",
+      "Completed",
+      "Closed",
+      "Cancelled",
+      "Material Requested",
+    ])
+    .optional(),
   warehouses: z.array(z.unknown()).optional(),
   amended_from: z.string().optional(),
   name: z.string().min(1, "ID is required"),
@@ -4242,8 +4519,7 @@ export const ProductionPlanCreateSchema = ProductionPlanSchema.pick({
   company: true,
   posting_date: true,
   po_items: true,
-}).extend({
-});
+}).extend({});
 
 export const ProductionPlanUpdateSchema = ProductionPlanSchema.partial().omit({
   name: true,
@@ -4295,7 +4571,17 @@ export const JobCardSchema = z.object({
   item_name: z.string().optional(),
   transferred_qty: z.number().optional(),
   requested_qty: z.number().optional(),
-  status: z.enum(["Open", "Work In Progress", "Material Transferred", "On Hold", "Submitted", "Cancelled", "Completed"]).optional(),
+  status: z
+    .enum([
+      "Open",
+      "Work In Progress",
+      "Material Transferred",
+      "On Hold",
+      "Submitted",
+      "Cancelled",
+      "Completed",
+    ])
+    .optional(),
   operation_row_number: z.string().optional(),
   operation_id: z.string().optional(),
   sequence_id: z.number().int().optional(),
@@ -4323,8 +4609,7 @@ export const JobCardCreateSchema = JobCardSchema.pick({
   operation: true,
   wip_warehouse: true,
   workstation: true,
-}).extend({
-});
+}).extend({});
 
 export const JobCardUpdateSchema = JobCardSchema.partial().omit({
   name: true,
@@ -4364,8 +4649,7 @@ export const DowntimeEntryCreateSchema = DowntimeEntrySchema.pick({
   from_time: true,
   to_time: true,
   stop_reason: true,
-}).extend({
-});
+}).extend({});
 
 export const DowntimeEntryUpdateSchema = DowntimeEntrySchema.partial().omit({
   name: true,
@@ -4387,7 +4671,9 @@ export const ProjectSchema = z.object({
   status: z.enum(["Open", "Completed", "Cancelled"]).optional(),
   project_type: z.string().optional(),
   is_active: z.enum(["Yes", "No"]).optional(),
-  percent_complete_method: z.enum(["Manual", "Task Completion", "Task Progress", "Task Weight"]).optional(),
+  percent_complete_method: z
+    .enum(["Manual", "Task Completion", "Task Progress", "Task Weight"])
+    .optional(),
   percent_complete: z.number().optional(),
   project_template: z.string().optional(),
   expected_start_date: z.string().optional(),
@@ -4421,7 +4707,17 @@ export const ProjectSchema = z.object({
   first_email: z.string().optional(),
   second_email: z.string().optional(),
   daily_time_to_send: z.string().optional(),
-  day_to_send: z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]).optional(),
+  day_to_send: z
+    .enum([
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ])
+    .optional(),
   weekly_time_to_send: z.string().optional(),
   subject: z.string().optional(),
   message: z.string().optional(),
@@ -4437,8 +4733,7 @@ export const ProjectCreateSchema = ProjectSchema.pick({
   naming_series: true,
   project_name: true,
   company: true,
-}).extend({
-});
+}).extend({});
 
 export const ProjectUpdateSchema = ProjectSchema.partial().omit({
   name: true,
@@ -4462,7 +4757,17 @@ export const TaskSchema = z.object({
   color: z.string().optional(),
   is_group: z.union([z.literal(0), z.literal(1)]).optional(),
   is_template: z.union([z.literal(0), z.literal(1)]).optional(),
-  status: z.enum(["Open", "Working", "Pending Review", "Overdue", "Template", "Completed", "Cancelled"]).optional(),
+  status: z
+    .enum([
+      "Open",
+      "Working",
+      "Pending Review",
+      "Overdue",
+      "Template",
+      "Completed",
+      "Cancelled",
+    ])
+    .optional(),
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional(),
   task_weight: z.number().optional(),
   parent_task: z.string().optional(),
@@ -4561,7 +4866,9 @@ export const TimesheetSchema = z.object({
   currency: z.string().optional(),
   exchange_rate: z.number().optional(),
   sales_invoice: z.string().optional(),
-  status: z.enum(["Draft", "Submitted", "Billed", "Payslip", "Completed", "Cancelled"]).optional(),
+  status: z
+    .enum(["Draft", "Submitted", "Billed", "Payslip", "Completed", "Cancelled"])
+    .optional(),
   parent_project: z.string().optional(),
   employee: z.string().optional(),
   employee_name: z.string().optional(),
@@ -4593,8 +4900,7 @@ export const TimesheetSchema = z.object({
 export const TimesheetCreateSchema = TimesheetSchema.pick({
   naming_series: true,
   time_logs: true,
-}).extend({
-});
+}).extend({});
 
 export const TimesheetUpdateSchema = TimesheetSchema.partial().omit({
   name: true,
@@ -4646,7 +4952,9 @@ export const IssueSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   customer: z.string().optional(),
   raised_by: z.string().optional(),
-  status: z.enum(["Open", "Replied", "On Hold", "Resolved", "Closed"]).optional(),
+  status: z
+    .enum(["Open", "Replied", "On Hold", "Resolved", "Closed"])
+    .optional(),
   priority: z.string().optional(),
   issue_type: z.string().optional(),
   issue_split_from: z.string().optional(),
@@ -4654,7 +4962,9 @@ export const IssueSchema = z.object({
   service_level_agreement: z.string().optional(),
   response_by: z.string().optional(),
   reset_service_level_agreement: z.unknown().optional(),
-  agreement_status: z.enum(["First Response Due", "Resolution Due", "Fulfilled", "Failed"]).optional(),
+  agreement_status: z
+    .enum(["First Response Due", "Resolution Due", "Fulfilled", "Failed"])
+    .optional(),
   sla_resolution_by: z.string().optional(),
   service_level_agreement_creation: z.string().optional(),
   on_hold_since: z.string().optional(),
@@ -4715,7 +5025,9 @@ export const WarrantyClaimSchema = z.object({
   item_code: z.string().optional(),
   item_name: z.string().optional(),
   description: z.string().optional(),
-  warranty_amc_status: z.enum(["Under Warranty", "Out of Warranty", "Under AMC", "Out of AMC"]).optional(),
+  warranty_amc_status: z
+    .enum(["Under Warranty", "Out of Warranty", "Under AMC", "Out of AMC"])
+    .optional(),
   warranty_expiry_date: z.string().optional(),
   amc_expiry_date: z.string().optional(),
   resolution_date: z.string().optional(),
@@ -4807,15 +5119,15 @@ export const MaintenanceVisitCreateSchema = MaintenanceVisitSchema.pick({
   maintenance_type: true,
   status: true,
   company: true,
-}).extend({
-});
+}).extend({});
 
-export const MaintenanceVisitUpdateSchema = MaintenanceVisitSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const MaintenanceVisitUpdateSchema =
+  MaintenanceVisitSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
 export type MaintenanceVisitSchemaType = z.infer<typeof MaintenanceVisitSchema>;
 
@@ -4857,17 +5169,19 @@ export const MaintenanceScheduleCreateSchema = MaintenanceScheduleSchema.pick({
   transaction_date: true,
   items: true,
   company: true,
-}).extend({
-});
+}).extend({});
 
-export const MaintenanceScheduleUpdateSchema = MaintenanceScheduleSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const MaintenanceScheduleUpdateSchema =
+  MaintenanceScheduleSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
 
-export type MaintenanceScheduleSchemaType = z.infer<typeof MaintenanceScheduleSchema>;
+export type MaintenanceScheduleSchemaType = z.infer<
+  typeof MaintenanceScheduleSchema
+>;
 
 /**
  * Customer Zod Schema

@@ -77,7 +77,7 @@ function AddressCard({ address }: { address: Address }) {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full hover:bg-primary hover:text-primary-foreground"
+          className="rounded-full hover:bg-primary hover:text-primary-foreground transform active:scale-95 transition-all"
           asChild
         >
           <Link
@@ -126,7 +126,7 @@ function ContactCard({ contact }: { contact: Contact }) {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full hover:bg-primary hover:text-primary-foreground"
+          className="rounded-full hover:bg-primary hover:text-primary-foreground transform active:scale-95 transition-all"
           asChild
         >
           <Link
@@ -156,35 +156,25 @@ export default function CustomerDetailPage() {
     error,
   } = useFrappeDoc<Customer>("Customer", name);
 
-  // Fetch ALL addresses and contacts (client-side filtering for now)
-  const { data: allAddresses } = useFrappeList<Address>("Address", {
-    limit: 500,
-  });
-  const { data: allContacts } = useFrappeList<Contact>("Contact", {
-    limit: 500,
-  });
+  // Fetch linked addresses using server-side filtering
+  const { data: linkedAddresses = [], isLoading: isLoadingAddresses } =
+    useFrappeList<Address>("Address", {
+      filters: [
+        ["Dynamic Link", "link_doctype", "=", "Customer"],
+        ["Dynamic Link", "link_name", "=", name],
+      ],
+      limit: 100,
+    });
 
-  // Filter addresses linked to this customer
-  const linkedAddresses = useMemo(() => {
-    if (!allAddresses || !customer) return [];
-    return allAddresses.filter((addr) =>
-      (addr.links as any[])?.some(
-        (link) =>
-          link.link_doctype === "Customer" && link.link_name === customer.name
-      )
-    );
-  }, [allAddresses, customer]);
-
-  // Filter contacts linked to this customer
-  const linkedContacts = useMemo(() => {
-    if (!allContacts || !customer) return [];
-    return allContacts.filter((contact) =>
-      (contact.links as any[])?.some(
-        (link) =>
-          link.link_doctype === "Customer" && link.link_name === customer.name
-      )
-    );
-  }, [allContacts, customer]);
+  // Fetch linked contacts using server-side filtering
+  const { data: linkedContacts = [], isLoading: isLoadingContacts } =
+    useFrappeList<Contact>("Contact", {
+      filters: [
+        ["Dynamic Link", "link_doctype", "=", "Customer"],
+        ["Dynamic Link", "link_name", "=", name],
+      ],
+      limit: 100,
+    });
 
   // Delete mutation
   const deleteMutation = useFrappeDelete("Customer", {
@@ -360,7 +350,7 @@ export default function CustomerDetailPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="rounded-full hover:bg-primary hover:text-primary-foreground"
+                      className="rounded-full hover:bg-primary hover:text-primary-foreground transform active:scale-95 transition-all"
                       asChild
                     >
                       <Link

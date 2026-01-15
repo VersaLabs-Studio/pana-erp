@@ -668,10 +668,96 @@ pnpm lint
 
 ---
 
+## 11. Critical Architecture Rules (Learned from CRM Implementation)
+
+### Rule 1: Schema Integrity for DocTypes
+
+Always ensure that the `[DocType]CreateSchema` in `lib/schemas/doctype-schemas.ts` reflects the **naming requirements** and **linkage requirements** of the Frappe backend.
+
+**Naming Fields:** If a DocType uses a specific field for naming (like `address_title` for Address or `item_code` for Item), that field **MUST** be included in the `.pick()` list of the Create Schema.
+
+**Links:** For any DocType that supports "Linked Documents" (like Address or Contact), the `links` field must be included in the schema to allow the `useEffect` pre-filling logic to persist the relationship during the `POST` request.
+
+**Why This Matters:** `zodResolver` will **silently drop** any form values not defined in the schema, leading to backend validation errors even if the frontend form looks complete.
+
+```typescript
+// ❌ WRONG - Missing address_title and links
+export const AddressCreateSchema = AddressSchema.pick({
+  address_type: true,
+  address_line1: true,
+  city: true,
+  country: true,
+}).extend({});
+
+// ✅ CORRECT - Includes naming field and links
+export const AddressCreateSchema = AddressSchema.pick({
+  address_title: true,  // Required for naming
+  address_type: true,
+  address_line1: true,
+  city: true,
+  country: true,
+  links: true,  // Required for Dynamic Link relationships
+}).extend({});
+```
+
+---
+
+### Rule 2: Server-Side Filtering for Child Table Relationships
+
+**NEVER** fetch a full list of documents (Address, Contact, etc.) to perform client-side matching based on child table links (e.g., `links.some(...)`).
+
+**Why:** Frappe List APIs (`get_list`) do **NOT** return child table data. Child tables require complex horizontal joins that degrade performance for list results.
+
+**Solution:** Always use **server-side filters** on the child table itself. For Addresses and Contacts, the child table name is `Dynamic Link`.
+
+```typescript
+// ❌ WRONG - Client-side filtering (links is always undefined in list results)
+const { data: allAddresses } = useFrappeList<Address>("Address", { limit: 500 });
+const linkedAddresses = allAddresses.filter(addr =>
+  addr.links?.some(link => link.link_doctype === "Customer" && link.link_name === name)
+);
+
+// ✅ CORRECT - Server-side filtering via Dynamic Link child table
+const { data: linkedAddresses } = useFrappeList<Address>("Address", {
+  filters: [
+    ["Dynamic Link", "link_doctype", "=", "Customer"],
+    ["Dynamic Link", "link_name", "=", name]
+  ],
+  limit: 100,
+});
+```
+
+---
+
+### Rule 3: Component Usage by Page Type
+
+**Detail Pages (`[name]/page.tsx`):**
+- Use `DataPoint` from `@/components/ui/info-card` for displaying read-only information
+- **NEVER** use `TextDataField`, `DataField`, or any form input components
+- These are visualization pages, not forms
+
+**Form Pages (`new/page.tsx`, `edit/page.tsx`):**
+- Use `FormInput`, `FormTextarea`, `FormSelect`, `FormFrappeSelect` from `@/components/form`
+- These wrap `react-hook-form` fields for proper form state management
+
+```tsx
+// ❌ WRONG - Using form components on detail page
+<TextDataField label="Name" value={customer.customer_name} />
+
+// ✅ CORRECT - Using DataPoint on detail page
+<DataPoint label="Name" value={customer.customer_name} />
+
+// ✅ CORRECT - Using form components on create/edit pages
+<FormInput control={form.control} name="customer_name" label="Name" />
+```
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.0.5 | 2026-01-15 | Added CRM Customer Hub, Critical Architecture Rules (Schema Integrity, Server-Side Filtering, Component Usage), Settings modules |
 | 3.0.4 | 2026-01-14 | Initial session kickoff guide, Contact module as Golden Template #2, Linked Entity CTA pattern, DataPoint component |
 
 ---

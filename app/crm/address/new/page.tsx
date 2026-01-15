@@ -129,6 +129,7 @@ export default function CreateAddressPage() {
                     control={form.control}
                     name="address_title"
                     label="Address Title"
+                    required
                     placeholder="e.g. Headquarters, Home"
                     className="md:col-span-2"
                   />

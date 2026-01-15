@@ -15,7 +15,10 @@ import {
   Mail,
   Globe,
   Link as LinkIcon,
+  ArrowUpRight,
+  Building2,
 } from "lucide-react";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,14 +29,9 @@ import {
 
 // v3.0 Imports
 import { useFrappeDoc, useFrappeDelete } from "@/hooks/generic";
-import {
-  PageHeader,
-  LoadingState,
-  ConfirmDialog,
-} from "@/components/smart";
-import { InfoCard } from "@/components/ui/info-card";
-// Assuming DataPoint is in @/components/ui/info-card as per instructions
-import { DataPoint } from "@/components/ui/info-card"; 
+import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
+import { InfoCard, DataPoint } from "@/components/ui/info-card";
+import { getApiPath } from "@/lib/doctype-config";
 import type { Address } from "@/types/doctype-types";
 
 export default function AddressDetailPage() {
@@ -43,7 +41,11 @@ export default function AddressDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch address data
-  const { data: address, isLoading, error } = useFrappeDoc<Address>("Address", name);
+  const {
+    data: address,
+    isLoading,
+    error,
+  } = useFrappeDoc<Address>("Address", name);
 
   // Delete mutation
   const deleteMutation = useFrappeDelete("Address", {
@@ -69,14 +71,22 @@ export default function AddressDetailPage() {
   }
 
   // Address type variant
-  const getTypeVariant = (type: string): "default" | "secondary" | "outline" => {
-    return type === "Billing" ? "default" : type === "Shipping" ? "secondary" : "outline";
+  const getTypeVariant = (
+    type: string
+  ): "default" | "secondary" | "outline" => {
+    return type === "Billing"
+      ? "default"
+      : type === "Shipping"
+      ? "secondary"
+      : "outline";
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={address.address_title || address.address_line1 || "Address Details"}
+        title={
+          address.address_title || address.address_line1 || "Address Details"
+        }
         subtitle={`ID: ${name}`}
         backHref="/crm/address"
         actions={
@@ -84,7 +94,9 @@ export default function AddressDetailPage() {
             <Button
               variant="outline"
               className="rounded-full"
-              onClick={() => router.push(`/crm/address/${encodeURIComponent(name)}/edit`)}
+              onClick={() =>
+                router.push(`/crm/address/${encodeURIComponent(name)}/edit`)
+              }
             >
               <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
@@ -119,12 +131,22 @@ export default function AddressDetailPage() {
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold text-lg">{address.address_line1}</p>
-                  {address.address_line2 && <p className="text-muted-foreground">{address.address_line2}</p>}
-                  <p className="text-muted-foreground mt-1">
-                    {[address.city, address.state, address.country].filter(Boolean).join(", ")}
+                  <p className="font-semibold text-lg">
+                    {address.address_line1}
                   </p>
-                  {address.pincode && <p className="text-muted-foreground">{address.pincode}</p>}
+                  {address.address_line2 && (
+                    <p className="text-muted-foreground">
+                      {address.address_line2}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground mt-1">
+                    {[address.city, address.state, address.country]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                  {address.pincode && (
+                    <p className="text-muted-foreground">{address.pincode}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -152,16 +174,38 @@ export default function AddressDetailPage() {
           {address.links && address.links.length > 0 && (
             <InfoCard title="Linked To" icon="link">
               <div className="space-y-3">
-                {address.links.map((link, idx) => {
-                  const linkName = (link as { link_doctype: string; link_name: string }).link_name;
-                  const linkDoctype = (link as { link_doctype: string; link_name: string }).link_doctype;
+                {(address.links as any[]).map((link, idx) => {
+                  const linkName = link.link_name;
+                  const linkDoctype = link.link_doctype;
+                  const apiPath = getApiPath(linkDoctype);
+                  const href = `/${apiPath}/${encodeURIComponent(linkName)}`;
+
                   return (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <LinkIcon className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{linkDoctype}</span>
+                    <div
+                      key={idx}
+                      className="group flex items-center justify-between p-4 bg-secondary/20 rounded-2xl hover:bg-secondary/40 transition-all duration-300 border border-transparent hover:border-primary/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+                          <Building2 className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-0.5">
+                            {linkDoctype}
+                          </p>
+                          <p className="font-semibold text-sm">{linkName}</p>
+                        </div>
                       </div>
-                      <Badge variant="outline">{linkName}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full hover:bg-primary hover:text-primary-foreground transform active:scale-90 transition-all"
+                        asChild
+                      >
+                        <Link href={href}>
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
                   );
                 })}
@@ -183,12 +227,16 @@ export default function AddressDetailPage() {
               </div>
               {address.is_primary_address === 1 && (
                 <div className="p-3 bg-primary/10 rounded-xl text-center">
-                  <p className="text-sm font-medium text-primary">Primary Address</p>
+                  <p className="text-sm font-medium text-primary">
+                    Primary Address
+                  </p>
                 </div>
               )}
               {address.is_shipping_address === 1 && (
                 <div className="p-3 bg-primary/10 rounded-xl text-center">
-                  <p className="text-sm font-medium text-primary">Shipping Address</p>
+                  <p className="text-sm font-medium text-primary">
+                    Shipping Address
+                  </p>
                 </div>
               )}
             </div>
@@ -197,8 +245,22 @@ export default function AddressDetailPage() {
           {/* System Info */}
           <InfoCard title="System Info">
             <div className="space-y-3">
-               <DataPoint label="Created" value={address.creation ? new Date(address.creation).toLocaleDateString() : "-"} />
-               <DataPoint label="Modified" value={address.modified ? new Date(address.modified).toLocaleDateString() : "-"} />
+              <DataPoint
+                label="Created"
+                value={
+                  address.creation
+                    ? new Date(address.creation).toLocaleDateString()
+                    : "-"
+                }
+              />
+              <DataPoint
+                label="Modified"
+                value={
+                  address.modified
+                    ? new Date(address.modified).toLocaleDateString()
+                    : "-"
+                }
+              />
             </div>
           </InfoCard>
         </div>
@@ -209,7 +271,9 @@ export default function AddressDetailPage() {
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         title="Delete Address"
-        description={`Are you sure you want to delete "${address.address_title || address.name}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${
+          address.address_title || address.name
+        }"? This action cannot be undone.`}
         confirmText="Delete"
         variant="destructive"
         onConfirm={handleDeleteConfirm}

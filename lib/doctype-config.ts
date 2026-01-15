@@ -10,6 +10,7 @@ export type ModuleCategory =
   | "Manufacturing"
   | "Accounting"
   | "CRM"
+  | "Sales"
   | "Purchasing"
   | "Assets"
   | "HR"
@@ -204,20 +205,34 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     defaultSortOrder: "desc",
   },
   "Sales Order": {
-    apiPath: "crm/sales-order",
-    module: "CRM",
+    apiPath: "sales/sales-order",
+    module: "Sales",
     labelField: "name",
     searchFields: ["name", "customer_name"],
     defaultSortField: "transaction_date",
     defaultSortOrder: "desc",
   },
   Quotation: {
-    apiPath: "crm/quotation",
-    module: "CRM",
+    apiPath: "sales/quotation",
+    module: "Sales",
     labelField: "name",
-    searchFields: ["name", "party_name"],
+    searchFields: ["name", "party_name", "customer_name"],
     defaultSortField: "transaction_date",
     defaultSortOrder: "desc",
+  },
+  "Sales Taxes and Charges Template": {
+    apiPath: "sales/taxes-template",
+    module: "Sales",
+    labelField: "title",
+    searchFields: ["title"],
+    isSettings: true,
+  },
+  "Terms and Conditions": {
+    apiPath: "sales/terms",
+    module: "Sales",
+    labelField: "title",
+    searchFields: ["title"],
+    isSettings: true,
   },
 
   // ============================================================================

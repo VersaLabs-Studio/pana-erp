@@ -153,10 +153,25 @@ const navigation = [
     title: "CRM",
     icon: Users,
     items: [
+      { title: "Dashboard", href: "/crm", icon: LayoutDashboard },
       { title: "Leads", href: "/crm/lead", icon: Target },
       { title: "Customers", href: "/crm/customer", icon: Users },
       { title: "Contacts", href: "/crm/contact", icon: User },
       { title: "Addresses", href: "/crm/address", icon: MapPin },
+      { title: "Settings", href: "/crm/settings", icon: Settings },
+    ],
+  },
+  {
+    title: "Sales",
+    icon: FileText,
+    items: [
+      { title: "Quotations", href: "/sales/quotation", icon: FileText },
+      {
+        title: "Sales Orders",
+        href: "/sales/sales-order",
+        icon: ClipboardList,
+      },
+      { title: "Settings", href: "/sales/settings", icon: Settings },
     ],
   },
   {
@@ -270,7 +285,13 @@ function NavSection({
                 const ItemIcon = item.icon;
                 const isItemActive =
                   pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+                  (pathname.startsWith(item.href + "/") &&
+                    !section.items?.some(
+                      (sibling) =>
+                        sibling !== item &&
+                        pathname.startsWith(sibling.href) &&
+                        sibling.href.length > item.href.length
+                    ));
                 return (
                   <Link
                     key={item.href}

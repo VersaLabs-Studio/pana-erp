@@ -1,7 +1,5 @@
-// app/api/crm/country/route.ts
-// Pana ERP v3.0 - Country API (GET list for options)
-
-import { createListHandler } from "@/lib/api-factory";
+import { createListHandler, createCreateHandler } from "@/lib/api-factory";
+import { CountryCreateSchema } from "@/lib/schemas/doctype-schemas";
 
 // GET /api/crm/country - List countries
 export const GET = createListHandler("Country", {
@@ -9,3 +7,6 @@ export const GET = createListHandler("Country", {
   defaultSort: { field: "country_name", order: "asc" },
   defaultLimit: 250,
 });
+
+// POST /api/crm/country - Create country
+export const POST = createCreateHandler("Country", CountryCreateSchema);

@@ -1,7 +1,8 @@
 // app/api/crm/customer-group/route.ts
 // Pana ERP v3.0 - Customer Group API (GET list for options)
 
-import { createListHandler } from "@/lib/api-factory";
+import { createListHandler, createCreateHandler } from "@/lib/api-factory";
+import { CustomerGroupCreateSchema } from "@/lib/schemas/doctype-schemas";
 
 // GET /api/crm/customer-group - List customer groups
 export const GET = createListHandler("Customer Group", {
@@ -14,3 +15,9 @@ export const GET = createListHandler("Customer Group", {
   defaultSort: { field: "customer_group_name", order: "asc" },
   defaultLimit: 100,
 });
+
+// POST /api/crm/customer-group - Create customer group
+export const POST = createCreateHandler(
+  "Customer Group",
+  CustomerGroupCreateSchema
+);

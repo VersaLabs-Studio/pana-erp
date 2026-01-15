@@ -109,17 +109,36 @@ export const queryKeys = {
       ["Opportunity", "list", options] as const,
     doc: (name: string) => ["Opportunity", "doc", name] as const,
   },
+
+  // ============================================================================
+  // SALES MODULE
+  // ============================================================================
+  quotation: {
+    all: () => ["Quotation"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Quotation", "list", options] as const,
+    doc: (name: string) => ["Quotation", "doc", name] as const,
+    byCustomer: (customerName: string) =>
+      ["Quotation", "list", "customer", customerName] as const,
+  },
   salesOrder: {
     all: () => ["Sales Order"] as const,
     list: (options?: FrappeListOptions) =>
       ["Sales Order", "list", options] as const,
     doc: (name: string) => ["Sales Order", "doc", name] as const,
   },
-  quotation: {
-    all: () => ["Quotation"] as const,
+  termsAndConditions: {
+    all: () => ["Terms and Conditions"] as const,
     list: (options?: FrappeListOptions) =>
-      ["Quotation", "list", options] as const,
-    doc: (name: string) => ["Quotation", "doc", name] as const,
+      ["Terms and Conditions", "list", options] as const,
+    doc: (name: string) => ["Terms and Conditions", "doc", name] as const,
+  },
+  salesTaxesTemplate: {
+    all: () => ["Sales Taxes and Charges Template"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Sales Taxes and Charges Template", "list", options] as const,
+    doc: (name: string) =>
+      ["Sales Taxes and Charges Template", "doc", name] as const,
   },
 
   // ============================================================================
