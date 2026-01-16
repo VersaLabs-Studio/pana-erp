@@ -135,6 +135,7 @@ const navigation = [
       { title: "Purchases", href: "/accounting/purchases", icon: ShoppingCart },
       { title: "Payments", href: "/accounting/payments", icon: CreditCard },
       { title: "Expenses", href: "/accounting/expenses", icon: Receipt },
+      { title: "Settings", href: "/accounting/settings", icon: Settings },
     ],
   },
   {
