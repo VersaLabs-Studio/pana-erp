@@ -1,19 +1,31 @@
 // app/sales/settings/taxes/page.tsx
-// Pana ERP v3.0 - Tax Templates List Page
+// Pana ERP v3.0 - Sales Tax Templates List Page
 // @ts-nocheck
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreVertical, Pencil, Trash2, Percent } from "lucide-react";
+import {
+  Plus,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Percent,
+  CheckCircle2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+
+// v3.0 Imports
 import { useFrappeList, useFrappeDelete } from "@/hooks/generic";
 import {
   PageHeader,
@@ -23,72 +35,180 @@ import {
 } from "@/components/smart";
 import type { SalesTaxesandChargesTemplate } from "@/types/doctype-types";
 
-export default function TaxTemplatesListPage() {
-  const router = useRouter();
-  const [deleteTarget, setDeleteTarget] = useState<SalesTaxesandChargesTemplate | null>(null);
+// Tax Template Row Component
+function TaxTemplateRow({
+  template,
+  index,
+  onEdit,
+  onDelete,
+}: {
+  template: SalesTaxesandChargesTemplate;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className="group relative flex items-center justify-between p-4 mb-2 bg-card hover:bg-card/80 hover:shadow-lg transition-all duration-300 rounded-2xl border border-transparent hover:border-primary/10"
+    >
+      <div className="flex items-center gap-4">
+        <div className="p-2.5 bg-primary/10 rounded-xl">
+          <Percent className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-foreground">{template.title}</h3>
+            {template.is_default === 1 && (
+              <Badge
+                variant="secondary"
+                className="text-[10px] h-4 bg-emerald-500/10 text-emerald-600 border-none"
+              >
+                Default
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">{template.company}</p>
+        </div>
+      </div>
 
-  const { data: taxes, isLoading, error } = useFrappeList<SalesTaxesandChargesTemplate>(
+      <div className="flex items-center gap-3">
+        {template.disabled === 1 && (
+          <Badge variant="outline" className="text-[10px] h-4 opacity-70">
+            Disabled
+          </Badge>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="rounded-xl border-none shadow-xl bg-popover/95 backdrop-blur-xl p-1"
+          >
+            <DropdownMenuItem className="rounded-lg" onClick={onEdit}>
+              <Pencil className="h-4 w-4 mr-2" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="rounded-lg text-destructive focus:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </motion.div>
+  );
+}
+
+export default function TaxTemplatesPage() {
+  const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] =
+    useState<SalesTaxesandChargesTemplate | null>(null);
+
+  const {
+    data: templates,
+    isLoading,
+    error,
+  } = useFrappeList<SalesTaxesandChargesTemplate>(
     "Sales Taxes and Charges Template",
-    { orderBy: { field: "creation", order: "desc" }, limit: 100 }
+    {
+      orderBy: { field: "title", order: "asc" },
+      search,
+      limit: 100,
+    }
   );
 
   const deleteMutation = useFrappeDelete("Sales Taxes and Charges Template", {
     onSuccess: () => setDeleteTarget(null),
   });
 
-  if (isLoading) return <LoadingState type="list" count={6} />;
-  if (error) return <div className="p-4 text-destructive">Failed to load tax templates</div>;
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    await deleteMutation.mutateAsync(deleteTarget.name);
+  };
+
+  if (isLoading) {
+    return <LoadingState type="list" count={6} />;
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-destructive font-bold text-lg">
+          Failed to load tax templates
+        </p>
+      </div>
+    );
+  }
+
+  const filteredTemplates = templates?.filter(
+    (t) =>
+      t.title?.toLowerCase().includes(search.toLowerCase()) ||
+      t.company?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <PageHeader
         title="Tax Templates"
-        subtitle={`${taxes?.length || 0} total`}
+        subtitle={`${filteredTemplates?.length || 0} templates configured`}
+        showSearch
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search templates..."
+        backHref="/sales/settings"
         actions={
-          <Button className="rounded-full" onClick={() => router.push("/sales/settings/taxes/new")}>
+          <Button
+            className="rounded-full shadow-lg shadow-primary/20"
+            onClick={() => router.push("/sales/settings/taxes/new")}
+          >
             <Plus className="h-4 w-4 mr-2" /> New Template
           </Button>
         }
       />
 
-      {!taxes || taxes.length === 0 ? (
+      {filteredTemplates?.length === 0 ? (
         <EmptyState
           title="No tax templates found"
-          description="Configure VAT, Sales Tax, etc."
-          action={<Button onClick={() => router.push("/sales/settings/taxes/new")}>Create Template</Button>}
+          description={
+            search
+              ? "Try adjusting your search"
+              : "Configure your first sales tax template"
+          }
+          action={
+            <Button onClick={() => router.push("/sales/settings/taxes/new")}>
+              <Plus className="h-4 w-4 mr-2" /> New Template
+            </Button>
+          }
         />
       ) : (
-        <div className="space-y-2">
-          {taxes.map((tax) => (
-            <div
-              key={tax.name}
-              className="group p-4 bg-card hover:bg-card/80 transition-colors rounded-xl flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-secondary/30 rounded-lg">
-                  <Percent className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">{tax.title}</h3>
-                  <p className="text-sm text-muted-foreground">{tax.company}</p>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => router.push(`/sales/settings/taxes/${encodeURIComponent(tax.name)}/edit`)}>
-                    <Pencil className="h-4 w-4 mr-2" /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(tax)}>
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+        <div className="space-y-2 max-w-5xl">
+          {filteredTemplates?.map((template, index) => (
+            <TaxTemplateRow
+              key={template.name}
+              template={template}
+              index={index}
+              onEdit={() =>
+                router.push(
+                  `/sales/settings/taxes/${encodeURIComponent(
+                    template.name
+                  )}/edit`
+                )
+              }
+              onDelete={() => setDeleteTarget(template)}
+            />
           ))}
         </div>
       )}
@@ -96,11 +216,11 @@ export default function TaxTemplatesListPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Template"
-        description={`Delete "${deleteTarget?.title}"?`}
+        title="Delete Tax Template"
+        description={`Are you sure you want to delete "${deleteTarget?.title}"? This cannot be undone.`}
         confirmText="Delete"
         variant="destructive"
-        onConfirm={async () => deleteTarget && (await deleteMutation.mutateAsync(deleteTarget.name))}
+        onConfirm={handleDeleteConfirm}
         loading={deleteMutation.isPending}
       />
     </div>

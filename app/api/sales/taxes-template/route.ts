@@ -9,8 +9,18 @@ import { z } from "zod";
 const SalesTaxesTemplateCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),
   company: z.string().optional(),
-  is_default: z.union([z.literal(0), z.literal(1)]).optional(),
-  disabled: z.union([z.literal(0), z.literal(1)]).optional(),
+  is_default: z
+    .preprocess(
+      (v) => (typeof v === "boolean" ? (v ? 1 : 0) : v),
+      z.union([z.literal(0), z.literal(1)])
+    )
+    .optional(),
+  disabled: z
+    .preprocess(
+      (v) => (typeof v === "boolean" ? (v ? 1 : 0) : v),
+      z.union([z.literal(0), z.literal(1)])
+    )
+    .optional(),
   taxes: z.array(z.unknown()).optional(),
 });
 
