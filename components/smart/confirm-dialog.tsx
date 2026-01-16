@@ -35,6 +35,8 @@ interface ConfirmDialogProps {
   loading?: boolean;
   /** Variant for styling */
   variant?: "default" | "destructive";
+  /** Custom children to render in the content area */
+  children?: React.ReactNode;
 }
 
 /**
@@ -68,6 +70,7 @@ export function ConfirmDialog({
   onConfirm,
   loading = false,
   variant = "default",
+  children,
 }: ConfirmDialogProps) {
   const handleConfirm = async () => {
     await onConfirm();
@@ -85,6 +88,7 @@ export function ConfirmDialog({
             {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {children && <div className="py-2">{children}</div>}
         <AlertDialogFooter className="gap-2">
           <AlertDialogCancel
             className="rounded-full px-6 border-0 bg-secondary hover:bg-secondary/80"
