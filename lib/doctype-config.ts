@@ -259,7 +259,7 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
   // ACCOUNTING MODULE
   // ============================================================================
   Company: {
-    apiPath: "accounting/company",
+    apiPath: "accounting/settings/company",
     module: "Accounting",
     labelField: "company_name",
     searchFields: ["company_name"],

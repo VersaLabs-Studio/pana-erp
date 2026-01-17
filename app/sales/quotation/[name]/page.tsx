@@ -407,15 +407,15 @@ export default function QuotationDetailPage() {
       />
 
       {/* Professional Invoice Card */}
-      <div className="bg-card rounded-2xl shadow-lg border border-border overflow-hidden">
+      <div className="bg-card md:rounded-2xl shadow-lg border-y md:border border-border overflow-hidden mx-[-1rem] md:mx-0">
         {/* Invoice Header */}
-        <div className="p-8 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-tight">
+        <div className="p-4 md:p-8 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+            <div className="w-full md:w-auto">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
                 QUOTATION
               </h1>
-              <p className="text-lg font-mono text-primary mt-1">
+              <p className="text-base md:text-lg font-mono text-primary mt-1">
                 {quote.name}
               </p>
               {company && (
@@ -429,8 +429,8 @@ export default function QuotationDetailPage() {
                 </div>
               )}
             </div>
-            <div className="text-right space-y-2">
-              <div className="bg-secondary/50 rounded-xl p-4 inline-block">
+            <div className="w-full md:w-auto md:text-right">
+              <div className="bg-secondary/50 rounded-xl p-4 w-full md:inline-block">
                 <DataPoint
                   label="Date"
                   value={formatDate(quote.transaction_date)}
@@ -455,7 +455,7 @@ export default function QuotationDetailPage() {
         </div>
 
         {/* Bill To Section */}
-        <div className="p-8 border-b border-border">
+        <div className="p-4 md:p-8 border-b border-border">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-3">
@@ -512,71 +512,132 @@ export default function QuotationDetailPage() {
           </div>
         </div>
 
-        {/* Items Table */}
-        <div className="p-8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-border text-muted-foreground">
-                <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                  #
-                </th>
-                <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                  Item / Service
-                </th>
-                <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                  Description / Specs
-                </th>
-                <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                  Qty
-                </th>
-                <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                  Rate
-                </th>
-                <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                  Amount
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr
-                  key={idx}
-                  className="border-b border-border/50 hover:bg-secondary/20 transition-colors"
-                >
-                  <td className="py-4 text-muted-foreground">{idx + 1}</td>
-                  <td className="py-4">
-                    <span className="font-semibold text-foreground">
-                      {item.item_code}
+        {/* Items Section */}
+        <div className="border-t border-border">
+          {/* Mobile Items View (Card-based) */}
+          <div className="p-4 space-y-4 md:hidden">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">
+              Items & Services
+            </p>
+            {items.map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-secondary/20 rounded-2xl p-4 border border-border/50 shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-primary">
+                      #{idx + 1}
                     </span>
-                    {item.item_name && item.item_name !== item.item_code && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.item_name}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-4 text-muted-foreground max-w-xs">
-                    <p className="whitespace-pre-wrap text-xs">
-                      {item.description || "—"}
-                    </p>
-                  </td>
-                  <td className="py-4 text-right font-medium">
+                    <h4 className="font-bold text-foreground">
+                      {item.item_code}
+                    </h4>
+                  </div>
+                  <Badge variant="secondary" className="font-mono text-[10px]">
                     {item.qty} {item.uom || "Nos"}
-                  </td>
-                  <td className="py-4 text-right">
-                    {formatCurrency(item.rate)}
-                  </td>
-                  <td className="py-4 text-right font-semibold text-foreground">
-                    {formatCurrency(item.amount || item.qty * item.rate)}
-                  </td>
+                  </Badge>
+                </div>
+
+                {item.item_name && item.item_name !== item.item_code && (
+                  <p className="text-xs text-foreground/80 mb-2">
+                    {item.item_name}
+                  </p>
+                )}
+
+                {item.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 italic mb-3">
+                    {item.description}
+                  </p>
+                )}
+
+                <div className="flex justify-between items-end pt-3 border-t border-border/50">
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] uppercase text-muted-foreground font-bold tracking-tighter">
+                      Rate
+                    </p>
+                    <p className="text-sm font-medium">
+                      {formatCurrency(item.rate)}
+                    </p>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <p className="text-[9px] uppercase text-muted-foreground font-bold tracking-tighter">
+                      Total
+                    </p>
+                    <p className="text-base font-bold text-foreground">
+                      {formatCurrency(item.amount || item.qty * item.rate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Items Table */}
+          <div className="hidden md:block p-8">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-border text-muted-foreground">
+                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                    #
+                  </th>
+                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                    Item / Service
+                  </th>
+                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                    Description / Specs
+                  </th>
+                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                    Qty
+                  </th>
+                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                    Rate
+                  </th>
+                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                    Amount
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className="border-b border-border/50 hover:bg-secondary/20 transition-colors"
+                  >
+                    <td className="py-4 text-muted-foreground">{idx + 1}</td>
+                    <td className="py-4">
+                      <span className="font-semibold text-foreground">
+                        {item.item_code}
+                      </span>
+                      {item.item_name && item.item_name !== item.item_code && (
+                        <p className="text-xs text-muted-foreground">
+                          {item.item_name}
+                        </p>
+                      )}
+                    </td>
+                    <td className="py-4 text-muted-foreground max-w-xs">
+                      <p className="whitespace-pre-wrap text-xs">
+                        {item.description || "—"}
+                      </p>
+                    </td>
+                    <td className="py-4 text-right font-medium">
+                      {item.qty} {item.uom || "Nos"}
+                    </td>
+                    <td className="py-4 text-right">
+                      {formatCurrency(item.rate)}
+                    </td>
+                    <td className="py-4 text-right font-semibold text-foreground">
+                      {formatCurrency(item.amount || item.qty * item.rate)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Totals */}
-        <div className="p-8 bg-secondary/10 border-t border-border">
-          <div className="ml-auto w-72 space-y-2">
+        <div className="p-4 md:p-8 bg-secondary/10 border-t border-border">
+          <div className="ml-auto w-full md:w-80 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-medium">
@@ -610,7 +671,7 @@ export default function QuotationDetailPage() {
 
         {/* Terms & Conditions */}
         {quote.terms && (
-          <div className="p-8 border-t border-border">
+          <div className="p-4 md:p-8 border-t border-border">
             <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-3">
               Terms & Conditions
             </h3>
