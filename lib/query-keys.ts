@@ -126,6 +126,22 @@ export const queryKeys = {
     list: (options?: FrappeListOptions) =>
       ["Sales Order", "list", options] as const,
     doc: (name: string) => ["Sales Order", "doc", name] as const,
+    byCustomer: (customerName: string) =>
+      ["Sales Order", "list", "customer", customerName] as const,
+    fromQuotation: (quotationName: string) =>
+      ["Sales Order", "list", "quotation", quotationName] as const,
+  },
+  salesPerson: {
+    all: () => ["Sales Person"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Sales Person", "list", options] as const,
+    doc: (name: string) => ["Sales Person", "doc", name] as const,
+  },
+  salesPartner: {
+    all: () => ["Sales Partner"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Sales Partner", "list", options] as const,
+    doc: (name: string) => ["Sales Partner", "doc", name] as const,
   },
   termsAndConditions: {
     all: () => ["Terms and Conditions"] as const,

@@ -1257,7 +1257,7 @@ export type QuotationSchemaType = z.infer<typeof QuotationSchema>;
 /**
  * Sales Order Zod Schema
  * @doctype Sales Order
- * @generated 2026-01-14T18:05:48.297Z
+ * @generated 2026-01-17T16:29:14.100Z
  */
 export const SalesOrderSchema = z.object({
   title: z.string().optional(),
@@ -1397,7 +1397,26 @@ export const SalesOrderCreateSchema = SalesOrderSchema.pick({
   plc_conversion_rate: true,
   items: true,
   status: true,
-}).extend({});
+}).extend({
+  // Make delivery_date required for Sales Order (Due Date is critical)
+  delivery_date: z.string().min(1, "Delivery Date is required"),
+  // Address & Contact
+  customer_address: z.string().optional(),
+  contact_person: z.string().optional(),
+  // Sales Team
+  sales_partner: z.string().optional(),
+  commission_rate: z.number().optional(),
+  // Taxes & Terms
+  taxes_and_charges: z.string().optional(),
+  taxes: z.array(z.unknown()).optional(),
+  tc_name: z.string().optional(),
+  terms: z.string().optional(),
+  // Customer PO (B2B tracking)
+  po_no: z.string().optional(),
+  po_date: z.string().optional(),
+  // Project linking
+  project: z.string().optional(),
+});
 
 export const SalesOrderUpdateSchema = SalesOrderSchema.partial().omit({
   name: true,
@@ -1411,7 +1430,7 @@ export type SalesOrderSchemaType = z.infer<typeof SalesOrderSchema>;
 /**
  * Sales Partner Zod Schema
  * @doctype Sales Partner
- * @generated 2026-01-14T18:05:48.298Z
+ * @generated 2026-01-17T16:29:14.100Z
  */
 export const SalesPartnerSchema = z.object({
   partner_name: z.string().min(1, "Sales Partner Name is required"),
@@ -1440,9 +1459,10 @@ export const SalesPartnerSchema = z.object({
 
 export const SalesPartnerCreateSchema = SalesPartnerSchema.pick({
   partner_name: true,
-  territory: true,
   commission_rate: true,
 }).extend({
+  partner_type: z.string().optional(),
+  territory: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -1458,7 +1478,7 @@ export type SalesPartnerSchemaType = z.infer<typeof SalesPartnerSchema>;
 /**
  * Sales Person Zod Schema
  * @doctype Sales Person
- * @generated 2026-01-14T18:05:48.298Z
+ * @generated 2026-01-17T16:29:14.100Z
  */
 export const SalesPersonSchema = z.object({
   sales_person_name: z.string().min(1, "Sales Person Name is required"),
@@ -1482,9 +1502,17 @@ export const SalesPersonSchema = z.object({
 
 export const SalesPersonCreateSchema = SalesPersonSchema.pick({
   sales_person_name: true,
-  is_group: true,
 }).extend({
-  is_group: z.union([z.literal(0), z.literal(1)]).optional(),
+  is_group: z
+    .union([z.literal(0), z.literal(1)])
+    .optional()
+    .default(0),
+  enabled: z
+    .union([z.literal(0), z.literal(1)])
+    .optional()
+    .default(1),
+  parent_sales_person: z.string().optional(),
+  employee: z.string().optional(),
 });
 
 export const SalesPersonUpdateSchema = SalesPersonSchema.partial().omit({

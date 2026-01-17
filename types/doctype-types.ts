@@ -1744,7 +1744,7 @@ export type QuotationUpdateRequest = Partial<Omit<Quotation, "name" | "creation"
 /**
  * Sales Order DocType
  * @doctype Sales Order
- * @generated 2026-01-14T18:05:48.286Z
+ * @generated 2026-01-17T16:29:14.093Z
  */
 export interface SalesOrder {
   /** Title */
@@ -1988,7 +1988,7 @@ export type SalesOrderUpdateRequest = Partial<Omit<SalesOrder, "name" | "creatio
 /**
  * Sales Partner DocType
  * @doctype Sales Partner
- * @generated 2026-01-14T18:05:48.286Z
+ * @generated 2026-01-17T16:29:14.100Z
  */
 export interface SalesPartner {
   /** Sales Partner Name */
@@ -2052,7 +2052,7 @@ export type SalesPartnerUpdateRequest = Partial<Omit<SalesPartner, "name" | "cre
 /**
  * Sales Person DocType
  * @doctype Sales Person
- * @generated 2026-01-14T18:05:48.286Z
+ * @generated 2026-01-17T16:29:14.099Z
  */
 export interface SalesPerson {
   /** Sales Person Name */
