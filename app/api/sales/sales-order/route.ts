@@ -1,9 +1,6 @@
-// app/api/sales/sales-order/route.ts
-// Pana ERP v3.0 - Sales Order API Routes (Placeholder for Phase 3)
+import { createListHandler, createCreateHandler } from "@/lib/api-factory";
+import { SalesOrderCreateSchema } from "@/lib/schemas/doctype-schemas";
 
-import { createListHandler } from "@/lib/api-factory";
-
-// GET /api/sales/sales-order - List sales orders
 export const GET = createListHandler("Sales Order", {
   allowedFields: [
     "name",
@@ -14,10 +11,13 @@ export const GET = createListHandler("Sales Order", {
     "status",
     "grand_total",
     "currency",
-    "company",
+    "per_delivered",
+    "per_billed",
+    "docstatus",
+    "Sales Order.creation", // Use explicit table reference to avoid ambiguity
   ],
-  defaultSort: { field: "transaction_date", order: "desc" },
+  defaultSort: { field: "Sales Order.creation", order: "desc" },
   defaultLimit: 50,
 });
 
-// Note: POST/PUT/DELETE will be implemented in Phase 3
+export const POST = createCreateHandler("Sales Order", SalesOrderCreateSchema);
