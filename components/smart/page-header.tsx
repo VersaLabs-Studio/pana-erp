@@ -98,7 +98,7 @@ export function PageHeader({
         // Base styles - Floating pill design
         "flex items-center justify-between sticky top-0 z-20",
         "bg-card/80 backdrop-blur-xl rounded-full shadow-sm border border-border/40",
-        "p-3 pr-4",
+        "p-2 pr-4",
         "animate-in fade-in slide-in-from-top-2 duration-500",
         className
       )}
