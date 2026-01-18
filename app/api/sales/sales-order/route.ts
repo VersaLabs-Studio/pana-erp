@@ -14,9 +14,9 @@ export const GET = createListHandler("Sales Order", {
     "per_delivered",
     "per_billed",
     "docstatus",
-    "Sales Order.creation", // Use explicit table reference to avoid ambiguity
+    "creation", // Use explicit table reference to avoid ambiguity
   ],
-  defaultSort: { field: "Sales Order.creation", order: "desc" },
+  defaultSort: { field: "creation", order: "desc" },
   defaultLimit: 50,
 });
 
