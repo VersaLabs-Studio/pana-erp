@@ -100,21 +100,21 @@ export default function QuotationDetailPage() {
   const { data: company } = useFrappeDoc<Company>(
     "Company",
     quote?.company || "",
-    { enabled: !!quote?.company }
+    { enabled: !!quote?.company },
   );
 
   // Fetch Address Details
   const { data: addressDoc } = useFrappeDoc<Address>(
     "Address",
     quote?.customer_address || "",
-    { enabled: !!quote?.customer_address }
+    { enabled: !!quote?.customer_address },
   );
 
   // Fetch Contact Details
   const { data: contactDoc } = useFrappeDoc<Contact>(
     "Contact",
     quote?.contact_person || "",
-    { enabled: !!quote?.contact_person }
+    { enabled: !!quote?.contact_person },
   );
 
   // Mutations
@@ -126,7 +126,7 @@ export default function QuotationDetailPage() {
         setShowSubmitDialog(false);
         setShowCancelDialog(false);
       },
-    }
+    },
   );
 
   const deleteMutation = useFrappeDelete("Quotation", {
@@ -165,8 +165,8 @@ export default function QuotationDetailPage() {
     quote.docstatus === 2
       ? "Cancelled"
       : isExpired && quote.status === "Open"
-      ? "Expired"
-      : quote.status || "Draft";
+        ? "Expired"
+        : quote.status || "Draft";
 
   const isDraft = quote.docstatus === 0;
   const isSubmitted = quote.docstatus === 1;
@@ -272,7 +272,9 @@ export default function QuotationDetailPage() {
   };
 
   const handleCreateSalesOrder = () => {
-    toast.info("Sales Order creation will be available in Phase 3");
+    router.push(
+      `/sales/sales-order/new?quotation=${encodeURIComponent(quote.name)}`,
+    );
   };
 
   // Get items array
@@ -287,7 +289,7 @@ export default function QuotationDetailPage() {
             <Badge
               className={cn(
                 "text-xs font-semibold border-0",
-                getStatusBadgeClasses(displayStatus)
+                getStatusBadgeClasses(displayStatus),
               )}
             >
               {displayStatus}
@@ -310,7 +312,7 @@ export default function QuotationDetailPage() {
                   className="rounded-full"
                   onClick={() =>
                     router.push(
-                      `/sales/quotation/${encodeURIComponent(name)}/edit`
+                      `/sales/quotation/${encodeURIComponent(name)}/edit`,
                     )
                   }
                 >

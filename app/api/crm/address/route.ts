@@ -19,9 +19,9 @@ export const GET = createListHandler("Address", {
     "is_primary_address",
     "is_shipping_address",
     "links",
-    "creation",
+    "`tabAddress`.creation",
   ],
-  defaultSort: { field: "creation", order: "desc" },
+  defaultSort: { field: "`tabAddress`.creation", order: "desc" },
   defaultLimit: 50,
 });
 

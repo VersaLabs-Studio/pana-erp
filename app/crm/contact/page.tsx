@@ -50,9 +50,10 @@ function ContactRow({
   onDelete: () => void;
 }) {
   // Extract linked entity name for display
-  const linkedEntity = contact.links && contact.links.length > 0
-    ? (contact.links[0] as { link_doctype: string; link_name: string })
-    : null;
+  const linkedEntity =
+    contact.links && contact.links.length > 0
+      ? (contact.links[0] as { link_doctype: string; link_name: string })
+      : null;
 
   return (
     <motion.div
@@ -70,13 +71,17 @@ function ContactRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-semibold text-foreground truncate">
-              {contact.full_name || `${contact.first_name || ""} ${contact.last_name || ""}`.trim() || "Unnamed Contact"}
+              {contact.full_name ||
+                `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
+                "Unnamed Contact"}
             </h3>
             {contact.is_primary_contact === 1 && (
-              <Badge variant="default" className="text-xs">Primary</Badge>
+              <Badge variant="default" className="text-xs">
+                Primary
+              </Badge>
             )}
           </div>
-          
+
           {contact.designation && (
             <div className="text-sm text-muted-foreground mb-1">
               {contact.designation}
@@ -87,7 +92,9 @@ function ContactRow({
             {contact.email_id && (
               <div className="flex items-center gap-1">
                 <Mail className="h-3 w-3" />
-                <span className="truncate max-w-[150px]">{contact.email_id}</span>
+                <span className="truncate max-w-[150px]">
+                  {contact.email_id}
+                </span>
               </div>
             )}
             {contact.mobile_no && (
@@ -101,7 +108,9 @@ function ContactRow({
           {linkedEntity && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
               <Building2 className="h-3 w-3" />
-              <span>{linkedEntity.link_doctype}: {linkedEntity.link_name}</span>
+              <span>
+                {linkedEntity.link_doctype}: {linkedEntity.link_name}
+              </span>
             </div>
           )}
         </div>
@@ -110,7 +119,11 @@ function ContactRow({
       {/* Actions Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -118,13 +131,22 @@ function ContactRow({
           align="end"
           className="rounded-xl border-none shadow-xl bg-popover/95 backdrop-blur-xl p-1"
         >
-          <DropdownMenuItem className="rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <DropdownMenuItem
+            className="rounded-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
             <Pencil className="h-4 w-4 mr-2" /> Edit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="rounded-lg text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </DropdownMenuItem>
@@ -141,8 +163,12 @@ export default function ContactsListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
 
   // Fetch contacts
-  const { data: contacts, isLoading, error } = useFrappeList<Contact>("Contact", {
-    orderBy: { field: "creation", order: "desc" },
+  const {
+    data: contacts,
+    isLoading,
+    error,
+  } = useFrappeList<Contact>("Contact", {
+    orderBy: { field: "`tabContact`.creation", order: "desc" },
     search,
     limit: 100,
   });
@@ -156,7 +182,7 @@ export default function ContactsListPage() {
   const filteredContacts = useMemo(() => {
     if (!contacts) return [];
     let result = contacts;
-    
+
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(
@@ -164,10 +190,10 @@ export default function ContactsListPage() {
           c.full_name?.toLowerCase().includes(searchLower) ||
           c.first_name?.toLowerCase().includes(searchLower) ||
           c.last_name?.toLowerCase().includes(searchLower) ||
-          c.email_id?.toLowerCase().includes(searchLower)
+          c.email_id?.toLowerCase().includes(searchLower),
       );
     }
-    
+
     return result;
   }, [contacts, search]);
 
@@ -214,9 +240,11 @@ export default function ContactsListPage() {
       {filteredContacts.length === 0 ? (
         <EmptyState
           title="No contacts found"
-          description={search
-            ? "Try adjusting your search"
-            : "Create your first contact to get started"}
+          description={
+            search
+              ? "Try adjusting your search"
+              : "Create your first contact to get started"
+          }
           action={
             <Button onClick={() => router.push("/crm/contact/new")}>
               <Plus className="h-4 w-4 mr-2" /> New Contact
@@ -230,8 +258,14 @@ export default function ContactsListPage() {
               key={contact.name}
               contact={contact}
               index={index}
-              onView={() => router.push(`/crm/contact/${encodeURIComponent(contact.name)}`)}
-              onEdit={() => router.push(`/crm/contact/${encodeURIComponent(contact.name)}/edit`)}
+              onView={() =>
+                router.push(`/crm/contact/${encodeURIComponent(contact.name)}`)
+              }
+              onEdit={() =>
+                router.push(
+                  `/crm/contact/${encodeURIComponent(contact.name)}/edit`,
+                )
+              }
               onDelete={() => setDeleteTarget(contact)}
             />
           ))}

@@ -17,9 +17,9 @@ export const GET = createListHandler("Contact", {
     "designation",
     "is_primary_contact",
     "links",
-    "creation",
+    "`tabContact`.creation",
   ],
-  defaultSort: { field: "creation", order: "desc" },
+  defaultSort: { field: "`tabContact`.creation", order: "desc" },
   defaultLimit: 50,
 });
 

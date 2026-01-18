@@ -34,7 +34,9 @@ import {
 import type { Address } from "@/types/doctype-types";
 
 // Address Type badge variant
-function getAddressTypeVariant(type: string): "default" | "secondary" | "outline" {
+function getAddressTypeVariant(
+  type: string,
+): "default" | "secondary" | "outline" {
   switch (type) {
     case "Billing":
       return "default";
@@ -60,9 +62,10 @@ function AddressRow({
   onDelete: () => void;
 }) {
   // Extract linked entity name for display
-  const linkedEntity = address.links && address.links.length > 0
-    ? (address.links[0] as { link_doctype: string; link_name: string })
-    : null;
+  const linkedEntity =
+    address.links && address.links.length > 0
+      ? (address.links[0] as { link_doctype: string; link_name: string })
+      : null;
 
   return (
     <motion.div
@@ -86,23 +89,29 @@ function AddressRow({
               {address.address_type}
             </Badge>
             {address.is_primary_address === 1 && (
-              <Badge variant="outline" className="text-xs">Primary</Badge>
+              <Badge variant="outline" className="text-xs">
+                Primary
+              </Badge>
             )}
             {address.is_shipping_address === 1 && (
-              <Badge variant="outline" className="text-xs">Shipping</Badge>
+              <Badge variant="outline" className="text-xs">
+                Shipping
+              </Badge>
             )}
           </div>
-          
+
           <p className="text-sm text-muted-foreground truncate">
             {[address.address_line1, address.city, address.country]
               .filter(Boolean)
               .join(", ")}
           </p>
-          
+
           {linkedEntity && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
               <Building2 className="h-3 w-3" />
-              <span>{linkedEntity.link_doctype}: {linkedEntity.link_name}</span>
+              <span>
+                {linkedEntity.link_doctype}: {linkedEntity.link_name}
+              </span>
             </div>
           )}
         </div>
@@ -111,7 +120,11 @@ function AddressRow({
       {/* Actions Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -119,13 +132,22 @@ function AddressRow({
           align="end"
           className="rounded-xl border-none shadow-xl bg-popover/95 backdrop-blur-xl p-1"
         >
-          <DropdownMenuItem className="rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <DropdownMenuItem
+            className="rounded-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
             <Pencil className="h-4 w-4 mr-2" /> Edit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="rounded-lg text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </DropdownMenuItem>
@@ -143,8 +165,12 @@ export default function AddressesListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Address | null>(null);
 
   // Fetch addresses
-  const { data: addresses, isLoading, error } = useFrappeList<Address>("Address", {
-    orderBy: { field: "creation", order: "desc" },
+  const {
+    data: addresses,
+    isLoading,
+    error,
+  } = useFrappeList<Address>("Address", {
+    orderBy: { field: "`tabAddress`.creation", order: "desc" },
     search,
     limit: 100,
   });
@@ -158,21 +184,21 @@ export default function AddressesListPage() {
   const filteredAddresses = useMemo(() => {
     if (!addresses) return [];
     let result = addresses;
-    
+
     if (typeFilter !== "all") {
       result = result.filter((a) => a.address_type === typeFilter);
     }
-    
+
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(
         (a) =>
           a.address_title?.toLowerCase().includes(searchLower) ||
           a.address_line1?.toLowerCase().includes(searchLower) ||
-          a.city?.toLowerCase().includes(searchLower)
+          a.city?.toLowerCase().includes(searchLower),
       );
     }
-    
+
     return result;
   }, [addresses, search, typeFilter]);
 
@@ -244,9 +270,11 @@ export default function AddressesListPage() {
       {filteredAddresses.length === 0 ? (
         <EmptyState
           title="No addresses found"
-          description={search || typeFilter !== "all"
-            ? "Try adjusting your filters"
-            : "Create your first address to get started"}
+          description={
+            search || typeFilter !== "all"
+              ? "Try adjusting your filters"
+              : "Create your first address to get started"
+          }
           action={
             <Button onClick={() => router.push("/crm/address/new")}>
               <Plus className="h-4 w-4 mr-2" /> New Address
@@ -260,8 +288,14 @@ export default function AddressesListPage() {
               key={address.name}
               address={address}
               index={index}
-              onView={() => router.push(`/crm/address/${encodeURIComponent(address.name)}`)}
-              onEdit={() => router.push(`/crm/address/${encodeURIComponent(address.name)}/edit`)}
+              onView={() =>
+                router.push(`/crm/address/${encodeURIComponent(address.name)}`)
+              }
+              onEdit={() =>
+                router.push(
+                  `/crm/address/${encodeURIComponent(address.name)}/edit`,
+                )
+              }
               onDelete={() => setDeleteTarget(address)}
             />
           ))}

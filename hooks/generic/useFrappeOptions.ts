@@ -32,6 +32,8 @@ export function useFrappeOptions(
     labelField?: string;
     /** Field to use as value (default: "name") */
     valueField?: string;
+    /** Extra fields to fetch */
+    extraFields?: string[];
     /** Additional filters */
     filters?: [string, string, unknown][];
     /** Order by field and direction (use table prefix for joins, e.g. "`tabAddress`.name") */
@@ -40,9 +42,9 @@ export function useFrappeOptions(
     limit?: number;
   },
   queryOptions?: Omit<
-    UseQueryOptions<DropdownOption[], Error>,
+    UseQueryOptions<DropdownOption[] | any[], Error>,
     "queryKey" | "queryFn"
-  >
+  >,
 ) {
   const labelField = options?.labelField || getLabelField(doctype);
   const valueField = options?.valueField || "name";
@@ -50,9 +52,14 @@ export function useFrappeOptions(
 
   return useQuery({
     queryKey: [doctype, "options", options],
-    queryFn: async (): Promise<DropdownOption[]> => {
+    queryFn: async (): Promise<any[]> => {
+      const fieldsToFetch = [valueField, labelField];
+      if (options?.extraFields) {
+        fieldsToFetch.push(...options.extraFields);
+      }
+
       const params = new URLSearchParams();
-      params.set("fields", JSON.stringify([valueField, labelField]));
+      params.set("fields", JSON.stringify([...new Set(fieldsToFetch)]));
 
       if (options?.filters && options.filters.length > 0) {
         params.set("filters", JSON.stringify(options.filters));
@@ -61,7 +68,7 @@ export function useFrappeOptions(
       if (options?.orderBy) {
         params.set(
           "order_by",
-          `${options.orderBy.field} ${options.orderBy.order || "asc"}`
+          `${options.orderBy.field} ${options.orderBy.order || "asc"}`,
         );
       }
       if (options?.limit) {
@@ -78,9 +85,10 @@ export function useFrappeOptions(
       }
 
       const json = await response.json();
-      const data = json.data as Record<string, string>[];
+      const data = json.data as Record<string, any>[];
 
       return data.map((item) => ({
+        ...item,
         value: item[valueField],
         label: item[labelField] || item[valueField],
       }));

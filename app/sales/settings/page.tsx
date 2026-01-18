@@ -3,11 +3,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Calculator, FileText, Handshake, User } from "lucide-react";
+import { Calculator, FileText, Handshake, User, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/smart";
 
 const settingsItems = [
+  {
+    title: "Projects",
+    description:
+      "Manage production projects and track progress for sales orders.",
+    icon: Briefcase,
+    href: "/sales/settings/project",
+  },
   {
     title: "Tax Templates",
     description:

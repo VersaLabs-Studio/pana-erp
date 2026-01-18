@@ -74,19 +74,21 @@ function CustomerRow({
               </span>
             )}
           </div>
-          
+
           {customer.customer_group && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
               <Building2 className="h-3 w-3" />
               <span className="truncate">{customer.customer_group}</span>
             </div>
           )}
-          
+
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             {customer.email_id && (
               <div className="flex items-center gap-1">
                 <Mail className="h-3 w-3" />
-                <span className="truncate max-w-[150px]">{customer.email_id}</span>
+                <span className="truncate max-w-[150px]">
+                  {customer.email_id}
+                </span>
               </div>
             )}
             {customer.mobile_no && (
@@ -108,7 +110,11 @@ function CustomerRow({
       {/* Actions Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -116,13 +122,22 @@ function CustomerRow({
           align="end"
           className="rounded-xl border-none shadow-xl bg-popover/95 backdrop-blur-xl p-1"
         >
-          <DropdownMenuItem className="rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <DropdownMenuItem
+            className="rounded-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
             <Pencil className="h-4 w-4 mr-2" /> Edit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="rounded-lg text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </DropdownMenuItem>
@@ -139,8 +154,12 @@ export default function CustomersListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
 
   // Fetch customers
-  const { data: customers, isLoading, error } = useFrappeList<Customer>("Customer", {
-    orderBy: { field: "creation", order: "desc" },
+  const {
+    data: customers,
+    isLoading,
+    error,
+  } = useFrappeList<Customer>("Customer", {
+    orderBy: { field: "`tabCustomer`.creation", order: "desc" },
     search,
     limit: 100,
   });
@@ -159,7 +178,7 @@ export default function CustomersListPage() {
       (c) =>
         c.customer_name?.toLowerCase().includes(searchLower) ||
         c.customer_group?.toLowerCase().includes(searchLower) ||
-        c.email_id?.toLowerCase().includes(searchLower)
+        c.email_id?.toLowerCase().includes(searchLower),
     );
   }, [customers, search]);
 
@@ -206,7 +225,11 @@ export default function CustomersListPage() {
       {filteredCustomers.length === 0 ? (
         <EmptyState
           title="No customers found"
-          description={search ? "Try adjusting your search" : "Create your first customer to get started"}
+          description={
+            search
+              ? "Try adjusting your search"
+              : "Create your first customer to get started"
+          }
           action={
             <Button onClick={() => router.push("/crm/customer/new")}>
               <Plus className="h-4 w-4 mr-2" /> New Customer
@@ -220,8 +243,16 @@ export default function CustomersListPage() {
               key={customer.name}
               customer={customer}
               index={index}
-              onView={() => router.push(`/crm/customer/${encodeURIComponent(customer.name)}`)}
-              onEdit={() => router.push(`/crm/customer/${encodeURIComponent(customer.name)}/edit`)}
+              onView={() =>
+                router.push(
+                  `/crm/customer/${encodeURIComponent(customer.name)}`,
+                )
+              }
+              onEdit={() =>
+                router.push(
+                  `/crm/customer/${encodeURIComponent(customer.name)}/edit`,
+                )
+              }
               onDelete={() => setDeleteTarget(customer)}
             />
           ))}

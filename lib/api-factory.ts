@@ -53,7 +53,7 @@ interface ListHandlerOptions {
  */
 export function createListHandler(
   doctype: string,
-  options?: ListHandlerOptions
+  options?: ListHandlerOptions,
 ) {
   return async function GET(request: NextRequest) {
     try {
@@ -91,16 +91,23 @@ export function createListHandler(
         order: "desc" as const,
       };
       if (searchParams.get("order_by")) {
-        const [field, order] = searchParams.get("order_by")!.split(" ");
-        orderBy = { field, order: order as "asc" | "desc" };
+        const orderByStr = searchParams.get("order_by")!;
+        const lastSpaceIndex = orderByStr.lastIndexOf(" ");
+        if (lastSpaceIndex !== -1) {
+          const field = orderByStr.substring(0, lastSpaceIndex);
+          const order = orderByStr.substring(lastSpaceIndex + 1);
+          orderBy = { field, order: order as "asc" | "desc" };
+        } else {
+          orderBy = { field: orderByStr, order: "asc" };
+        }
       }
 
       // Parse pagination
       const limit = Math.min(
         parseInt(
-          searchParams.get("limit") || String(options?.defaultLimit || 100)
+          searchParams.get("limit") || String(options?.defaultLimit || 100),
         ),
-        options?.maxLimit || 500
+        options?.maxLimit || 500,
       );
       const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -139,7 +146,7 @@ export function createListHandler(
 export function createGetHandler(doctype: string) {
   return async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ name: string }> }
+    { params }: { params: Promise<{ name: string }> },
   ) {
     try {
       const { name } = await params;
@@ -151,13 +158,13 @@ export function createGetHandler(doctype: string) {
             error: "Missing Parameter",
             details: "Document name is required",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const data = await frappeClient.db.getDoc(
         doctype,
-        decodeURIComponent(name)
+        decodeURIComponent(name),
       );
 
       return NextResponse.json({
@@ -200,7 +207,7 @@ export function createCreateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
                 error: "Validation Error",
                 details: e.flatten().fieldErrors,
               },
-              { status: 400 }
+              { status: 400 },
             );
           }
           throw e;
@@ -215,7 +222,7 @@ export function createCreateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
           data,
           message: `${doctype} created successfully`,
         },
-        { status: 201 }
+        { status: 201 },
       );
     } catch (error) {
       const errorResponse = frappeClient.handleError(error);
@@ -239,7 +246,7 @@ export function createCreateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
 export function createUpdateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
   return async function PUT(
     request: NextRequest,
-    context?: { params: Promise<{ name: string }> }
+    context?: { params: Promise<{ name: string }> },
   ) {
     try {
       // Get name from route params or query string
@@ -262,7 +269,7 @@ export function createUpdateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
             error: "Missing Parameter",
             details: "Document name is required",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -280,7 +287,7 @@ export function createUpdateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
                 error: "Validation Error",
                 details: e.flatten().fieldErrors,
               },
-              { status: 400 }
+              { status: 400 },
             );
           }
           throw e;
@@ -290,7 +297,7 @@ export function createUpdateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
       const data = await frappeClient.db.updateDoc(
         doctype,
         decodeURIComponent(name),
-        body
+        body,
       );
 
       return NextResponse.json({
@@ -319,7 +326,7 @@ export function createUpdateHandler<T>(doctype: string, schema?: ZodSchema<T>) {
 export function createDeleteHandler(doctype: string) {
   return async function DELETE(
     request: NextRequest,
-    context?: { params: Promise<{ name: string }> }
+    context?: { params: Promise<{ name: string }> },
   ) {
     try {
       // Get name from route params or query string
@@ -342,7 +349,7 @@ export function createDeleteHandler(doctype: string) {
             error: "Missing Parameter",
             details: "Document name is required",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -380,7 +387,7 @@ export function createCrudHandlers<TCreate = unknown, TUpdate = unknown>(
     createSchema?: ZodSchema<TCreate>;
     updateSchema?: ZodSchema<TUpdate>;
     listOptions?: ListHandlerOptions;
-  }
+  },
 ) {
   return {
     listHandler: createListHandler(doctype, options?.listOptions),

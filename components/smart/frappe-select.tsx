@@ -13,14 +13,16 @@ interface FrappeSelectProps {
   doctype: string;
   /** Current value */
   value?: string;
-  /** Change handler */
-  onChange: (value: string) => void;
+  /** Field to use as value (default: "name") */
+  valueField?: string;
+  /** Extra fields to fetch (e.g. ["standard_rate", "stock_uom"]) */
+  extraFields?: string[];
+  /** Change handler with optional full doc */
+  onChange: (value: string, doc?: any) => void;
   /** Placeholder text */
   placeholder?: string;
   /** Field to use as display label (default: "name") */
   labelField?: string;
-  /** Field to use as value (default: "name") */
-  valueField?: string;
   /** Additional Frappe filters */
   filters?: [string, string, unknown][];
   /** Order by field and direction (use table prefix for joins) */
@@ -63,6 +65,7 @@ export function FrappeSelect({
   placeholder = "Select...",
   labelField = "name",
   valueField = "name",
+  extraFields,
   filters,
   orderBy,
   disabled,
@@ -77,6 +80,7 @@ export function FrappeSelect({
   } = useFrappeOptions(doctype, {
     labelField,
     valueField,
+    extraFields,
     filters,
     orderBy,
     limit: 500,
@@ -88,7 +92,7 @@ export function FrappeSelect({
       <div
         className={cn(
           "h-12 rounded-xl bg-secondary/30 flex items-center px-4 gap-2",
-          className
+          className,
         )}
       >
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -105,7 +109,7 @@ export function FrappeSelect({
       <div
         className={cn(
           "h-12 rounded-xl bg-destructive/10 flex items-center px-4",
-          className
+          className,
         )}
       >
         <span className="text-sm text-destructive">Failed to load options</span>
@@ -117,14 +121,17 @@ export function FrappeSelect({
     <SearchableSelect
       options={options || []}
       value={value}
-      onValueChange={onChange}
+      onValueChange={(val) => {
+        const option = options?.find((o) => o.value === val);
+        onChange(val, option);
+      }}
       placeholder={placeholder}
       searchPlaceholder={`Search ${doctype.toLowerCase()}...`}
       emptyText={`No ${doctype.toLowerCase()} found`}
       disabled={disabled}
       className={cn(
         error && "border-destructive focus:ring-destructive",
-        className
+        className,
       )}
     />
   );

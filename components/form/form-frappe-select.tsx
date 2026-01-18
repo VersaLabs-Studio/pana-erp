@@ -32,6 +32,10 @@ interface FormFrappeSelectProps<T extends FieldValues> {
   filters?: [string, string, unknown][];
   /** Order by field and direction (use table prefix for Dynamic Link joins, e.g. "`tabAddress`.name") */
   orderBy?: { field: string; order?: "asc" | "desc" };
+  /** Extra fields to fetch (e.g. ["standard_rate", "stock_uom"]) */
+  extraFields?: string[];
+  /** Custom change handler with optional full doc */
+  onValueChange?: (value: string, doc?: any) => void;
   /** Additional CSS classes */
   className?: string;
   /** Whether select is disabled */
@@ -78,6 +82,8 @@ export function FormFrappeSelect<T extends FieldValues>({
   labelField = "name",
   filters,
   orderBy,
+  extraFields,
+  onValueChange,
   className,
   disabled = false,
 }: FormFrappeSelectProps<T>) {
@@ -85,50 +91,61 @@ export function FormFrappeSelect<T extends FieldValues>({
     <FormField
       control={control}
       name={name}
-      render={({ field }) => (
-        <FormItem>
-          {hideLabel ? (
-            <FrappeSelect
-              doctype={doctype}
-              valueField={valueField}
-              labelField={labelField}
-              value={field.value}
-              onChange={field.onChange}
-              placeholder={placeholder}
-              filters={filters}
-              orderBy={orderBy}
-              disabled={disabled}
-              className={cn(
-                "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
-                className
-              )}
-            />
-          ) : (
-            <DataField
-              label={label || String(name)}
-              name={String(name)}
-              required={required}
-            >
+      render={({ field }) => {
+        const handleChange = (val: string, doc?: any) => {
+          field.onChange(val);
+          if (onValueChange) {
+            onValueChange(val, doc);
+          }
+        };
+
+        return (
+          <FormItem>
+            {hideLabel ? (
               <FrappeSelect
                 doctype={doctype}
                 valueField={valueField}
                 labelField={labelField}
+                extraFields={extraFields}
                 value={field.value}
-                onChange={field.onChange}
+                onChange={handleChange}
                 placeholder={placeholder}
                 filters={filters}
                 orderBy={orderBy}
                 disabled={disabled}
                 className={cn(
                   "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
-                  className
+                  className,
                 )}
               />
-            </DataField>
-          )}
-          <FormMessage />
-        </FormItem>
-      )}
+            ) : (
+              <DataField
+                label={label || String(name)}
+                name={String(name)}
+                required={required}
+              >
+                <FrappeSelect
+                  doctype={doctype}
+                  valueField={valueField}
+                  labelField={labelField}
+                  extraFields={extraFields}
+                  value={field.value}
+                  onChange={handleChange}
+                  placeholder={placeholder}
+                  filters={filters}
+                  orderBy={orderBy}
+                  disabled={disabled}
+                  className={cn(
+                    "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
+                    className,
+                  )}
+                />
+              </DataField>
+            )}
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }

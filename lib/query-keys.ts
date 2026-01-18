@@ -156,6 +156,12 @@ export const queryKeys = {
     doc: (name: string) =>
       ["Sales Taxes and Charges Template", "doc", name] as const,
   },
+  project: {
+    all: () => ["Project"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Project", "list", options] as const,
+    doc: (name: string) => ["Project", "doc", name] as const,
+  },
 
   // ============================================================================
   // PURCHASING MODULE

@@ -38,7 +38,9 @@ import {
 import type { Lead } from "@/types/doctype-types";
 
 // Status badge variant mapping
-function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+function getStatusVariant(
+  status: string,
+): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
     case "Converted":
       return "default";
@@ -88,18 +90,16 @@ function LeadRow({
             <h3 className="font-semibold text-foreground truncate">
               {lead.lead_name || lead.first_name || "Unnamed Lead"}
             </h3>
-            <Badge variant={getStatusVariant(lead.status)}>
-              {lead.status}
-            </Badge>
+            <Badge variant={getStatusVariant(lead.status)}>{lead.status}</Badge>
           </div>
-          
+
           {lead.company_name && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
               <Building2 className="h-3 w-3" />
               <span className="truncate">{lead.company_name}</span>
             </div>
           )}
-          
+
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             {lead.email_id && (
               <div className="flex items-center gap-1">
@@ -120,7 +120,11 @@ function LeadRow({
       {/* Actions Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -128,18 +132,33 @@ function LeadRow({
           align="end"
           className="rounded-xl border-none shadow-xl bg-popover/95 backdrop-blur-xl p-1"
         >
-          <DropdownMenuItem className="rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <DropdownMenuItem
+            className="rounded-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
             <Pencil className="h-4 w-4 mr-2" /> Edit
           </DropdownMenuItem>
           {lead.status !== "Converted" && (
-            <DropdownMenuItem className="rounded-lg" onClick={(e) => { e.stopPropagation(); onConvert(); }}>
+            <DropdownMenuItem
+              className="rounded-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                onConvert();
+              }}
+            >
               <UserPlus className="h-4 w-4 mr-2" /> Convert to Customer
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="rounded-lg text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </DropdownMenuItem>
@@ -157,8 +176,12 @@ export default function LeadsListPage() {
   const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
 
   // Fetch leads
-  const { data: leads, isLoading, error } = useFrappeList<Lead>("Lead", {
-    orderBy: { field: "creation", order: "desc" },
+  const {
+    data: leads,
+    isLoading,
+    error,
+  } = useFrappeList<Lead>("Lead", {
+    orderBy: { field: "`tabLead`.creation", order: "desc" },
     search,
     limit: 100,
   });
@@ -172,21 +195,21 @@ export default function LeadsListPage() {
   const filteredLeads = useMemo(() => {
     if (!leads) return [];
     let result = leads;
-    
+
     if (statusFilter !== "all") {
       result = result.filter((l) => l.status === statusFilter);
     }
-    
+
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(
         (l) =>
           l.lead_name?.toLowerCase().includes(searchLower) ||
           l.company_name?.toLowerCase().includes(searchLower) ||
-          l.email_id?.toLowerCase().includes(searchLower)
+          l.email_id?.toLowerCase().includes(searchLower),
       );
     }
-    
+
     return result;
   }, [leads, search, statusFilter]);
 
@@ -272,9 +295,11 @@ export default function LeadsListPage() {
       {filteredLeads.length === 0 ? (
         <EmptyState
           title="No leads found"
-          description={search || statusFilter !== "all" 
-            ? "Try adjusting your filters" 
-            : "Create your first lead to get started"}
+          description={
+            search || statusFilter !== "all"
+              ? "Try adjusting your filters"
+              : "Create your first lead to get started"
+          }
           action={
             <Button onClick={() => router.push("/crm/lead/new")}>
               <Plus className="h-4 w-4 mr-2" /> New Lead
@@ -288,8 +313,12 @@ export default function LeadsListPage() {
               key={lead.name}
               lead={lead}
               index={index}
-              onView={() => router.push(`/crm/lead/${encodeURIComponent(lead.name)}`)}
-              onEdit={() => router.push(`/crm/lead/${encodeURIComponent(lead.name)}/edit`)}
+              onView={() =>
+                router.push(`/crm/lead/${encodeURIComponent(lead.name)}`)
+              }
+              onEdit={() =>
+                router.push(`/crm/lead/${encodeURIComponent(lead.name)}/edit`)
+              }
               onDelete={() => setDeleteTarget(lead)}
               onConvert={() => handleConvertToCustomer(lead)}
             />

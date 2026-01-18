@@ -4693,90 +4693,6 @@ export const DowntimeEntryUpdateSchema = DowntimeEntrySchema.partial().omit({
 export type DowntimeEntrySchemaType = z.infer<typeof DowntimeEntrySchema>;
 
 /**
- * Project Zod Schema
- * @doctype Project
- * @generated 2026-01-14T18:05:48.302Z
- */
-export const ProjectSchema = z.object({
-  naming_series: z.string().min(1, "Series is required"),
-  project_name: z.string().min(1, "Project Name is required"),
-  status: z.enum(["Open", "Completed", "Cancelled"]).optional(),
-  project_type: z.string().optional(),
-  is_active: z.enum(["Yes", "No"]).optional(),
-  percent_complete_method: z
-    .enum(["Manual", "Task Completion", "Task Progress", "Task Weight"])
-    .optional(),
-  percent_complete: z.number().optional(),
-  project_template: z.string().optional(),
-  expected_start_date: z.string().optional(),
-  expected_end_date: z.string().optional(),
-  priority: z.enum(["Medium", "Low", "High"]).optional(),
-  department: z.string().optional(),
-  customer: z.string().optional(),
-  sales_order: z.string().optional(),
-  users: z.array(z.unknown()).optional(),
-  copied_from: z.string().optional(),
-  notes: z.string().optional(),
-  actual_start_date: z.string().optional(),
-  actual_time: z.number().optional(),
-  actual_end_date: z.string().optional(),
-  estimated_costing: z.number().optional(),
-  total_costing_amount: z.number().optional(),
-  total_purchase_cost: z.number().optional(),
-  company: z.string().min(1, "Company is required"),
-  total_sales_amount: z.number().optional(),
-  total_billable_amount: z.number().optional(),
-  total_billed_amount: z.number().optional(),
-  total_consumed_material_cost: z.number().optional(),
-  cost_center: z.string().optional(),
-  gross_margin: z.number().optional(),
-  per_gross_margin: z.number().optional(),
-  collect_progress: z.union([z.literal(0), z.literal(1)]).optional(),
-  holiday_list: z.string().optional(),
-  frequency: z.enum(["Hourly", "Twice Daily", "Daily", "Weekly"]).optional(),
-  from_time: z.string().optional(),
-  to_time: z.string().optional(),
-  first_email: z.string().optional(),
-  second_email: z.string().optional(),
-  daily_time_to_send: z.string().optional(),
-  day_to_send: z
-    .enum([
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-      "Sunday",
-    ])
-    .optional(),
-  weekly_time_to_send: z.string().optional(),
-  subject: z.string().optional(),
-  message: z.string().optional(),
-  name: z.string().min(1, "ID is required"),
-  owner: z.string().optional(),
-  creation: z.string().optional(),
-  modified: z.string().optional(),
-  modified_by: z.string().optional(),
-  docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
-});
-
-export const ProjectCreateSchema = ProjectSchema.pick({
-  naming_series: true,
-  project_name: true,
-  company: true,
-}).extend({});
-
-export const ProjectUpdateSchema = ProjectSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
-
-export type ProjectSchemaType = z.infer<typeof ProjectSchema>;
-
-/**
  * Task Zod Schema
  * @doctype Task
  * @generated 2026-01-14T18:05:48.302Z
@@ -5311,14 +5227,107 @@ export const SalesPartnerTypeSchema = z.object({
 
 export const SalesPartnerTypeCreateSchema = SalesPartnerTypeSchema.pick({
   sales_partner_type: true,
-}).extend({
+}).extend({});
+
+export const SalesPartnerTypeUpdateSchema =
+  SalesPartnerTypeSchema.partial().omit({
+    name: true,
+    creation: true,
+    owner: true,
+    docstatus: true,
+  });
+
+export type SalesPartnerTypeSchemaType = z.infer<typeof SalesPartnerTypeSchema>;
+
+/**
+ * Project Zod Schema
+ * @doctype Project
+ * @generated 2026-01-14T18:05:48.302Z
+ */
+export const ProjectSchema = z.object({
+  naming_series: z.string().min(1, "Series is required"),
+  project_name: z.string().min(1, "Project Name is required"),
+  status: z.enum(["Open", "Completed", "Cancelled"]).optional(),
+  project_type: z.string().optional(),
+  is_active: z.enum(["Yes", "No"]).optional(),
+  percent_complete_method: z
+    .enum(["Manual", "Task Completion", "Task Progress", "Task Weight"])
+    .optional(),
+  percent_complete: z.number().optional(),
+  project_template: z.string().optional(),
+  expected_start_date: z.string().optional(),
+  expected_end_date: z.string().optional(),
+  priority: z.enum(["Medium", "Low", "High"]).optional(),
+  department: z.string().optional(),
+  customer: z.string().optional(),
+  sales_order: z.string().optional(),
+  users: z.array(z.unknown()).optional(),
+  copied_from: z.string().optional(),
+  notes: z.string().optional(),
+  actual_start_date: z.string().optional(),
+  actual_time: z.number().optional(),
+  actual_end_date: z.string().optional(),
+  estimated_costing: z.number().optional(),
+  total_costing_amount: z.number().optional(),
+  total_purchase_cost: z.number().optional(),
+  company: z.string().min(1, "Company is required"),
+  total_sales_amount: z.number().optional(),
+  total_billable_amount: z.number().optional(),
+  total_billed_amount: z.number().optional(),
+  total_consumed_material_cost: z.number().optional(),
+  cost_center: z.string().optional(),
+  gross_margin: z.number().optional(),
+  per_gross_margin: z.number().optional(),
+  collect_progress: z.union([z.literal(0), z.literal(1)]).optional(),
+  holiday_list: z.string().optional(),
+  frequency: z.enum(["Hourly", "Twice Daily", "Daily", "Weekly"]).optional(),
+  from_time: z.string().optional(),
+  to_time: z.string().optional(),
+  first_email: z.string().optional(),
+  second_email: z.string().optional(),
+  daily_time_to_send: z.string().optional(),
+  day_to_send: z
+    .enum([
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ])
+    .optional(),
+  weekly_time_to_send: z.string().optional(),
+  subject: z.string().optional(),
+  message: z.string().optional(),
+  name: z.string().min(1, "ID is required"),
+  owner: z.string().optional(),
+  creation: z.string().optional(),
+  modified: z.string().optional(),
+  modified_by: z.string().optional(),
+  docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const SalesPartnerTypeUpdateSchema = SalesPartnerTypeSchema.partial().omit({
+export const ProjectCreateSchema = ProjectSchema.pick({
+  naming_series: true,
+  project_name: true,
+  company: true,
+  customer: true,
+  expected_start_date: true,
+  expected_end_date: true,
+  status: true,
+  priority: true,
+}).extend({
+  customer: z.string().optional(),
+  expected_start_date: z.string().optional(),
+  expected_end_date: z.string().optional(),
+});
+
+export const ProjectUpdateSchema = ProjectSchema.partial().omit({
   name: true,
   creation: true,
   owner: true,
   docstatus: true,
 });
 
-export type SalesPartnerTypeSchemaType = z.infer<typeof SalesPartnerTypeSchema>;
+export type ProjectSchemaType = z.infer<typeof ProjectSchema>;

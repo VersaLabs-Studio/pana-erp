@@ -212,6 +212,13 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     defaultSortField: "transaction_date",
     defaultSortOrder: "desc",
   },
+  Project: {
+    apiPath: "sales/settings/project",
+    module: "Sales",
+    labelField: "project_name",
+    searchFields: ["project_name", "name"],
+    isSettings: false,
+  },
   Quotation: {
     apiPath: "sales/quotation",
     module: "Sales",
