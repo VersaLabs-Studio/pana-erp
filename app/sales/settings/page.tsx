@@ -3,7 +3,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Calculator, FileText } from "lucide-react";
+import { Calculator, FileText, Handshake, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/smart";
 
@@ -28,6 +28,20 @@ const settingsItems = [
       "Manage categories for sales partners (e.g. Agency, Reseller).",
     icon: FileText,
     href: "/sales/settings/sales-partner-type",
+  },
+  {
+    title: "Sales Partners",
+    description:
+      "Manage external entities that help you sell products/services.",
+    icon: Handshake,
+    href: "/sales/settings/sales-partner",
+  },
+  {
+    title: "Sales Persons",
+    description:
+      "Manage internal staff members responsible for sales operations.",
+    icon: User,
+    href: "/sales/settings/sales-person",
   },
 ];
 
