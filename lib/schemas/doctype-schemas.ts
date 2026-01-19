@@ -4442,19 +4442,25 @@ export const WorkstationSchema = z.object({
   docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const WorkstationCreateSchema = WorkstationSchema.pick({
-  workstation_name: true,
-  production_capacity: true,
-}).extend({
+/**
+ * Workstation Create Schema
+ * @doctype Workstation
+ */
+export const WorkstationCreateSchema = z.object({
+  workstation_name: z.string().min(1, "Workstation Name is required"),
+  production_capacity: z.number().min(1).default(1),
+  hour_rate: z.number().min(0).default(0),
+  hour_rate_labour: z.number().min(0).optional().default(0),
+  hour_rate_electricity: z.number().min(0).optional().default(0),
+  hour_rate_consumable: z.number().min(0).optional().default(0),
   description: z.string().optional(),
+  company: z.string().optional(),
 });
 
-export const WorkstationUpdateSchema = WorkstationSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
+export const WorkstationUpdateSchema = WorkstationCreateSchema.partial();
+
+// Use z.input for Form Initialization to handle defaults correctly
+export type WorkstationFormData = z.input<typeof WorkstationCreateSchema>;
 
 export type WorkstationSchemaType = z.infer<typeof WorkstationSchema>;
 

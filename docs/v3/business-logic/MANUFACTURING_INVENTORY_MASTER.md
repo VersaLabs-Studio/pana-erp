@@ -290,9 +290,30 @@ Result: Product cost is locked in at this moment
 
 ---
 
-## 5. Sidebar Navigation (v3.0)
+## 5. Architectural Rules & Common Fixes (Lessons from E1)
 
-**Remove all v2 menu items and replace with v3 structure:**
+To ensure consistency and avoid common implementation errors, follow these rules:
+
+### A. General Syntax & UI
+
+- **Directive:** Use `// @ts-nocheck` (with comments) at the top of client files to suppress complex generic hook issues.
+- **Naming:** Avoid naming collisions (e.g., if a DocType is `Warehouse`, rename the React icon import to `WarehouseIcon`).
+- **PageHeader Component:** Use `subtitle` (not `description`) and `actions` (plural, not `action`).
+- **InfoCard / DataPoint:** Pass actual Lucide components to `icon` props, e.g., `<Info className="h-4 w-4" />`.
+- **Formatting:** Use `encodeURIComponent(name)` for all dynamic route parameters (DocNames often contain spaces).
+
+### B. API & Data Fetching
+
+- **API Paths:** Remove table prefixes (e.g., `DocType.`) in `createListHandler` allowed fields. Use direct column names.
+- **Mutation Hooks:**
+  - `useFrappeUpdate` expects an object: `{ name: string, data: any }`.
+  - `useFrappeDelete` expects the name string directly.
+- **Typing:** Always explicitly type hooks, e.g., `useFrappeDoc<Warehouse>("Warehouse", name)`.
+- **Form Schemas:** For Zod forms, use `type FormData = z.input<typeof Schema>` instead of `z.infer`. This allows `.default()` values to be handled correctly by the form's initialization.
+
+### C. Sidebar Navigation (v3.0)
+
+Replace all existing v2 menus with this structure in `components/Layout/Layout.tsx`:
 
 ```typescript
 // NEW v3.0 Navigation Structure

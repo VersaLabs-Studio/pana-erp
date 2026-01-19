@@ -343,6 +343,14 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     defaultSortField: "creation",
     defaultSortOrder: "desc",
   },
+  Workstation: {
+    apiPath: "manufacturing/workstation",
+    module: "Manufacturing",
+    labelField: "workstation_name",
+    searchFields: ["workstation_name"],
+    defaultSortField: "creation",
+    defaultSortOrder: "desc",
+  },
 
   // ============================================================================
   // ASSETS MODULE
