@@ -4505,28 +4505,43 @@ export const OperationSchema = z.object({
 });
 
 /**
+ * Sub Operation Schema (Child Table Row)
+ * This defines the structure of each row in the sub_operations child table.
+ * @doctype Sub Operation
+ * @parent Operation
+ */
+export const SubOperationSchema = z.object({
+  /** Link to another Operation DocType (the sub-operation) */
+  operation: z.string().min(1, "Sub-operation is required"),
+  /** Time in minutes for this sub-operation */
+  time_in_mins: z.number().min(0, "Time must be 0 or greater").default(0),
+});
+
+/**
  * Operation Create Schema
  * @doctype Operation
  * @scope MVP - Print Shop Manufacturing
+ * @note total_operation_time is computed by backend from sub_operations
  */
 export const OperationCreateSchema = z.object({
   // The operation name IS the DocType name field (auto-generated as ID)
   name: z.string().min(1, "Operation Name is required"),
   workstation: z.string().optional(),
-  total_operation_time: z.number().min(0).optional().default(0),
   description: z.string().optional(),
+  // Sub-operations child table - required for time calculation
+  sub_operations: z.array(SubOperationSchema).optional().default([]),
 });
 
 export const OperationUpdateSchema = z.object({
   workstation: z.string().optional(),
-  total_operation_time: z.number().min(0).optional(),
   description: z.string().optional(),
+  sub_operations: z.array(SubOperationSchema).optional(),
 });
 
-// Use z.input for Form Initialization to handle defaults correctly
+// Type exports
+export type SubOperationData = z.infer<typeof SubOperationSchema>;
 export type OperationFormData = z.input<typeof OperationCreateSchema>;
 export type OperationUpdateData = z.input<typeof OperationUpdateSchema>;
-
 export type OperationSchemaType = z.infer<typeof OperationSchema>;
 
 /**

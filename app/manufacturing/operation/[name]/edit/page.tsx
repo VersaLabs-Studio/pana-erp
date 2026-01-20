@@ -1,11 +1,11 @@
 // app/manufacturing/operation/[name]/edit/page.tsx
-// Pana ERP v3.0 - Edit Operation Page
+// Pana ERP v3.0 - Edit Operation Page with Sub-Operations
 // @ts-nocheck
 
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import {
   Cpu,
   FileText,
   AlertCircle,
+  Plus,
+  Trash2,
+  Layers,
 } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
@@ -28,6 +31,7 @@ import {
 } from "@/lib/schemas/doctype-schemas";
 import { toast } from "sonner";
 import type { Operation } from "@/types/doctype-types";
+import { cn } from "@/lib/utils";
 
 export default function EditOperationPage() {
   const params = useParams();
@@ -46,21 +50,37 @@ export default function EditOperationPage() {
     resolver: zodResolver(OperationUpdateSchema),
     defaultValues: {
       workstation: "",
-      total_operation_time: 0,
       description: "",
+      sub_operations: [],
     },
   });
 
-  // Populate form
+  // Field array for sub-operations
+  const { fields, append, remove, replace } = useFieldArray({
+    control: form.control,
+    name: "sub_operations",
+  });
+
+  // Populate form when operation loads
   useEffect(() => {
     if (operation) {
       form.reset({
         workstation: operation.workstation || "",
-        total_operation_time: operation.total_operation_time || 0,
         description: operation.description || "",
+        sub_operations: (operation.sub_operations || []).map((sub: any) => ({
+          operation: sub.operation || "",
+          time_in_mins: sub.time_in_mins || 0,
+        })),
       });
     }
   }, [operation, form]);
+
+  // Watch sub_operations to calculate total time
+  const subOperations = form.watch("sub_operations") || [];
+  const totalTime = subOperations.reduce(
+    (sum, sub) => sum + (sub?.time_in_mins || 0),
+    0,
+  );
 
   // Update mutation
   const updateMutation = useFrappeUpdate<
@@ -84,6 +104,20 @@ export default function EditOperationPage() {
       name: operationName,
       data: data,
     });
+  };
+
+  // Add new sub-operation row
+  const handleAddSubOperation = () => {
+    append({ operation: "", time_in_mins: 0 });
+  };
+
+  // Format time helper
+  const formatTime = (minutes: number): string => {
+    if (minutes === 0) return "0 min";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   if (isLoading) {
@@ -114,7 +148,7 @@ export default function EditOperationPage() {
     <div className="space-y-6">
       <PageHeader
         title={`Edit: ${operation.name}`}
-        subtitle="Modify operation configuration and standard times"
+        subtitle="Modify operation configuration and sub-operations"
         backHref={`/manufacturing/operation/${encodeURIComponent(operationName)}`}
       />
 
@@ -147,38 +181,146 @@ export default function EditOperationPage() {
               />
             </div>
 
-            {/* Time Estimation */}
+            {/* Sub-Operations Section */}
             <div className="space-y-4 pt-6 border-t border-border/50">
-              <div className="flex items-center gap-2 text-lg font-semibold">
-                <Clock className="h-5 w-5 text-amber-500" />
-                <span>Time Management</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <Layers className="h-5 w-5 text-violet-500" />
+                  <span>Sub-Operations</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddSubOperation}
+                  className="rounded-full"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Step
+                </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormInput
-                  control={form.control}
-                  name="total_operation_time"
-                  label="Standard Time (Minutes)"
-                  type="number"
-                />
+              <p className="text-sm text-muted-foreground">
+                Modify the individual steps that make up this operation.
+              </p>
 
-                <div className="flex flex-col justify-end">
-                  <div className="bg-secondary/20 rounded-2xl p-4 border border-border/30 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                        Formatted Duration
-                      </p>
-                      <p className="text-2xl font-black text-foreground">
-                        {(
-                          (form.watch("total_operation_time") || 0) / 60
-                        ).toFixed(2)}{" "}
-                        <span className="text-sm font-medium text-muted-foreground uppercase">
-                          hrs
-                        </span>
-                      </p>
-                    </div>
-                    <Clock className="h-8 w-8 text-amber-500/20" />
+              {/* Sub-Operations Table */}
+              {fields.length === 0 ? (
+                <div className="bg-secondary/20 rounded-xl p-8 text-center">
+                  <Layers className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No sub-operations defined. Add steps to break down this
+                    operation.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddSubOperation}
+                    className="rounded-full"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add First Step
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-4 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="col-span-1">#</div>
+                    <div className="col-span-6">Sub-Operation</div>
+                    <div className="col-span-3">Time (Minutes)</div>
+                    <div className="col-span-2 text-right">Actions</div>
                   </div>
+
+                  {/* Rows */}
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className={cn(
+                        "grid grid-cols-12 gap-4 items-center p-4 rounded-xl",
+                        "bg-secondary/20 border border-border/30",
+                      )}
+                    >
+                      {/* Row Number */}
+                      <div className="col-span-1">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          {index + 1}
+                        </span>
+                      </div>
+
+                      {/* Sub-Operation Select */}
+                      <div className="col-span-6">
+                        <FormFrappeSelect
+                          control={form.control}
+                          name={`sub_operations.${index}.operation`}
+                          doctype="Operation"
+                          placeholder="Select operation..."
+                          filters={[["name", "!=", operationName]]}
+                        />
+                      </div>
+
+                      {/* Time Input */}
+                      <div className="col-span-3">
+                        <FormInput
+                          control={form.control}
+                          name={`sub_operations.${index}.time_in_mins`}
+                          type="number"
+                          placeholder="0"
+                        />
+                      </div>
+
+                      {/* Remove Button */}
+                      <div className="col-span-2 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          className="h-8 w-8 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Add More Button */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleAddSubOperation}
+                    className="w-full rounded-xl border border-dashed border-border/50 hover:border-primary/50"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Another Step
+                  </Button>
+                </div>
+              )}
+
+              {/* Total Time Display */}
+              <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                      Total Operation Time
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Calculated from sub-operations
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-black text-indigo-600">
+                    {formatTime(totalTime)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(totalTime / 60).toFixed(2)} hours
+                  </p>
                 </div>
               </div>
             </div>

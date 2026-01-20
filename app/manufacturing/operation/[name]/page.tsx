@@ -1,5 +1,5 @@
 // app/manufacturing/operation/[name]/page.tsx
-// Pana ERP v3.0 - Operation Detail Page
+// Pana ERP v3.0 - Operation Detail Page with Sub-Operations Display
 // @ts-nocheck
 
 "use client";
@@ -16,6 +16,7 @@ import {
   FileText,
   ChevronRight,
   Activity,
+  Layers,
 } from "lucide-react";
 import { useFrappeDoc, useFrappeDelete } from "@/hooks/generic";
 import {
@@ -29,6 +30,7 @@ import type { Operation, Workstation } from "@/types/doctype-types";
 import { toast } from "sonner";
 import { useState } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 // Format time helper
 function formatTime(minutes: number | undefined): string {
@@ -39,6 +41,13 @@ function formatTime(minutes: number | undefined): string {
   return mins > 0
     ? `${hours} hour${hours > 1 ? "s" : ""} ${mins} min`
     : `${hours} hour${hours > 1 ? "s" : ""}`;
+}
+
+// Sub Operation type (for child table rows)
+interface SubOperationRow {
+  operation: string;
+  time_in_mins: number;
+  idx?: number;
 }
 
 export default function OperationDetailPage() {
@@ -98,6 +107,11 @@ export default function OperationDetailPage() {
     );
   }
 
+  // Get sub-operations array
+  const subOperations: SubOperationRow[] = (operation.sub_operations ||
+    []) as SubOperationRow[];
+  const hasSubOperations = subOperations.length > 0;
+
   // Calculate estimated cost
   const estimatedCost =
     workstation?.hour_rate && operation.total_operation_time
@@ -146,7 +160,7 @@ export default function OperationDetailPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <DataPoint
-                label="Operation Time"
+                label="Total Operation Time"
                 value={formatTime(operation.total_operation_time)}
               />
               <DataPoint
@@ -157,6 +171,23 @@ export default function OperationDetailPage() {
                     : "—"
                 }
               />
+            </div>
+
+            {/* Sub-operations count badge */}
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="secondary"
+                className="rounded-full bg-violet-500/10 text-violet-600"
+              >
+                <Layers className="h-3 w-3 mr-1" />
+                {subOperations.length} sub-operation
+                {subOperations.length !== 1 ? "s" : ""}
+              </Badge>
+              {hasSubOperations && (
+                <span className="text-xs text-muted-foreground">
+                  Time calculated from sub-operations
+                </span>
+              )}
             </div>
 
             {estimatedCost !== null ? (
@@ -252,6 +283,103 @@ export default function OperationDetailPage() {
               <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
                 Costing disabled
               </p>
+            </div>
+          )}
+        </InfoCard>
+
+        {/* Sub-Operations Card */}
+        <InfoCard
+          title="Sub-Operations"
+          icon={<Layers className="h-4 w-4 text-violet-500" />}
+          className="lg:col-span-2"
+        >
+          {hasSubOperations ? (
+            <div className="space-y-4">
+              {/* Table Header */}
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50">
+                <div className="col-span-1">#</div>
+                <div className="col-span-8">Sub-Operation</div>
+                <div className="col-span-3 text-right">Time</div>
+              </div>
+
+              {/* Table Rows */}
+              {subOperations.map((sub, index) => (
+                <div
+                  key={sub.operation || index}
+                  className={cn(
+                    "grid grid-cols-12 gap-4 items-center px-4 py-3 rounded-xl",
+                    "bg-secondary/20 border border-border/30",
+                    "hover:bg-secondary/30 transition-colors",
+                  )}
+                >
+                  <div className="col-span-1">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div className="col-span-8">
+                    <Link
+                      href={`/manufacturing/operation/${encodeURIComponent(sub.operation)}`}
+                      className="flex items-center gap-3 group"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
+                        <OperationIcon className="h-4 w-4" />
+                      </div>
+                      <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                        {sub.operation}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  </div>
+                  <div className="col-span-3 text-right">
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full bg-amber-500/10 text-amber-600"
+                    >
+                      <Clock className="h-3 w-3 mr-1" />
+                      {sub.time_in_mins} min
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+
+              {/* Total Row */}
+              <div className="grid grid-cols-12 gap-4 items-center px-4 py-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                <div className="col-span-1" />
+                <div className="col-span-8">
+                  <span className="text-sm font-bold text-foreground">
+                    Total Operation Time
+                  </span>
+                </div>
+                <div className="col-span-3 text-right">
+                  <span className="text-lg font-black text-indigo-600">
+                    {formatTime(operation.total_operation_time)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-border/40 rounded-3xl">
+              <Layers className="h-10 w-10 text-muted-foreground/30 mb-4" />
+              <p className="text-sm text-muted-foreground">
+                No sub-operations defined
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add sub-operations to break down this operation into steps
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  router.push(
+                    `/manufacturing/operation/${encodeURIComponent(operationName)}/edit`,
+                  )
+                }
+                className="rounded-full mt-4"
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Add Sub-Operations
+              </Button>
             </div>
           )}
         </InfoCard>

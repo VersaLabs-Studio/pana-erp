@@ -9,6 +9,7 @@ export const GET = createListHandler("Operation", {
     "name",
     "workstation",
     "total_operation_time",
+    "sub_operations",
     "description",
     "creation",
     "modified",

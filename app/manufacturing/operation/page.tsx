@@ -18,6 +18,7 @@ import {
   Clock,
   Cpu,
   PlayCircle,
+  Layers,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,12 +55,14 @@ function OperationCard({
   onEdit,
   onDelete,
 }: {
-  operation: Operation;
+  operation: Operation & { sub_operations?: unknown[] };
   index: number;
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const subOpsCount = operation.sub_operations?.length || 0;
+
   return (
     <div
       className={cn(
@@ -128,18 +131,29 @@ function OperationCard({
 
       {/* Content */}
       <div className="space-y-3">
-        {/* Time Badge */}
-        <div className="flex items-center justify-between">
+        {/* Time & Sub-operations Badges */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
             <Clock className="h-4 w-4" />
             <span>{formatTime(operation.total_operation_time)}</span>
           </div>
-          <Badge
-            variant="secondary"
-            className="text-[10px] rounded-full px-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-          >
-            Operation
-          </Badge>
+          <div className="flex items-center gap-2">
+            {subOpsCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-[10px] rounded-full px-2 bg-violet-500/10 text-violet-600 dark:text-violet-400"
+              >
+                <Layers className="h-3 w-3 mr-1" />
+                {subOpsCount} step{subOpsCount !== 1 ? "s" : ""}
+              </Badge>
+            )}
+            <Badge
+              variant="secondary"
+              className="text-[10px] rounded-full px-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+            >
+              Operation
+            </Badge>
+          </div>
         </div>
 
         {/* Description Preview */}
