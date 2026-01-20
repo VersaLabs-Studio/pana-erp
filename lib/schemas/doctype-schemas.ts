@@ -4482,9 +4482,8 @@ export type WorkstationFormData = z.input<typeof WorkstationCreateSchema>;
 export type WorkstationSchemaType = z.infer<typeof WorkstationSchema>;
 
 /**
- * Operation Zod Schema
+ * Operation Base Schema (Full Document)
  * @doctype Operation
- * @generated 2026-01-14T18:05:48.302Z
  */
 export const OperationSchema = z.object({
   workstation: z.string().optional(),
@@ -4505,12 +4504,28 @@ export const OperationSchema = z.object({
   docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
 });
 
-export const OperationUpdateSchema = OperationSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
+/**
+ * Operation Create Schema
+ * @doctype Operation
+ * @scope MVP - Print Shop Manufacturing
+ */
+export const OperationCreateSchema = z.object({
+  // The operation name IS the DocType name field (auto-generated as ID)
+  name: z.string().min(1, "Operation Name is required"),
+  workstation: z.string().optional(),
+  total_operation_time: z.number().min(0).optional().default(0),
+  description: z.string().optional(),
 });
+
+export const OperationUpdateSchema = z.object({
+  workstation: z.string().optional(),
+  total_operation_time: z.number().min(0).optional(),
+  description: z.string().optional(),
+});
+
+// Use z.input for Form Initialization to handle defaults correctly
+export type OperationFormData = z.input<typeof OperationCreateSchema>;
+export type OperationUpdateData = z.input<typeof OperationUpdateSchema>;
 
 export type OperationSchemaType = z.infer<typeof OperationSchema>;
 

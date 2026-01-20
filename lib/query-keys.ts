@@ -236,6 +236,14 @@ export const queryKeys = {
       ["Workstation", "list", options] as const,
     doc: (name: string) => ["Workstation", "doc", name] as const,
   },
+  operation: {
+    all: () => ["Operation"] as const,
+    list: (options?: FrappeListOptions) =>
+      ["Operation", "list", options] as const,
+    doc: (name: string) => ["Operation", "doc", name] as const,
+    byWorkstation: (workstationName: string) =>
+      ["Operation", "list", "workstation", workstationName] as const,
+  },
 
   // ============================================================================
   // ASSETS MODULE
