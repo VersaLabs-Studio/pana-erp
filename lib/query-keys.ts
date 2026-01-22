@@ -223,6 +223,8 @@ export const queryKeys = {
     all: () => ["BOM"] as const,
     list: (options?: FrappeListOptions) => ["BOM", "list", options] as const,
     doc: (name: string) => ["BOM", "doc", name] as const,
+    byItem: (itemCode: string) => ["BOM", "list", "item", itemCode] as const,
+    defaultForItem: (itemCode: string) => ["BOM", "default", itemCode] as const,
   },
   workOrder: {
     all: () => ["Work Order"] as const,

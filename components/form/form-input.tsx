@@ -74,11 +74,15 @@ export function FormInput<T extends FieldValues>({
                   const val = e.target.value;
                   if (type === "number") {
                     // Convert to number, or undefined if empty to trigger Zod validation
-                    field.onChange(val === "" ? undefined : Number(val));
+                    const numVal =
+                      val === "" || val === "-" ? undefined : Number(val);
+                    field.onChange(numVal);
                   } else {
                     field.onChange(val);
                   }
                 }}
+                onFocus={(e) => e.target.select()}
+                onWheel={(e) => e.currentTarget.blur()}
                 type={type}
                 placeholder={placeholder}
                 disabled={disabled || loading}

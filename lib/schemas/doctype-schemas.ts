@@ -4321,92 +4321,54 @@ export const WorkOrderUpdateSchema = WorkOrderSchema.partial().omit({
 export type WorkOrderSchemaType = z.infer<typeof WorkOrderSchema>;
 
 /**
- * BOM Zod Schema
- * @doctype BOM
- * @generated 2026-01-14T18:05:48.302Z
+ * BOM Item (Child Table Row)
  */
-export const BomSchema = z.object({
+export const BOMItemSchema = z.object({
+  item_code: z.string().min(1, "Item is required"),
+  item_name: z.string().optional(),
+  qty: z.number().min(0, "Quantity cannot be negative").default(1),
+  uom: z.string().optional(),
+  rate: z.number().min(0, "Rate cannot be negative").default(0),
+  amount: z.number().optional(),
+  source_warehouse: z.string().optional(),
+});
+
+/**
+ * BOM Operation (Child Table Row)
+ */
+export const BOMOperationSchema = z.object({
+  operation: z.string().min(1, "Operation is required"),
+  workstation: z.string().optional(),
+  time_in_mins: z.number().min(0).default(0),
+  operating_cost: z.number().optional(),
+  hour_rate: z.number().optional(),
+});
+
+/**
+ * BOM Create Schema
+ */
+export const BOMCreateSchema = z.object({
   item: z.string().min(1, "Item is required"),
   company: z.string().min(1, "Company is required"),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
   uom: z.string().optional(),
-  quantity: z.number(),
-  is_active: z.union([z.literal(0), z.literal(1)]).optional(),
-  is_default: z.union([z.literal(0), z.literal(1)]).optional(),
-  allow_alternative_item: z.union([z.literal(0), z.literal(1)]).optional(),
-  set_rate_of_sub_assembly_item_based_on_bom: z
-    .union([z.literal(0), z.literal(1)])
-    .optional(),
-  project: z.string().optional(),
-  image: z.string().optional(),
+  currency: z.string().default("ETB"),
+  conversion_rate: z.number().default(1),
+  is_active: z.union([z.literal(0), z.literal(1)]).default(1),
+  is_default: z.union([z.literal(0), z.literal(1)]).default(0),
+  with_operations: z.union([z.literal(0), z.literal(1)]).default(0),
   rm_cost_as_per: z
     .enum(["Valuation Rate", "Last Purchase Rate", "Price List"])
-    .optional(),
-  buying_price_list: z.string().optional(),
-  price_list_currency: z.string().optional(),
-  plc_conversion_rate: z.number().optional(),
-  currency: z.string().min(1, "Currency is required"),
-  conversion_rate: z.number(),
-  items: z.array(z.unknown()),
-  with_operations: z.union([z.literal(0), z.literal(1)]).optional(),
-  transfer_material_against: z.enum(["Work Order", "Job Card"]).optional(),
-  routing: z.string().optional(),
-  fg_based_operating_cost: z.union([z.literal(0), z.literal(1)]).optional(),
-  operating_cost_per_bom_quantity: z.number().optional(),
-  operations: z.array(z.unknown()).optional(),
-  scrap_items: z.array(z.unknown()).optional(),
-  process_loss_percentage: z.number().optional(),
-  process_loss_qty: z.number().optional(),
-  operating_cost: z.number().optional(),
-  raw_material_cost: z.number().optional(),
-  scrap_material_cost: z.number().optional(),
-  base_operating_cost: z.number().optional(),
-  base_raw_material_cost: z.number().optional(),
-  base_scrap_material_cost: z.number().optional(),
-  total_cost: z.number().optional(),
-  base_total_cost: z.number().optional(),
-  item_name: z.string().optional(),
-  description: z.string().optional(),
-  has_variants: z.union([z.literal(0), z.literal(1)]).optional(),
-  inspection_required: z.union([z.literal(0), z.literal(1)]).optional(),
-  quality_inspection_template: z.string().optional(),
-  exploded_items: z.array(z.unknown()).optional(),
-  show_in_website: z.union([z.literal(0), z.literal(1)]).optional(),
-  route: z.string().optional(),
-  website_image: z.string().optional(),
-  thumbnail: z.string().optional(),
-  show_items: z.union([z.literal(0), z.literal(1)]).optional(),
-  show_operations: z.union([z.literal(0), z.literal(1)]).optional(),
-  web_long_description: z.string().optional(),
-  bom_creator: z.string().optional(),
-  bom_creator_item: z.string().optional(),
-  amended_from: z.string().optional(),
-  name: z.string().min(1, "ID is required"),
-  owner: z.string().optional(),
-  creation: z.string().optional(),
-  modified: z.string().optional(),
-  modified_by: z.string().optional(),
-  docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+    .default("Valuation Rate"),
+  items: z.array(BOMItemSchema).min(1, "At least one material is required"),
+  operations: z.array(BOMOperationSchema).optional(),
 });
 
-export const BomCreateSchema = BomSchema.pick({
-  item: true,
-  company: true,
-  quantity: true,
-  currency: true,
-  conversion_rate: true,
-  items: true,
-}).extend({
-  description: z.string().optional(),
-});
+export const BOMUpdateSchema = BOMCreateSchema.partial();
 
-export const BomUpdateSchema = BomSchema.partial().omit({
-  name: true,
-  creation: true,
-  owner: true,
-  docstatus: true,
-});
-
-export type BomSchemaType = z.infer<typeof BomSchema>;
+export type BOMFormData = z.input<typeof BOMCreateSchema>;
+export type BOMItemData = z.input<typeof BOMItemSchema>;
+export type BOMOperationData = z.input<typeof BOMOperationSchema>;
 
 /**
  * Workstation Zod Schema

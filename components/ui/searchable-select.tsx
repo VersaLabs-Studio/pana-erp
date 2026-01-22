@@ -17,6 +17,9 @@ export interface SearchableSelectOption {
   value: string;
   label: string;
   description?: string;
+  subtitle?: string; // Alias for description, used for item_code display
+  item_name?: string;
+  item_code?: string;
 }
 
 interface SearchableSelectProps {
@@ -53,7 +56,7 @@ export function SearchableSelect({
       (option) =>
         option.label.toLowerCase().includes(searchLower) ||
         option.value.toLowerCase().includes(searchLower) ||
-        option.description?.toLowerCase().includes(searchLower)
+        option.description?.toLowerCase().includes(searchLower),
     );
   }, [options, search]);
 
@@ -75,7 +78,7 @@ export function SearchableSelect({
             "w-full h-12 justify-between rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0 shadow-none font-normal",
             !value && "text-muted-foreground",
             disabled && "opacity-60 cursor-not-allowed",
-            className
+            className,
           )}
         >
           <span className="truncate">
@@ -111,20 +114,20 @@ export function SearchableSelect({
                   className={cn(
                     "relative flex items-center rounded-xl px-3 py-2.5 cursor-pointer transition-colors",
                     "hover:bg-accent hover:text-accent-foreground",
-                    value === option.value && "bg-accent/50"
+                    value === option.value && "bg-accent/50",
                   )}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
+                      value === option.value ? "opacity-100" : "opacity-0",
                     )}
                   />
                   <div className="flex flex-col">
                     <span className="text-sm">{option.label}</span>
-                    {option.description && (
-                      <span className="text-xs text-muted-foreground">
-                        {option.description}
+                    {(option.subtitle || option.description) && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {option.subtitle || option.description}
                       </span>
                     )}
                   </div>

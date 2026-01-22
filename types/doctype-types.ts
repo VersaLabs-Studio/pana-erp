@@ -7347,7 +7347,7 @@ export type WorkOrderUpdateRequest = Partial<
 /**
  * BOM DocType
  * @doctype BOM
- * @generated 2026-01-14T18:05:48.293Z
+ * @generated 2026-01-20T21:36:13.957Z
  */
 export interface Bom {
   /** Item - Item to be manufactured or repacked */
@@ -7468,33 +7468,13 @@ export interface Bom {
  * BOM Create Request
  * Fields required to create a new BOM
  */
-export type BomCreateRequest = Pick<
-  Bom,
-  "item" | "company" | "quantity" | "currency" | "conversion_rate" | "items"
-> &
-  Partial<
-    Pick<
-      Bom,
-      | "uom"
-      | "is_active"
-      | "is_default"
-      | "allow_alternative_item"
-      | "set_rate_of_sub_assembly_item_based_on_bom"
-      | "project"
-      | "image"
-      | "rm_cost_as_per"
-      | "buying_price_list"
-      | "price_list_currency"
-    >
-  >;
+export type BomCreateRequest = Pick<Bom, "item" | "company" | "quantity" | "currency" | "conversion_rate" | "items"> & Partial<Pick<Bom, "uom" | "is_active" | "is_default" | "allow_alternative_item" | "set_rate_of_sub_assembly_item_based_on_bom" | "project" | "image" | "rm_cost_as_per" | "buying_price_list" | "price_list_currency">>;
 
 /**
  * BOM Update Request
  * All fields optional for update
  */
-export type BomUpdateRequest = Partial<
-  Omit<Bom, "name" | "creation" | "owner" | "docstatus">
->;
+export type BomUpdateRequest = Partial<Omit<Bom, "name" | "creation" | "owner" | "docstatus">>;
 
 /**
  * Workstation DocType

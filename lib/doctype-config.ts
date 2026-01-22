@@ -331,9 +331,21 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     apiPath: "manufacturing/bom",
     module: "Manufacturing",
     labelField: "name",
-    searchFields: ["name", "item"],
+    searchFields: ["name", "item", "item_name"],
     defaultSortField: "creation",
     defaultSortOrder: "desc",
+  },
+  "BOM Item": {
+    apiPath: "manufacturing/bom-item",
+    module: "Manufacturing",
+    labelField: "item_code",
+    isSettings: true,
+  },
+  "BOM Operation": {
+    apiPath: "manufacturing/bom-operation",
+    module: "Manufacturing",
+    labelField: "operation",
+    isSettings: true,
   },
   "Work Order": {
     apiPath: "manufacturing/work-order",

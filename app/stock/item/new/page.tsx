@@ -57,6 +57,7 @@ const itemFormSchema = z.object({
   stock_uom: z.string().min(1, "Unit of measure is required"),
   description: z.string().optional(),
   brand: z.string().optional(),
+  valuation_rate: z.number().min(0).optional(),
   is_stock_item: z.boolean().default(true),
   is_fixed_asset: z.boolean().default(false),
   disabled: z.boolean().default(false),
@@ -83,6 +84,7 @@ function formToFrappe(data: ItemFormData): ItemCreateRequest {
     item_group: data.item_group,
     stock_uom: data.stock_uom,
     description: data.description,
+    valuation_rate: data.valuation_rate || 0,
     is_stock_item: data.is_stock_item ? 1 : 0,
     disabled: data.disabled ? 1 : 0,
   };
@@ -118,6 +120,7 @@ export default function CreateItemPage() {
       stock_uom: "",
       description: "",
       brand: "",
+      valuation_rate: 0,
       is_stock_item: true,
       is_fixed_asset: false,
       disabled: false,
@@ -290,6 +293,34 @@ export default function CreateItemPage() {
                           />
                         </DataField>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Valuation Rate */}
+                  <FormField
+                    control={form.control}
+                    name="valuation_rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <DataField
+                          label="Valuation Rate"
+                          name="valuation_rate"
+                          helperText="Used for BOM cost calculations"
+                        >
+                          <Input
+                            {...field}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={field.value ?? 0}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0"
+                          />
+                        </DataField>
                       </FormItem>
                     )}
                   />

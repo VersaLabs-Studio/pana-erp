@@ -30,6 +30,7 @@ export const GET = createListHandler("Item", {
     "description",
     "valuation_rate",
     "standard_rate",
+    "last_purchase_rate",
     "creation",
     "modified",
   ],

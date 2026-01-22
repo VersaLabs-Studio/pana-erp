@@ -40,6 +40,8 @@ export function useFrappeOptions(
     orderBy?: { field: string; order?: "asc" | "desc" };
     /** Limit number of options */
     limit?: number;
+    /** Whether to show code in label (e.g. "Item Name (Code)") */
+    showCode?: boolean;
   },
   queryOptions?: Omit<
     UseQueryOptions<DropdownOption[] | any[], Error>,
@@ -54,6 +56,23 @@ export function useFrappeOptions(
     queryKey: [doctype, "options", options],
     queryFn: async (): Promise<any[]> => {
       const fieldsToFetch = [valueField, labelField];
+
+      // Always include item_name for Item doctype to ensure proper display
+      if (doctype === "Item" && !fieldsToFetch.includes("item_name")) {
+        fieldsToFetch.push("item_name");
+      }
+      // Always include item_code for Item doctype
+      if (doctype === "Item" && !fieldsToFetch.includes("item_code")) {
+        fieldsToFetch.push("item_code");
+      }
+      // Always include workstation_name for Workstation doctype
+      if (
+        doctype === "Workstation" &&
+        !fieldsToFetch.includes("workstation_name")
+      ) {
+        fieldsToFetch.push("workstation_name");
+      }
+
       if (options?.extraFields) {
         fieldsToFetch.push(...options.extraFields);
       }
@@ -87,11 +106,39 @@ export function useFrappeOptions(
       const json = await response.json();
       const data = json.data as Record<string, any>[];
 
-      return data.map((item) => ({
-        ...item,
-        value: item[valueField],
-        label: item[labelField] || item[valueField],
-      }));
+      return data.map((item) => {
+        const val = item[valueField];
+        let label = item[labelField] || val;
+        let subtitle: string | undefined = undefined;
+
+        // Custom formatting for Items, BOMs, or Workstations to emphasize Names
+        const isEmphasizedDocType = ["Item", "BOM", "Workstation"].includes(
+          doctype,
+        );
+
+        if (options?.showCode !== false && isEmphasizedDocType) {
+          const code = item.item_code || item.name || val;
+          const name =
+            item.item_name || item.workstation_name || item[labelField];
+
+          if (name && name !== code) {
+            // Emphasize Name with Code in parenthesis
+            label = `${name} (${code})`;
+            subtitle = code;
+          } else {
+            label = code;
+          }
+        }
+
+        return {
+          ...item,
+          value: val,
+          label: label,
+          subtitle: subtitle, // For components that want to display code separately
+          item_name: item.item_name, // Ensure item_name is always available
+          item_code: item.item_code || item.name, // Ensure item_code is always available
+        };
+      });
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - options change less frequently
     ...queryOptions,
