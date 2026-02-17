@@ -15,7 +15,7 @@ const jakarta = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Pana ERP",
+  title: "Pana Promotion",
   description: "Enterprise Resource Planning - Premium Business Management",
 };
 
