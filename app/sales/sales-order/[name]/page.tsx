@@ -137,7 +137,34 @@ export default function SalesOrderDetailPage() {
   const isCancelled = order.docstatus === 2;
 
   return (
-    <div className="space-y-8 pb-24 print:p-0 print:m-0 print:bg-white">
+    <div className="space-y-8 pb-24 print:p-0 print:m-0 print:bg-white document-container">
+      {/* Print-only Header */}
+      <div className="hidden print:flex justify-between items-start mb-10 pb-6 border-b-2 border-slate-200">
+        <div className="flex items-start gap-4">
+          <img
+            src="/pana-logo.png"
+            style={{ height: "60px", width: "60px", objectFit: "contain" }}
+          />
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Pana Promotion
+            </h1>
+            <p className="text-xs text-slate-500 max-w-xs">{order.company}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <h2 className="text-3xl font-black text-primary tracking-tighter">
+            SALES ORDER
+          </h2>
+          <p className="text-sm font-mono font-bold mt-1 text-slate-700">
+            {order.name}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Date: {formatDate(order.transaction_date)}
+          </p>
+        </div>
+      </div>
+
       {/* Header - Hidden on Print */}
       <div className="print:hidden">
         <PageHeader

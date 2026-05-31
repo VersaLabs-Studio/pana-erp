@@ -278,8 +278,8 @@ export default function GlobalDashboard() {
               Command Center
             </h1>
             <p className="text-base text-muted-foreground font-medium leading-relaxed max-w-lg">
-              Central management workspace for pana enterprise resources.
-              Monitor performance and streamline operations.
+              Central management workspace for pana promotion resources. Monitor
+              performance and streamline operations.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Button

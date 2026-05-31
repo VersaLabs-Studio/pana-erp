@@ -413,17 +413,28 @@ export default function QuotationDetailPage() {
         {/* Invoice Header */}
         <div className="p-4 md:p-8 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex flex-col md:flex-row justify-between items-start gap-6">
-            <div className="w-full md:w-auto">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
-                QUOTATION
-              </h1>
-              <p className="text-base md:text-lg font-mono text-primary mt-1">
-                {quote.name}
-              </p>
+            <div className="w-full md:w-auto flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 relative overflow-hidden rounded-2xl shadow-sm border border-border bg-white p-2">
+                  <img
+                    src="/pana-logo.png"
+                    alt="Pana Promotion"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+                    QUOTATION
+                  </h1>
+                  <p className="text-base md:text-lg font-mono text-primary mt-1">
+                    {quote.name}
+                  </p>
+                </div>
+              </div>
               {company && (
-                <div className="mt-4 space-y-1 text-sm text-muted-foreground">
-                  <p className="font-semibold text-foreground">
-                    {company.company_name}
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground text-base">
+                    {company.company_name || "Pana Promotion"}
                   </p>
                   {company.address && <p>{company.address}</p>}
                   {company.phone_no && <p>Tel: {company.phone_no}</p>}
@@ -696,11 +707,17 @@ export default function QuotationDetailPage() {
       <div ref={printRef} className="hidden">
         <div className="print-container">
           <div className="header">
-            <div className="company-info">
-              <h1>{company?.company_name || quote.company}</h1>
-              {company?.address && <p>{company.address}</p>}
-              {company?.phone_no && <p>Tel: {company.phone_no}</p>}
-              {company?.email && <p>Email: {company.email}</p>}
+            <div className="flex items-start gap-4">
+              <img
+                src="/pana-logo.png"
+                style={{ height: "60px", width: "60px", objectFit: "contain" }}
+              />
+              <div className="company-info">
+                <h1>{company?.company_name || "Pana Promotion"}</h1>
+                {company?.address && <p>{company.address}</p>}
+                {company?.phone_no && <p>Tel: {company.phone_no}</p>}
+                {company?.email && <p>Email: {company.email}</p>}
+              </div>
             </div>
             <div className="quote-info">
               <h2>QUOTATION</h2>

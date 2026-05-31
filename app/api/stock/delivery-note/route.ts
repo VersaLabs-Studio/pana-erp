@@ -11,6 +11,7 @@ export const GET = createListHandler("Delivery Note", {
     "posting_time",
     "status",
     "grand_total",
+    "currency",
     "total_qty",
     "per_billed",
     "per_returned",

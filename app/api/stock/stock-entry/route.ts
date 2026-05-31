@@ -5,6 +5,7 @@ import { StockEntryCreateSchema } from "@/lib/schemas/doctype-schemas";
 export const GET = createListHandler("Stock Entry", {
   allowedFields: [
     "name",
+    "naming_series",
     "stock_entry_type",
     "purpose",
     "posting_date",

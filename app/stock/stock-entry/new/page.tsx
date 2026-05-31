@@ -25,7 +25,12 @@ import {
   Badge,
 } from "lucide-react";
 import { Form } from "@/components/ui/form";
-import { useFrappeCreate, useFrappeDoc, useFrappeList } from "@/hooks/generic";
+import {
+  useFrappeCreate,
+  useFrappeDoc,
+  useFrappeList,
+  useFrappeUpdate,
+} from "@/hooks/generic";
 import { PageHeader, LoadingState } from "@/components/smart";
 import {
   FormInput,
@@ -35,11 +40,13 @@ import {
 } from "@/components/form";
 import {
   StockEntryCreateSchema,
-  type StockEntryFormData,
+  StockEntryFormData,
 } from "@/lib/schemas/doctype-schemas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { WorkOrder, Bom, MaterialRequest } from "@/types/doctype-types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const PURPOSES = [
   {
@@ -117,6 +124,9 @@ function CreateStockEntryForm() {
   const workOrder = form.watch("work_order");
   const fgQty = form.watch("fg_completed_qty");
 
+  // State to track whether to submit (docstatus=1) after creation
+  const [submitAfterCreate, setSubmitAfterCreate] = useState(true);
+
   const isManufacture = purpose === "Manufacture";
   const isTransferForMfg = purpose === "Material Transfer for Manufacture";
   const needsSource = [
@@ -146,34 +156,57 @@ function CreateStockEntryForm() {
   // Auto-populate items from Work Order for manufacturing flows
   useEffect(() => {
     if (woDetails && (isManufacture || isTransferForMfg)) {
+      // Set company
       form.setValue("company", woDetails.company);
-      form.setValue(
-        "from_warehouse",
-        woDetails.source_warehouse || woDetails.wip_warehouse,
-      );
-      form.setValue(
-        "to_warehouse",
-        isManufacture ? woDetails.fg_warehouse : woDetails.wip_warehouse,
-      );
-      form.setValue(
-        "fg_completed_qty",
+
+      // Determine source warehouse: source_warehouse (raw materials) -> wip_warehouse fallback
+      const sourceWH =
+        woDetails.source_warehouse || woDetails.wip_warehouse || "";
+      // Determine target warehouse based on purpose
+      const targetWH = isManufacture
+        ? woDetails.fg_warehouse
+        : woDetails.wip_warehouse || "";
+
+      form.setValue("from_warehouse", sourceWH);
+      form.setValue("to_warehouse", targetWH);
+
+      // Calculate remaining quantity to produce/transfer
+      const remainingQty = Math.max(
+        0,
         woDetails.qty - (woDetails.produced_qty || 0),
       );
+      form.setValue("fg_completed_qty", remainingQty);
       form.setValue("bom_no", woDetails.bom_no);
 
+      // Populate items from Work Order required_items
       if (woDetails.required_items?.length > 0) {
-        const items = woDetails.required_items.map((item: any) => ({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          qty: isTransferForMfg
-            ? item.required_qty - (item.transferred_qty || 0)
-            : item.required_qty,
-          uom: item.uom || "Nos",
-          s_warehouse: woDetails.source_warehouse,
-          t_warehouse: isTransferForMfg ? woDetails.wip_warehouse : undefined,
-          basic_rate: 0,
-          doctype: "Stock Entry Detail",
-        }));
+        const items = woDetails.required_items.map((item: any) => {
+          // For Transfer for Mfg: only transfer what hasn't been transferred yet
+          // For other purposes: use full required qty
+          const pendingQty = isTransferForMfg
+            ? Math.max(
+                0,
+                (item.required_qty || 0) - (item.transferred_qty || 0),
+              )
+            : item.required_qty || 0;
+
+          return {
+            item_code: item.item_code,
+            item_name: item.item_name || item.item_code,
+            qty: pendingQty,
+            uom: item.uom || item.stock_uom || "Nos",
+            // Source warehouse: item's source or work order's source
+            s_warehouse: item.source_warehouse || sourceWH,
+            // Target warehouse: WIP for transfer, FG for manufacture
+            t_warehouse: isTransferForMfg ? woDetails.wip_warehouse : undefined,
+            work_order: woDetails.name,
+            bom_no: woDetails.bom_no,
+            basic_rate: item.rate || item.valuation_rate || 0,
+            doctype: "Stock Entry Detail",
+          };
+        });
+
+        // Only include items with pending quantity
         replace(items.filter((i) => i.qty > 0));
       }
     }
@@ -190,6 +223,8 @@ function CreateStockEntryForm() {
           qty: fgQty,
           uom: woDetails.stock_uom || "Nos",
           t_warehouse: woDetails.fg_warehouse,
+          work_order: woDetails.name,
+          bom_no: woDetails.bom_no,
           is_finished_item: true,
           basic_rate: 0,
           doctype: "Stock Entry Detail",
@@ -198,9 +233,37 @@ function CreateStockEntryForm() {
     }
   }, [fgQty, isManufacture, woDetails, fields, append]);
 
+  const workOrderUpdateMutation = useFrappeUpdate("Work Order", {
+    onSuccess: () => {
+      console.log("Work Order status updated to In Process");
+    },
+    onError: (err) =>
+      console.error("Failed to update Work Order status:", err.message),
+  });
+
   const createMutation = useFrappeCreate("Stock Entry", {
     onSuccess: (response) => {
-      toast.success("Stock Entry recorded");
+      const docstatus = response.data?.docstatus ?? response.docstatus;
+      const wasSubmitted = docstatus === 1;
+
+      // Proactively update Work Order status if material is transferred
+      if (
+        wasSubmitted &&
+        workOrder &&
+        (purpose === "Material Transfer for Manufacture" ||
+          purpose === "Manufacture")
+      ) {
+        workOrderUpdateMutation.mutate({
+          name: workOrder,
+          data: { status: "In Process" },
+        });
+      }
+
+      toast.success(
+        wasSubmitted
+          ? "Stock Entry submitted successfully! Work Order status updated."
+          : "Stock Entry saved as draft.",
+      );
       router.push(
         `/stock/stock-entry/${encodeURIComponent(response.data?.name || response.name)}`,
       );
@@ -209,12 +272,22 @@ function CreateStockEntryForm() {
   });
 
   const onSubmit = (data: StockEntryFormData) => {
+    // Ensure stock_entry_type is never null - use purpose or default
+    const stockEntryType =
+      data.stock_entry_type || data.purpose || "Material Transfer";
+
     const payload = {
       ...data,
-      docstatus: 0,
-      stock_entry_type: data.purpose,
+      // docstatus: 1 = submitted (updates Work Order status), 0 = draft
+      docstatus: submitAfterCreate ? 1 : 0,
+      stock_entry_type: stockEntryType,
+      from_bom: data.bom_no ? 1 : 0,
+      // Also set purpose to match for ERPNext compatibility
+      purpose: data.purpose || stockEntryType,
       items: data.items.map((item) => ({
         ...item,
+        work_order: data.work_order,
+        bom_no: data.bom_no,
         s_warehouse:
           item.s_warehouse || (needsSource ? data.from_warehouse : undefined),
         t_warehouse:
@@ -578,23 +651,52 @@ function CreateStockEntryForm() {
                 </div>
               )}
 
+              {/* Submit Option */}
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                <Checkbox
+                  id="submitAfterCreate"
+                  checked={submitAfterCreate}
+                  onCheckedChange={(checked) => setSubmitAfterCreate(!!checked)}
+                  className="h-5 w-5 border-2 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                />
+                <div className="flex-1">
+                  <Label
+                    htmlFor="submitAfterCreate"
+                    className="font-bold text-sm cursor-pointer"
+                  >
+                    Submit Entry
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    {submitAfterCreate
+                      ? "Entry will be submitted and update linked Work Order status"
+                      : "Entry will be saved as draft (won't update Work Order)"}
+                  </p>
+                </div>
+              </div>
+
               <Button
                 type="submit"
                 disabled={createMutation.isPending || fields.length === 0}
-                className="w-full rounded-2xl h-14 font-black uppercase tracking-[0.1em] text-xs shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                className={cn(
+                  "w-full rounded-2xl h-14 font-black uppercase tracking-[0.1em] text-xs shadow-lg transition-all",
+                  submitAfterCreate
+                    ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 hover:shadow-emerald-500/30"
+                    : "shadow-primary/20 hover:shadow-primary/30",
+                )}
               >
                 {createMutation.isPending ? (
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 ) : (
                   <Save className="h-5 w-5 mr-3" />
                 )}
-                Post Stock Entry
+                {submitAfterCreate ? "Submit & Post Entry" : "Save as Draft"}
               </Button>
 
               <div className="p-5 rounded-3xl bg-secondary/30 text-[11px] text-muted-foreground font-medium border border-border/50 flex gap-4">
                 <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                Posting this entry will update Stock Ledger and affect weighted
-                average costs immediately.
+                {submitAfterCreate
+                  ? "Submitting will update Stock Ledger, Work Order status, and affect weighted average costs immediately."
+                  : "Draft entries won't affect stock levels until submitted."}
               </div>
             </div>
           </div>
