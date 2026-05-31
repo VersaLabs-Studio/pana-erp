@@ -238,9 +238,41 @@ function CreateBOMForm() {
     createMutation.mutate(payload);
   };
 
+  // Handle form validation errors
+  const onFormError = (errors: any) => {
+    console.error("Full validation errors:", errors);
+
+    // Explicitly stringify to ensure we see everything in case of proxy/truncation
+    const errorDetail = JSON.stringify(errors, null, 2);
+    console.error("Stringified errors:", errorDetail);
+
+    // Show validation errors via toast
+    const messages: string[] = [];
+
+    // Recursive error collector to find all messages
+    const collectErrors = (errs: any, path = "") => {
+      if (!errs) return;
+      if (errs.message) {
+        messages.push(`${path}: ${errs.message}`);
+      } else {
+        Object.keys(errs).forEach((key) => {
+          collectErrors(errs[key], path ? `${path}.${key}` : key);
+        });
+      }
+    };
+
+    collectErrors(errors);
+
+    if (messages.length > 0) {
+      toast.error("Validation failed: \n" + messages.join("\n"));
+    } else {
+      toast.error("Form validation failed. Please check all required fields.");
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit, onFormError)}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form - 2 columns */}
           <div className="lg:col-span-2 space-y-6">

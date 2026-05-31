@@ -15,7 +15,7 @@ const jakarta = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Versalabs OBSIDIAN",
+  title: "Pana Promotion",
   description: "Enterprise Resource Planning - Premium Business Management",
 };
 

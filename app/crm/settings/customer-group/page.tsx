@@ -1,5 +1,5 @@
-// app/crm/settings/customer-group/page.tsx
-// Pana ERP v3.0 - Customer Groups Settings Page
+// app/crm/settings/-group/page.tsx
+// Pana ERP v3.0 -  Groups Settings Page
 // @ts-nocheck
 
 "use client";
@@ -33,16 +33,16 @@ import {
   LoadingState,
   ConfirmDialog,
 } from "@/components/smart";
-import type { CustomerGroup } from "@/types/doctype-types";
+import type { Group } from "@/types/doctype-types";
 
-// Customer Group Row Component
-function CustomerGroupRow({
+//  Group Row Component
+function GroupRow({
   group,
   index,
   onEdit,
   onDelete,
 }: {
-  group: CustomerGroup;
+  group: Group;
   index: number;
   onEdit: () => void;
   onDelete: () => void;
@@ -65,7 +65,7 @@ function CustomerGroupRow({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">
-              {group.customer_group_name}
+              {group._group_name}
             </h3>
             {group.is_group === 1 && (
               <Badge variant="secondary" className="text-xs">
@@ -73,9 +73,9 @@ function CustomerGroupRow({
               </Badge>
             )}
           </div>
-          {group.parent_customer_group && (
+          {group.parent__group && (
             <p className="text-xs text-muted-foreground">
-              Parent: {group.parent_customer_group}
+              Parent: {group.parent__group}
             </p>
           )}
         </div>
@@ -111,22 +111,22 @@ function CustomerGroupRow({
   );
 }
 
-export default function CustomerGroupsPage() {
+export default function GroupsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<CustomerGroup | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
 
   const {
     data: groups,
     isLoading,
     error,
-  } = useFrappeList<CustomerGroup>("Customer Group", {
-    orderBy: { field: "customer_group_name", order: "asc" },
+  } = useFrappeList<Group>(" Group", {
+    orderBy: { field: "_group_name", order: "asc" },
     search,
     limit: 100,
   });
 
-  const deleteMutation = useFrappeDelete("Customer Group", {
+  const deleteMutation = useFrappeDelete(" Group", {
     onSuccess: () => setDeleteTarget(null),
   });
 
@@ -142,29 +142,29 @@ export default function CustomerGroupsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load customer groups</p>
+        <p className="text-destructive">Failed to load groups</p>
       </div>
     );
   }
 
   const filteredGroups = groups?.filter((g) =>
-    g.customer_group_name?.toLowerCase().includes(search.toLowerCase())
+    g._group_name?.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Customer Groups"
+        title=" Groups"
         subtitle={`${filteredGroups?.length || 0} groups`}
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search groups..."
-        backHref="/crm/customer"
+        backHref="/crm/"
         actions={
           <Button
             className="rounded-full"
-            onClick={() => router.push("/crm/settings/customer-group/new")}
+            onClick={() => router.push("/crm/settings/-group/new")}
           >
             <Plus className="h-4 w-4 mr-2" /> New Group
           </Button>
@@ -173,16 +173,12 @@ export default function CustomerGroupsPage() {
 
       {filteredGroups?.length === 0 ? (
         <EmptyState
-          title="No customer groups found"
+          title="No  groups found"
           description={
-            search
-              ? "Try adjusting your search"
-              : "Create your first customer group"
+            search ? "Try adjusting your search" : "Create your first  group"
           }
           action={
-            <Button
-              onClick={() => router.push("/crm/settings/customer-group/new")}
-            >
+            <Button onClick={() => router.push("/crm/settings/-group/new")}>
               <Plus className="h-4 w-4 mr-2" /> New Group
             </Button>
           }
@@ -190,15 +186,13 @@ export default function CustomerGroupsPage() {
       ) : (
         <div className="space-y-2">
           {filteredGroups?.map((group, index) => (
-            <CustomerGroupRow
+            <GroupRow
               key={group.name}
               group={group}
               index={index}
               onEdit={() =>
                 router.push(
-                  `/crm/settings/customer-group/${encodeURIComponent(
-                    group.name
-                  )}/edit`
+                  `/crm/settings/-group/${encodeURIComponent(group.name)}/edit`,
                 )
               }
               onDelete={() => setDeleteTarget(group)}
@@ -210,8 +204,8 @@ export default function CustomerGroupsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Customer Group"
-        description={`Are you sure you want to delete "${deleteTarget?.customer_group_name}"? This action cannot be undone.`}
+        title="Delete  Group"
+        description={`Are you sure you want to delete "${deleteTarget?._group_name}"? This action cannot be undone.`}
         confirmText="Delete"
         variant="destructive"
         onConfirm={handleDeleteConfirm}
