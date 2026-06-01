@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian ERP — Pharmaceutical Stock Management Solution</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #111118;
+            --bg-card: #16161f;
+            --bg-elevated: #1e1e2a;
+            --accent: #7c3aed;
+            --accent-light: #a78bfa;
+            --accent-glow: rgba(124, 58, 237, 0.3);
+            --cyan: #06b6d4;
+            --cyan-glow: rgba(6, 182, 212, 0.3);
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --rose: #f43f5e;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-dim: #64748b;
+            --border: rgba(255,255,255,0.06);
+            --glass: rgba(255,255,255,0.03);
+        }
+
+        html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== SLIDE SYSTEM ===== */
+        .slide {
+            min-height: 100vh;
+            scroll-snap-align: start;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 60% 50% at 50% 0%, var(--accent-glow), transparent 70%);
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        .slide-content {
+            max-width: 1200px;
+            width: 100%;
+            z-index: 2;
+            animation: fadeSlideUp 0.8s ease-out;
+        }
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px var(--accent-glow); }
+            50% { box-shadow: 0 0 40px var(--accent-glow), 0 0 60px rgba(124,58,237,0.1); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* ===== NAVIGATION ===== */
+        .nav-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 16px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(20px);
+            background: rgba(10,10,15,0.7);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-brand img {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+        }
+
+        .nav-brand span {
+            font-weight: 700;
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, var(--accent-light), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+        }
+
+        .nav-dot.active, .nav-dot:hover {
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent-glow);
+            transform: scale(1.3);
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent);
+            background: var(--bg-elevated);
+        }
+
+        /* ===== TYPOGRAPHY ===== */
+        .slide-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--accent-light);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slide-label::before {
+            content: '';
+            width: 24px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.05;
+            margin-bottom: 24px;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-title .gradient-text {
+            background: linear-gradient(135deg, var(--accent-light) 0%, var(--cyan) 50%, var(--emerald) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 200% auto;
+            animation: shimmer 4s linear infinite;
+        }
+
+        .section-title {
+            font-size: clamp(2rem, 3.5vw, 3rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .section-subtitle {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            max-width: 640px;
+        }
+
+        /* ===== CARDS ===== */
+        .glass-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            backdrop-filter: blur(10px);
+            transition: all 0.4s;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(124,58,237,0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 30px var(--accent-glow);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--cyan));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(124,58,237,0.3);
+            transform: translateY(-6px);
+            box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+        }
+
+        .feature-card:hover::before { opacity: 1; }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ===== STAT CARDS ===== */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-light), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        /* ===== FLOW DIAGRAM ===== */
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+
+        .flow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 24px;
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.3s;
+        }
+
+        .flow-step:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .flow-step .step-icon { font-size: 1.6rem; margin-bottom: 8px; }
+        .flow-step .step-title { font-size: 0.8rem; font-weight: 700; }
+        .flow-step .step-desc { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; }
+
+        .flow-arrow {
+            font-size: 1.4rem;
+            color: var(--accent-light);
+            animation: float 2s ease-in-out infinite;
+        }
+
+        /* ===== TWO COLUMN ===== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .img-container {
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .img-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* ===== PAIN POINTS ===== */
+        .pain-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .pain-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(244,63,94,0.15);
+            border-radius: 14px;
+            padding: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .pain-card .pain-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .pain-card h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--rose);
+            margin-bottom: 6px;
+        }
+
+        .pain-card p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* ===== SOLUTION LIST ===== */
+        .solution-list {
+            list-style: none;
+            margin-top: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .solution-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            transition: all 0.3s;
+        }
+
+        .solution-list li:hover {
+            border-color: rgba(16,185,129,0.3);
+            background: rgba(16,185,129,0.03);
+        }
+
+        .solution-list .check {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(16,185,129,0.15);
+            color: var(--emerald);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.75rem;
+        }
+
+        .solution-list .sol-title {
+            font-weight: 700;
+            font-size: 0.92rem;
+            margin-bottom: 4px;
+        }
+
+        .solution-list .sol-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* ===== AI SECTION ===== */
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15));
+            border: 1px solid rgba(124,58,237,0.25);
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-light);
+            margin-bottom: 20px;
+        }
+
+        .ai-features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 36px;
+        }
+
+        .ai-card {
+            background: linear-gradient(135deg, rgba(124,58,237,0.05), rgba(6,182,212,0.05));
+            border: 1px solid rgba(124,58,237,0.12);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.4s;
+        }
+
+        .ai-card:hover {
+            border-color: rgba(124,58,237,0.35);
+            box-shadow: 0 8px 30px rgba(124,58,237,0.1);
+            transform: translateY(-4px);
+        }
+
+        .ai-card .ai-icon { font-size: 1.6rem; margin-bottom: 12px; }
+        .ai-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+        .ai-card p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; }
+
+        /* ===== PRICING SLIDE ===== */
+        .pricing-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 40px;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .pricing-table th {
+            background: var(--bg-card);
+            padding: 16px 24px;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .pricing-table td {
+            padding: 14px 24px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .pricing-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+        .pricing-table tr:hover td { background: rgba(124,58,237,0.04); }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .tier-starter { background: rgba(16,185,129,0.1); color: var(--emerald); }
+        .tier-pro { background: rgba(124,58,237,0.1); color: var(--accent-light); }
+        .tier-enterprise { background: rgba(245,158,11,0.1); color: var(--amber); }
+
+        /* ===== CTA SLIDE ===== */
+        .cta-box {
+            text-align: center;
+            padding: 60px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(6,182,212,0.08));
+            border: 1px solid rgba(124,58,237,0.2);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, var(--accent), #5b21b6);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 28px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 10px 40px var(--accent-glow);
+        }
+
+        /* ===== TIMELINE ===== */
+        .timeline {
+            display: flex;
+            gap: 0;
+            margin-top: 40px;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 36px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--cyan), var(--emerald));
+            border-radius: 3px;
+        }
+
+        .timeline-item {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            padding-top: 60px;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 4px solid var(--bg-primary);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .timeline-item h4 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .timeline-item p {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* ===== SLIDE COUNTER ===== */
+        .slide-counter {
+            position: fixed;
+            bottom: 24px;
+            right: 40px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            z-index: 100;
+            background: var(--bg-card);
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .slide { padding: 80px 24px 40px; }
+            .two-col { grid-template-columns: 1fr; gap: 30px; }
+            .stat-row { grid-template-columns: repeat(2, 1fr); }
+            .pain-grid { grid-template-columns: 1fr; }
+            .ai-features { grid-template-columns: 1fr; }
+            .flow-container { flex-direction: column; }
+            .flow-arrow { transform: rotate(90deg); }
+            .nav-bar { padding: 12px 16px; }
+        }
+
+        /* Print styles */
+        @media print {
+            .slide { page-break-after: always; min-height: 100vh; }
+            .nav-bar, .nav-controls, .slide-counter { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav-bar">
+    <div class="nav-brand">
+        <img src="assets/logo.png" alt="Obsidian ERP">
+        <span>Obsidian ERP</span>
+    </div>
+    <div class="nav-dots" id="navDots"></div>
+    <div class="nav-controls">
+        <button class="nav-btn" onclick="prevSlide()">← Prev</button>
+        <button class="nav-btn" onclick="nextSlide()">Next →</button>
+    </div>
+</nav>
+
+<!-- Slide Counter -->
+<div class="slide-counter" id="slideCounter">1 / 12</div>
+
+<!-- ============================================================
+     SLIDE 1: TITLE
+     ============================================================ -->
+<section class="slide" id="slide-1">
+    <div class="slide-content" style="text-align: center;">
+        <div style="margin-bottom: 32px;">
+            <img src="assets/logo.png" alt="Obsidian" style="width: 80px; height: 80px; border-radius: 20px; animation: float 3s ease-in-out infinite; box-shadow: 0 0 40px var(--accent-glow);">
+        </div>
+        <h1 class="hero-title">
+            <span class="gradient-text">Obsidian ERP</span>
+        </h1>
+        <p style="font-size: 1.3rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto 20px; line-height: 1.6;">
+            The Intelligent Enterprise Software Built for<br>
+            <strong style="color: var(--text-primary);">Pharmaceutical Stock Management</strong>
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-dim); margin-top: 24px;">
+            Presented by <strong style="color: var(--accent-light);">VersaForge Technologies</strong> &nbsp;•&nbsp; April 2026
+        </p>
+        <div style="margin-top: 50px;">
+            <button class="cta-button" onclick="nextSlide()">
+                Begin Presentation →
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 2: THE PROBLEM
+     ============================================================ -->
+<section class="slide" id="slide-2">
+    <div class="slide-content">
+        <div class="slide-label">The Challenge</div>
+        <h2 class="section-title">The Problems Your Business <br>Faces <span style="color: var(--rose);">Every Single Day</span></h2>
+        <p class="section-subtitle">These aren't just inconveniences — they're costing you money, time, and customers.</p>
+
+        <div class="pain-grid">
+            <div class="pain-card">
+                <span class="pain-icon">📋</span>
+                <div>
+                    <h4>Paper & Spreadsheet Chaos</h4>
+                    <p>Tracking thousands of pharmaceutical items across Excel files leads to errors, missing stock, and wasted hours searching for the right data.</p>
+                </div>
+            </div>
+            <div class="pain-card">
+                <span class="pain-icon">⏰</span>
+                <div>
+                    <h4>Expired Stock Surprises</h4>
+                    <p>Without automated expiry tracking, expired medicines sit on shelves, leading to regulatory risk, financial loss, and potential health hazards.</p>
+                </div>
+            </div>
+            <div class="pain-card">
+                <span class="pain-icon">📦</span>
+                <div>
+                    <h4>Stock-Out Emergencies</h4>
+                    <p>You only realize you're out of a critical medicine when a customer asks for it. No forecasting, no alerts — just lost sales and unhappy clients.</p>
+                </div>
+            </div>
+            <div class="pain-card">
+                <span class="pain-icon">💰</span>
+                <div>
+                    <h4>Cash Flow Blindness</h4>
+                    <p>No clear view of what suppliers you owe, what customers owe you, or where your money actually is. Financial decisions are made on gut feeling.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 3: THE SOLUTION (OVERVIEW)
+     ============================================================ -->
+<section class="slide" id="slide-3">
+    <div class="slide-content">
+        <div class="two-col">
+            <div>
+                <div class="slide-label">The Solution</div>
+                <h2 class="section-title">One System to Run Your <span class="gradient-text" style="-webkit-text-fill-color: transparent;">Entire Business</span></h2>
+                <p class="section-subtitle">Obsidian ERP replaces your spreadsheets, notebooks, and guesswork with one beautiful, intelligent system that every team member can use.</p>
+
+                <div style="margin-top: 32px; display: flex; flex-wrap: wrap; gap: 10px;">
+                    <span class="ai-badge">🧠 AI-Powered</span>
+                    <span class="ai-badge" style="border-color: rgba(16,185,129,0.25); color: var(--emerald);">☁️ Cloud-Based</span>
+                    <span class="ai-badge" style="border-color: rgba(245,158,11,0.25); color: var(--amber);">📱 Works on Any Device</span>
+                </div>
+            </div>
+            <div class="img-container">
+                <img src="assets/dashboard.png" alt="Obsidian ERP Dashboard">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 4: HOW IT WORKS - THE FULL FLOW
+     ============================================================ -->
+<section class="slide" id="slide-4">
+    <div class="slide-content">
+        <div class="slide-label">How It Works</div>
+        <h2 class="section-title" style="text-align: center;">Your Business, From Start to Finish — <span style="color: var(--cyan);">Automated</span></h2>
+        <p class="section-subtitle" style="text-align: center; margin: 0 auto;">Every step of your daily work flows seamlessly into the next. No re-typing. No errors.</p>
+
+        <div class="flow-container">
+            <div class="flow-step">
+                <div class="step-icon">👥</div>
+                <div class="step-title">Customer Contacts</div>
+                <div class="step-desc">Manage leads & clients</div>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">
+                <div class="step-icon">📝</div>
+                <div class="step-title">Price Quotation</div>
+                <div class="step-desc">Send professional quotes</div>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step" style="border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow);">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Sales Order</div>
+                <div class="step-desc">Confirm the deal</div>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">
+                <div class="step-icon">📦</div>
+                <div class="step-title">Smart Warehouse</div>
+                <div class="step-desc">Pick & pack goods</div>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">
+                <div class="step-icon">🚚</div>
+                <div class="step-title">Delivery</div>
+                <div class="step-desc">Ship with gate pass</div>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step" style="border-color: var(--emerald); box-shadow: 0 0 15px rgba(16,185,129,0.2);">
+                <div class="step-icon">💰</div>
+                <div class="step-title">Get Paid</div>
+                <div class="step-desc">Invoice & collect</div>
+            </div>
+        </div>
+
+        <p style="text-align: center; margin-top: 32px; font-size: 0.85rem; color: var(--text-dim);">
+            ✨ Every step automatically generates the financial records (no manual bookkeeping needed)
+        </p>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 5: STOCK MANAGEMENT (PHARMACEUTICAL FOCUS)
+     ============================================================ -->
+<section class="slide" id="slide-5">
+    <div class="slide-content">
+        <div class="two-col">
+            <div class="img-container">
+                <img src="assets/warehouse.png" alt="Pharmaceutical Warehouse">
+            </div>
+            <div>
+                <div class="slide-label">Core Feature</div>
+                <h2 class="section-title">Pharmaceutical-Grade <span style="color: var(--emerald);">Stock Control</span></h2>
+                <p class="section-subtitle">Know exactly what you have, where it is, and when it expires — in real time.</p>
+
+                <ul class="solution-list" style="margin-top: 24px;">
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Multi-Warehouse Tracking</div>
+                            <div class="sol-desc">Main store, cold storage, branch outlets — see stock levels everywhere, instantly.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Batch & Expiry Management</div>
+                            <div class="sol-desc">Every medicine is tracked by batch number and expiry date. First-Expiry-First-Out (FEFO) automatically.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Auto Reorder Alerts</div>
+                            <div class="sol-desc">Running low? The system creates purchase requests automatically before you run out.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Smart Stock Transfers</div>
+                            <div class="sol-desc">Move stock between warehouses with full traceability. Every movement is recorded.</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 6: ALL MODULES
+     ============================================================ -->
+<section class="slide" id="slide-6">
+    <div class="slide-content">
+        <div class="slide-label">Complete Platform</div>
+        <h2 class="section-title" style="text-align: center;">Everything You Need, <span class="gradient-text" style="-webkit-text-fill-color: transparent;">Nothing You Don't</span></h2>
+        <p class="section-subtitle" style="text-align: center; margin: 0 auto;">Eight powerful modules working together like a well-oiled machine.</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(124,58,237,0.1); color: var(--accent-light);">👥</div>
+                <h3>Customer Management (CRM)</h3>
+                <p>Track every hospital, pharmacy, and clinic you serve. Know their purchase history, preferences, and outstanding balances at a glance.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(6,182,212,0.1); color: var(--cyan);">📝</div>
+                <h3>Smart Quotations</h3>
+                <p>Create professional price quotes in seconds. Auto-calculate taxes, apply discounts, and convert to orders with one click when approved.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(16,185,129,0.1); color: var(--emerald);">🛒</div>
+                <h3>Sales Orders</h3>
+                <p>The heart of your business — confirmed deals that automatically trigger warehouse picking, delivery, and billing workflows.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(245,158,11,0.1); color: var(--amber);">📦</div>
+                <h3>Inventory & Warehouses</h3>
+                <p>Multi-location stock tracking with batch numbers, expiry dates, and real-time quantities. Never lose track of a single tablet or vial.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(244,63,94,0.1); color: var(--rose);">🏪</div>
+                <h3>Supplier & Purchasing</h3>
+                <p>Manage all your pharmaceutical suppliers. Create purchase orders, track deliveries, and compare pricing across vendors.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(99,102,241,0.1); color: #818cf8;">🚚</div>
+                <h3>Delivery & Logistics</h3>
+                <p>Schedule deliveries with driver and vehicle tracking. Generate gate passes and proof-of-delivery documents automatically.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(34,197,94,0.1); color: #22c55e;">💳</div>
+                <h3>Accounting & Finance</h3>
+                <p>Full double-entry bookkeeping. Sales invoices, purchase invoices, payments, and a complete financial picture — all automatic.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(168,85,247,0.1); color: #a855f7;">📊</div>
+                <h3>Reports & Dashboards</h3>
+                <p>Beautiful visual reports. Revenue vs expenses, stock aging, accounts receivable, profit by category — the numbers that matter.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 7: SUPPLY CHAIN VISIBILITY
+     ============================================================ -->
+<section class="slide" id="slide-7">
+    <div class="slide-content">
+        <div class="two-col">
+            <div>
+                <div class="slide-label">Supply Chain</div>
+                <h2 class="section-title">See Your Entire <span style="color: var(--cyan);">Supply Chain</span> in One View</h2>
+                <p class="section-subtitle">From the manufacturer to the patient — track every step of the pharmaceutical journey.</p>
+
+                <ul class="solution-list" style="margin-top: 24px;">
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Supplier Performance Tracking</div>
+                            <div class="sol-desc">Know which suppliers deliver on time, which ones have the best prices, and which ones are unreliable.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">Purchase Order Automation</div>
+                            <div class="sol-desc">System generates purchase orders when stock drops below minimum levels. You just approve and send.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="check">✓</span>
+                        <div>
+                            <div class="sol-title">3-Way Invoice Matching</div>
+                            <div class="sol-desc">Automatically verify: What you ordered = What arrived = What the supplier invoiced. No overpaying.</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="img-container">
+                <img src="assets/supply_chain.png" alt="Supply Chain Network">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 8: ACCOUNTING & FINANCE
+     ============================================================ -->
+<section class="slide" id="slide-8">
+    <div class="slide-content">
+        <div class="slide-label">Financial Control</div>
+        <h2 class="section-title" style="text-align: center;">Your Money. <span style="color: var(--emerald);">Crystal Clear.</span></h2>
+        <p class="section-subtitle" style="text-align: center; margin: 0 auto;">Every sale, every purchase, every payment — automatically organized into proper financial records.</p>
+
+        <div class="stat-row" style="margin-top: 48px;">
+            <div class="stat-card">
+                <div class="stat-number">0</div>
+                <div class="stat-label">Manual Bookkeeping Entries</div>
+                <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 6px;">Everything posts automatically</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="background: linear-gradient(135deg, var(--emerald), var(--cyan)); -webkit-background-clip: text;">100%</div>
+                <div class="stat-label">Financial Visibility</div>
+                <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 6px;">Real-time profit & loss</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="background: linear-gradient(135deg, var(--amber), var(--rose)); -webkit-background-clip: text;">24/7</div>
+                <div class="stat-label">Access from Anywhere</div>
+                <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 6px;">Phone, tablet, or computer</p>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">1</div>
+                <div class="stat-label">Click to Get Reports</div>
+                <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 6px;">Trial balance, P&L, cash flow</p>
+            </div>
+        </div>
+
+        <div class="feature-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 32px;">
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">📥</div>
+                <h3 style="font-size: 0.95rem;">Accounts Receivable</h3>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">See exactly who owes you, how much, and how overdue. Chase payments with auto-reminders.</p>
+            </div>
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
+                <h3 style="font-size: 0.95rem;">Accounts Payable</h3>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">Track what you owe to suppliers. Pay on time, avoid late fees, and maintain strong relationships.</p>
+            </div>
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">🏦</div>
+                <h3 style="font-size: 0.95rem;">Cash Management</h3>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">Real-time view of bank and cash balances. Get warned before overdrafts happen.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 9: AI FEATURES
+     ============================================================ -->
+<section class="slide" id="slide-9">
+    <div class="slide-content">
+        <div class="two-col">
+            <div>
+                <div class="ai-badge">🧠 AI-Integrated &nbsp;•&nbsp; v3.5</div>
+                <h2 class="section-title">Artificial Intelligence That <span class="gradient-text" style="-webkit-text-fill-color: transparent;">Thinks Ahead</span></h2>
+                <p class="section-subtitle">Obsidian ERP doesn't just record what happened — it predicts what's coming and tells you what to do about it.</p>
+
+                <div class="ai-features" style="grid-template-columns: 1fr; margin-top: 28px;">
+                    <div class="ai-card">
+                        <div class="ai-icon">🔮</div>
+                        <h3>Demand Forecasting</h3>
+                        <p>AI analyzes your past sales and seasonal patterns to predict which medicines will be in demand next month. Order smart, not blind.</p>
+                    </div>
+                    <div class="ai-card">
+                        <div class="ai-icon">⚠️</div>
+                        <h3>Expiry Risk Analyzer</h3>
+                        <p>Automatically flags medicines approaching expiry. Suggests markdowns, returns to supplier, or transfer to high-demand locations.</p>
+                    </div>
+                    <div class="ai-card">
+                        <div class="ai-icon">📈</div>
+                        <h3>Profit Optimization Engine</h3>
+                        <p>Identifies your most and least profitable products. Suggests optimal pricing and which items to prioritize for maximum margin.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="img-container">
+                <img src="assets/ai.png" alt="AI Analytics">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 10: MORE AI FEATURES
+     ============================================================ -->
+<section class="slide" id="slide-10">
+    <div class="slide-content">
+        <div class="slide-label">AI Intelligence</div>
+        <h2 class="section-title" style="text-align: center;">AI Features That <span style="color: var(--accent-light);">Save You Hours</span> Every Week</h2>
+
+        <div class="ai-features" style="margin-top: 40px;">
+            <div class="ai-card">
+                <div class="ai-icon">🤖</div>
+                <h3>Smart Purchase Suggestions</h3>
+                <p>Instead of manually checking what to reorder, AI reviews your stock levels, sales trends, and supplier lead times — then generates a purchase list for your approval.</p>
+            </div>
+            <div class="ai-card">
+                <div class="ai-icon">📊</div>
+                <h3>Intelligent Financial Reports</h3>
+                <p>AI-generated plain-language summaries of your financial health. "Your revenue is up 12% this month, but Supplier X invoices are 15 days overdue."</p>
+            </div>
+            <div class="ai-card">
+                <div class="ai-icon">🔍</div>
+                <h3>Anomaly Detection</h3>
+                <p>Unusual stock movements? Suspicious discrepancies? The AI flags them before they become problems. Protect your business from shrinkage and errors.</p>
+            </div>
+            <div class="ai-card">
+                <div class="ai-icon">💬</div>
+                <h3>Natural Language Assistant</h3>
+                <p>Ask the system questions in plain Amharic or English: "How many Paracetamol boxes do we have?" — and get instant, accurate answers.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 11: IMPLEMENTATION TIMELINE
+     ============================================================ -->
+<section class="slide" id="slide-11">
+    <div class="slide-content">
+        <div class="slide-label">Implementation</div>
+        <h2 class="section-title" style="text-align: center;">Up and Running in <span style="color: var(--emerald);">Weeks, Not Months</span></h2>
+        <p class="section-subtitle" style="text-align: center; margin: 0 auto;">We handle the heavy lifting. Your team keeps working while we set everything up.</p>
+
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <h4>Week 1-2</h4>
+                <p>Discovery & Setup<br>Import your items, customers, suppliers & opening stock</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot" style="background: var(--cyan);"></div>
+                <h4>Week 3-4</h4>
+                <p>Customization<br>Configure to match your workflows, pricing rules & tax setup</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot" style="background: var(--emerald);"></div>
+                <h4>Week 5-6</h4>
+                <p>Training<br>Hands-on training for your team. Practice with real scenarios</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot" style="background: var(--amber);"></div>
+                <h4>Week 7-8</h4>
+                <p>Go Live<br>Switch over with full support. We stay by your side</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 60px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 8px;">🎓</div>
+                <h3 style="font-size: 0.9rem;">Full Team Training</h3>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">We train every user until they're confident</p>
+            </div>
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 8px;">📞</div>
+                <h3 style="font-size: 0.9rem;">Dedicated Support</h3>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Phone and remote support when you need it</p>
+            </div>
+            <div class="glass-card" style="text-align: center;">
+                <div style="font-size: 1.5rem; margin-bottom: 8px;">📦</div>
+                <h3 style="font-size: 0.9rem;">Data Migration</h3>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">We move your existing data into Obsidian</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================
+     SLIDE 12: CALL TO ACTION
+     ============================================================ -->
+<section class="slide" id="slide-12">
+    <div class="slide-content">
+        <div class="cta-box">
+            <div style="margin-bottom: 24px;">
+                <img src="assets/logo.png" alt="Obsidian" style="width: 60px; height: 60px; border-radius: 16px; animation: float 3s ease-in-out infinite;">
+            </div>
+            <h2 class="section-title">Ready to Transform <br> <span class="gradient-text" style="-webkit-text-fill-color: transparent;">Your Pharmaceutical Business?</span></h2>
+            <p style="font-size: 1.1rem; color: var(--text-secondary); max-width: 600px; margin: 16px auto 0; line-height: 1.7;">
+                Stop losing money to expired stock, spreadsheet errors, and guesswork. <br>
+                <strong style="color: var(--text-primary);">Let Obsidian ERP work for you — starting today.</strong>
+            </p>
+            <button class="cta-button">
+                📞 Schedule a Live Demo
+            </button>
+            <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 20px;">
+                Free consultation &nbsp;•&nbsp; No commitment &nbsp;•&nbsp; See it with your own data
+            </p>
+
+            <div style="margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--border);">
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <strong style="color: var(--accent-light);">VersaForge Technologies</strong><br>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">Enterprise Software Solutions &nbsp;•&nbsp; Addis Ababa, Ethiopia</span>
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+    const totalSlides = 12;
+    let currentSlide = 1;
+
+    // Generate nav dots
+    const dotsContainer = document.getElementById('navDots');
+    for (let i = 1; i <= totalSlides; i++) {
+        const dot = document.createElement('button');
+        dot.className = 'nav-dot' + (i === 1 ? ' active' : '');
+        dot.onclick = () => goToSlide(i);
+        dotsContainer.appendChild(dot);
+    }
+
+    function updateUI() {
+        const dots = document.querySelectorAll('.nav-dot');
+        dots.forEach((dot, i) => dot.classList.toggle('active', i + 1 === currentSlide));
+        document.getElementById('slideCounter').textContent = `${currentSlide} / ${totalSlides}`;
+    }
+
+    function goToSlide(n) {
+        currentSlide = n;
+        document.getElementById(`slide-${n}`).scrollIntoView({ behavior: 'smooth' });
+        updateUI();
+    }
+
+    function nextSlide() {
+        if (currentSlide < totalSlides) goToSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+        if (currentSlide > 1) goToSlide(currentSlide - 1);
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+            e.preventDefault();
+            nextSlide();
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            prevSlide();
+        }
+    });
+
+    // Scroll detection
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const slideNum = parseInt(entry.target.id.split('-')[1]);
+                currentSlide = slideNum;
+                updateUI();
+            }
+        });
+    }, { threshold: 0.5 });
+
+    document.querySelectorAll('.slide').forEach(slide => observer.observe(slide));
+</script>
+
+</body>
+</html>
