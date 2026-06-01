@@ -255,7 +255,7 @@ export default function EditSalesOrderPage() {
                 title="Line Items & Technical Specs"
                 icon={<Package className="h-5 w-5 text-amber-500" />}
               >
-                <div className="rounded-[2rem] border border-border/50 overflow-hidden bg-white dark:bg-card shadow-sm">
+                <div className="rounded-[2rem] border border-border/50 overflow-hidden bg-card shadow-sm">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-border/50">
                       <tr>
@@ -427,7 +427,7 @@ export default function EditSalesOrderPage() {
               {/* System Logic */}
               <InfoCard
                 title="System Configuration"
-                icon={<Settings2 className="h-5 w-5 text-gray-500" />}
+                icon={<Settings2 className="h-5 w-5 text-muted-foreground" />}
                 collapsible="initially-closed"
               >
                 <div className="space-y-4 p-2">

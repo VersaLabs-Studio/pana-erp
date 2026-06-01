@@ -706,7 +706,7 @@ export default function NewSalesOrderPage() {
               {/* Series Configuration */}
               <InfoCard
                 title="Configuration"
-                icon={<Settings2 className="h-5 w-5 text-gray-500" />}
+                icon={<Settings2 className="h-5 w-5 text-muted-foreground" />}
                 collapsible="initially-closed"
               >
                 <div className="space-y-4">
