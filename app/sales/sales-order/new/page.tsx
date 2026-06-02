@@ -2,20 +2,22 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import {
   ShoppingCart,
-  Users,
   Calendar,
   Package,
   CheckCircle2,
   Lock,
-  Loader2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
 import { PageHeader } from "@/components/smart";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { FlowAutoFill } from "@/components/flows/FlowAutoFill";
@@ -35,6 +37,7 @@ import {
   salesOrderStepSchemas,
   type StepValidationResult,
 } from "@/lib/flows/flow-validation";
+import { SalesOrderCreateSchema } from "@/lib/schemas/doctype-schemas";
 import type { WizardStep } from "@/types/flow-types";
 import type { AutoFillRegistryEntry } from "@/types/flow-types";
 import type {
@@ -104,44 +107,39 @@ interface SalesOrderItem {
   conversion_factor?: number;
 }
 
-interface FormData {
-  [key: string]: unknown;
-  customer: string;
-  customer_name: string;
-  company: string;
-  transaction_date: string;
-  delivery_date: string;
-  po_no: string;
-  currency: string;
-  conversion_rate: number;
-  selling_price_list: string;
-  price_list_currency: string;
-  plc_conversion_rate: number;
-  order_type: string;
-  naming_series: string;
-  status: string;
-  taxes_and_charges: string;
-  tc_name: string;
-  territory: string;
-  customer_address: string;
-  shipping_address_name: string;
-  contact_person: string;
-  campaign: string;
-  source: string;
-  items: SalesOrderItem[];
-}
+const salesOrderFormSchema = SalesOrderCreateSchema.extend({
+  customer_name: z.string().optional(),
+  items: z.array(
+    z.object({
+      item_code: z.string(),
+      item_name: z.string().optional(),
+      description: z.string().optional(),
+      qty: z.number(),
+      rate: z.number(),
+      amount: z.number().optional(),
+      uom: z.string().optional(),
+      warehouse: z.string().optional(),
+      item_group: z.string().optional(),
+      brand: z.string().optional(),
+      conversion_factor: z.number().optional(),
+    })
+  ),
+  confirmed: z.boolean().optional(),
+});
+
+type SalesOrderFormData = z.infer<typeof salesOrderFormSchema>;
 
 function StepCustomerDates({
-  formData,
-  onFieldChange,
+  form,
   autoFilledFields,
   mapping,
 }: {
-  formData: FormData;
-  onFieldChange: (field: string, value: unknown) => void;
+  form: ReturnType<typeof useForm<SalesOrderFormData>>;
   autoFilledFields: Set<string>;
   mapping: AutoFillRegistryEntry | null;
 }) {
+  const formData = form.watch();
+
   return (
     <div className="space-y-6">
       <div>
@@ -181,12 +179,17 @@ function StepCustomerDates({
             </div>
           ) : (
             <FormFrappeSelect
-              control={undefined as never}
-              name={"customer" as never}
+              control={form.control}
+              name="customer"
               doctype="Customer"
               labelField="customer_name"
               placeholder="Search customer..."
-              disabled={false}
+              onValueChange={(val, doc) => {
+                if (doc?.customer_name) {
+                  form.setValue("customer_name", doc.customer_name);
+                }
+              }}
+              hideLabel
             />
           )}
         </div>
@@ -207,12 +210,12 @@ function StepCustomerDates({
             </div>
           ) : (
             <FormFrappeSelect
-              control={undefined as never}
-              name={"company" as never}
+              control={form.control}
+              name="company"
               doctype="Company"
               labelField="company_name"
               placeholder="Select company..."
-              disabled={false}
+              hideLabel
             />
           )}
         </div>
@@ -233,53 +236,28 @@ function StepCustomerDates({
               </span>
             </div>
           ) : (
-            <input
-              type="date"
-              value={formData.transaction_date}
-              onChange={(e) =>
-                onFieldChange("transaction_date", e.target.value)
-              }
-              className="flex h-12 w-full rounded-xl border border-input bg-secondary/30 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <FormDatePicker
+              control={form.control}
+              name="transaction_date"
+              label="Order Date"
+              required
             />
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
-            Delivery Date
-            <span className="text-destructive ml-0.5">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={formData.delivery_date}
-              onChange={(e) => onFieldChange("delivery_date", e.target.value)}
-              className={cn(
-                "flex h-12 w-full rounded-xl border bg-secondary/30 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                !formData.delivery_date && "border-destructive/50"
-              )}
-            />
-            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
-          {!formData.delivery_date && (
-            <p className="text-xs text-destructive">
-              Delivery date is required for production scheduling
-            </p>
-          )}
-        </div>
+        <FormDatePicker
+          control={form.control}
+          name="delivery_date"
+          label="Delivery Date"
+          required
+        />
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
-            Customer PO No
-          </label>
-          <input
-            type="text"
-            value={formData.po_no}
-            onChange={(e) => onFieldChange("po_no", e.target.value)}
-            placeholder="External reference..."
-            className="flex h-12 w-full rounded-xl border border-input bg-secondary/30 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
+        <FormInput
+          control={form.control}
+          name="po_no"
+          label="Customer PO No"
+          placeholder="External reference..."
+        />
 
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
@@ -300,16 +278,15 @@ function StepCustomerDates({
 }
 
 function StepOrderItems({
-  formData,
-  onFieldChange,
+  form,
   autoFilledFields,
   mapping,
 }: {
-  formData: FormData;
-  onFieldChange: (field: string, value: unknown) => void;
+  form: ReturnType<typeof useForm<SalesOrderFormData>>;
   autoFilledFields: Set<string>;
   mapping: AutoFillRegistryEntry | null;
 }) {
+  const formData = form.watch();
   const items = formData.items || [];
 
   const handleItemChange = useCallback(
@@ -323,9 +300,9 @@ function StepOrderItems({
         updated[index].amount = qty * rate;
       }
 
-      onFieldChange("items", updated);
+      form.setValue("items", updated);
     },
-    [items, onFieldChange]
+    [items, form]
   );
 
   const subtotal = useMemo(() => {
@@ -517,31 +494,12 @@ function StepOrderItems({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
-            Tax Template
-            {autoFilledFields.has("taxes_and_charges") && (
-              <Lock className="inline h-3 w-3 ml-1 text-primary" />
-            )}
-          </label>
-          {autoFilledFields.has("taxes_and_charges") ? (
-            <div className="flex h-12 items-center rounded-xl border border-primary/20 bg-primary/5 px-3 text-sm dark:bg-primary/10">
-              <span className="text-foreground font-medium truncate">
-                {formData.taxes_and_charges || "—"}
-              </span>
-            </div>
-          ) : (
-            <input
-              type="text"
-              value={formData.taxes_and_charges}
-              onChange={(e) =>
-                onFieldChange("taxes_and_charges", e.target.value)
-              }
-              placeholder="Select tax template..."
-              className="flex h-12 w-full rounded-xl border border-input bg-secondary/30 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          )}
-        </div>
+        <FormInput
+          control={form.control}
+          name="taxes_and_charges"
+          label="Tax Template"
+          placeholder="Select tax template..."
+        />
 
         <div className="flex items-end">
           <div className="bg-secondary/20 p-4 rounded-2xl border border-border/50 w-full">
@@ -573,14 +531,15 @@ function StepOrderItems({
 }
 
 function StepReview({
-  formData,
+  form,
   confirmed,
   onConfirmedChange,
 }: {
-  formData: FormData;
+  form: ReturnType<typeof useForm<SalesOrderFormData>>;
   confirmed: boolean;
   onConfirmedChange: (val: boolean) => void;
 }) {
+  const formData = form.watch();
   const items = formData.items || [];
   const subtotal = useMemo(() => {
     return items.reduce((acc: number, item: SalesOrderItem) => {
@@ -821,32 +780,6 @@ export default function NewSalesOrderPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    customer: "",
-    customer_name: "",
-    company: "",
-    transaction_date: new Date().toISOString().split("T")[0],
-    delivery_date: "",
-    po_no: "",
-    currency: "ETB",
-    conversion_rate: 1,
-    selling_price_list: "Standard Selling",
-    price_list_currency: "ETB",
-    plc_conversion_rate: 1,
-    order_type: "Sales",
-    naming_series: "SAL-ORD-.YYYY.-",
-    status: "Draft",
-    taxes_and_charges: "",
-    tc_name: "",
-    territory: "",
-    customer_address: "",
-    shipping_address_name: "",
-    contact_person: "",
-    campaign: "",
-    source: "",
-    items: [],
-  });
-
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set()
   );
@@ -855,6 +788,30 @@ export default function NewSalesOrderPage() {
     () => AUTO_FILL_REGISTRY["Quotation->Sales Order"] ?? null,
     []
   );
+
+  const form = useForm<SalesOrderFormData>({
+    resolver: zodResolver(salesOrderFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      naming_series: "SAL-ORD-.YYYY.-",
+      customer: "",
+      customer_name: "",
+      order_type: "Sales",
+      transaction_date: new Date().toISOString().split("T")[0],
+      delivery_date: "",
+      company: "",
+      currency: "ETB",
+      conversion_rate: 1,
+      selling_price_list: "Standard Selling",
+      price_list_currency: "ETB",
+      plc_conversion_rate: 1,
+      status: "Draft",
+      items: [],
+      po_no: "",
+      taxes_and_charges: "",
+      confirmed: false,
+    },
+  });
 
   const {
     data: quotation,
@@ -889,59 +846,60 @@ export default function NewSalesOrderPage() {
 
     setAutoFilledFields(filled);
 
-    setFormData((prev) => ({
-      ...prev,
-      ...headerData,
-      items:
-        mappedItems.length > 0
-          ? mappedItems.map((item) => ({
-              item_code: String(item.item_code ?? ""),
-              item_name: item.item_name
-                ? String(item.item_name)
-                : undefined,
-              description: item.description
-                ? String(item.description)
-                : undefined,
-              qty: Number(item.qty) ?? 1,
-              rate: Number(item.rate) ?? 0,
-              amount: Number(item.amount) ?? 0,
-              uom: item.uom ? String(item.uom) : "Nos",
-              warehouse: item.warehouse
-                ? String(item.warehouse)
-                : undefined,
-              item_group: item.item_group
-                ? String(item.item_group)
-                : undefined,
-              brand: item.brand ? String(item.brand) : undefined,
-              conversion_factor: item.conversion_factor
-                ? Number(item.conversion_factor)
-                : undefined,
-            }))
-          : prev.items,
-    }));
+    // Apply header fields via RHF
+    for (const [key, value] of Object.entries(headerData)) {
+      if (value !== undefined && value !== null) {
+        form.setValue(
+          key as keyof SalesOrderFormData,
+          value as SalesOrderFormData[keyof SalesOrderFormData]
+        );
+      }
+    }
+
+    // Apply mapped items
+    if (mappedItems.length > 0) {
+      const items: SalesOrderItem[] = mappedItems.map((item) => ({
+        item_code: String(item.item_code ?? ""),
+        item_name: item.item_name ? String(item.item_name) : undefined,
+        description: item.description ? String(item.description) : undefined,
+        qty: Number(item.qty) || 1,
+        rate: Number(item.rate) || 0,
+        amount: Number(item.amount) || 0,
+        uom: item.uom ? String(item.uom) : "Nos",
+        warehouse: item.warehouse ? String(item.warehouse) : undefined,
+        item_group: item.item_group ? String(item.item_group) : undefined,
+        brand: item.brand ? String(item.brand) : undefined,
+        conversion_factor: item.conversion_factor
+          ? Number(item.conversion_factor)
+          : undefined,
+      }));
+      form.setValue("items", items);
+    }
 
     toast.success(`Loaded data from Quotation ${quotationId}`, {
       description: "Please specify the delivery date to proceed.",
     });
-  }, [quotation, mapping, quotationId]);
+  }, [quotation, mapping, quotationId, form]);
 
   const validationResults = useMemo((): Record<string, StepValidationResult> => {
+    const formValues = form.getValues();
+
     const step1Data = {
-      customer: formData.customer,
-      company: formData.company,
-      transaction_date: formData.transaction_date,
-      delivery_date: formData.delivery_date,
-      currency: formData.currency,
-      selling_price_list: formData.selling_price_list,
-      order_type: formData.order_type,
-      territory: formData.territory,
-      customer_address: formData.customer_address,
-      shipping_address_name: formData.shipping_address_name,
-      contact_person: formData.contact_person,
+      customer: formValues.customer,
+      company: formValues.company,
+      transaction_date: formValues.transaction_date,
+      delivery_date: formValues.delivery_date,
+      currency: formValues.currency,
+      selling_price_list: formValues.selling_price_list,
+      order_type: formValues.order_type,
+      territory: "",
+      customer_address: "",
+      shipping_address_name: "",
+      contact_person: "",
     };
 
     const step2Data = {
-      items: formData.items.map((item) => ({
+      items: (formValues.items || []).map((item) => ({
         item_code: item.item_code,
         qty: item.qty,
         rate: item.rate,
@@ -959,14 +917,7 @@ export default function NewSalesOrderPage() {
       step2: validateWizardStep("Sales Order", "step2", step2Data),
       step3: validateWizardStep("Sales Order", "step3", step3Data),
     };
-  }, [formData, confirmed]);
-
-  const handleFieldChange = useCallback(
-    (field: string, value: unknown) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-    },
-    []
-  );
+  }, [form, confirmed]);
 
   const handleStepChange = useCallback((step: number) => {
     setCurrentStep(step);
@@ -985,46 +936,43 @@ export default function NewSalesOrderPage() {
     onError: () => {},
   });
 
+  const onSubmit = useCallback(
+    (data: SalesOrderFormData) => {
+      if (!confirmed) {
+        toast.error("Please confirm the order details");
+        return;
+      }
+
+      const payload = {
+        naming_series: data.naming_series,
+        customer: data.customer,
+        order_type: data.order_type,
+        transaction_date: data.transaction_date,
+        delivery_date: data.delivery_date,
+        company: data.company,
+        currency: data.currency,
+        conversion_rate: data.conversion_rate,
+        selling_price_list: data.selling_price_list,
+        price_list_currency: data.price_list_currency,
+        plc_conversion_rate: data.plc_conversion_rate,
+        status: "Draft" as const,
+        items: (data.items || []).filter(
+          (item) => item.item_code && item.qty > 0
+        ),
+        po_no: data.po_no || undefined,
+        taxes_and_charges: data.taxes_and_charges || undefined,
+        customer_address: data.customer_address || undefined,
+        contact_person: data.contact_person || undefined,
+      } as SalesOrderCreateRequest;
+
+      createMutation.mutate(payload);
+    },
+    [confirmed, createMutation]
+  );
+
   const handleSubmit = useCallback(() => {
-    const allValid = Object.values(validationResults).every((r) => r.valid);
-    if (!allValid) {
-      toast.error("Please fix validation errors before submitting");
-      return;
-    }
-
-    if (!confirmed) {
-      toast.error("Please confirm the order details");
-      return;
-    }
-
-    const payload = {
-      naming_series: formData.naming_series as "SAL-ORD-.YYYY.-",
-      customer: formData.customer,
-      order_type: formData.order_type as
-        | "Sales"
-        | "Maintenance"
-        | "Shopping Cart",
-      transaction_date: formData.transaction_date,
-      delivery_date: formData.delivery_date,
-      company: formData.company,
-      currency: formData.currency,
-      conversion_rate: formData.conversion_rate,
-      selling_price_list: formData.selling_price_list,
-      price_list_currency: formData.price_list_currency,
-      plc_conversion_rate: formData.plc_conversion_rate,
-      status: "Draft" as const,
-      items: formData.items.filter(
-        (item) => item.item_code && item.qty > 0
-      ),
-      po_no: formData.po_no || undefined,
-      taxes_and_charges: formData.taxes_and_charges || undefined,
-      tc_name: formData.tc_name || undefined,
-      customer_address: formData.customer_address || undefined,
-      contact_person: formData.contact_person || undefined,
-    } as SalesOrderCreateRequest;
-
-    createMutation.mutate(payload);
-  }, [formData, confirmed, validationResults, createMutation]);
+    form.handleSubmit(onSubmit)();
+  }, [form, onSubmit]);
 
   const handleCancel = useCallback(() => {
     router.back();
@@ -1036,8 +984,7 @@ export default function NewSalesOrderPage() {
         case "step1":
           return (
             <StepCustomerDates
-              formData={formData}
-              onFieldChange={handleFieldChange}
+              form={form}
               autoFilledFields={autoFilledFields}
               mapping={mapping}
             />
@@ -1045,8 +992,7 @@ export default function NewSalesOrderPage() {
         case "step2":
           return (
             <StepOrderItems
-              formData={formData}
-              onFieldChange={handleFieldChange}
+              form={form}
               autoFilledFields={autoFilledFields}
               mapping={mapping}
             />
@@ -1054,7 +1000,7 @@ export default function NewSalesOrderPage() {
         case "step3":
           return (
             <StepReview
-              formData={formData}
+              form={form}
               confirmed={confirmed}
               onConfirmedChange={setConfirmed}
             />
@@ -1063,7 +1009,7 @@ export default function NewSalesOrderPage() {
           return null;
       }
     },
-    [formData, handleFieldChange, autoFilledFields, mapping, confirmed]
+    [form, autoFilledFields, mapping, confirmed]
   );
 
   if (quotationId && isLoadingQuotation) {
@@ -1096,39 +1042,48 @@ export default function NewSalesOrderPage() {
   }
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-6 pb-20"
-    >
-      <motion.div variants={itemVariants}>
-        <PageHeader
-          title="Create Sales Order"
-          subtitle={
-            quotationId
-              ? `Converting Quotation ${quotationId}`
-              : "Create a new order from scratch"
-          }
-          backHref="/sales/sales-order"
-        />
-      </motion.div>
+    <Form {...form}>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="space-y-6 pb-20"
+      >
+        <motion.div variants={itemVariants}>
+          <PageHeader
+            title="Create Sales Order"
+            subtitle={
+              quotationId
+                ? `Converting Quotation ${quotationId}`
+                : "Create a new order from scratch"
+            }
+            backHref="/sales/sales-order"
+          />
+        </motion.div>
 
-      <motion.div variants={itemVariants} className="max-w-4xl mx-auto">
-        <FlowWizard
-          steps={SALES_ORDER_STEPS}
-          formData={formData}
-          validationResults={validationResults}
-          isSubmitting={createMutation.isPending}
-          onFormDataChange={(data) => setFormData(data as FormData)}
-          onStepChange={handleStepChange}
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          renderStep={renderStep}
-          submitLabel="Create Sales Order"
-          submittingLabel="Creating..."
-        />
+        <motion.div variants={itemVariants} className="max-w-4xl mx-auto">
+          <FlowWizard
+            steps={SALES_ORDER_STEPS}
+            formData={form.watch()}
+            validationResults={validationResults}
+            isSubmitting={createMutation.isPending}
+            onFormDataChange={(data) => {
+              for (const [key, value] of Object.entries(data)) {
+                form.setValue(
+                  key as keyof SalesOrderFormData,
+                  value as SalesOrderFormData[keyof SalesOrderFormData]
+                );
+              }
+            }}
+            onStepChange={handleStepChange}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            renderStep={renderStep}
+            submitLabel="Create Sales Order"
+            submittingLabel="Creating..."
+          />
+        </motion.div>
       </motion.div>
-    </motion.div>
+    </Form>
   );
 }

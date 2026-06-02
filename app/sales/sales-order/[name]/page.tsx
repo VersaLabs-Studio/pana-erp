@@ -1,53 +1,57 @@
 // app/sales/sales-order/[name]/page.tsx
-// Obsidian ERP v4.0 - Sales Order Detail View (Professional Invoice Layout)
+// Obsidian ERP v4.0 - Sales Order Detail Page (V3 Golden Template)
 
 "use client";
 
 import { useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Printer,
-  Share2,
   Edit,
   Trash2,
+  Printer,
+  Share2,
   Send,
   Ban,
-  Phone,
-  Mail,
-  MoreVertical,
-  Check,
   Truck,
   FileCheck,
+  MoreVertical,
+  Check,
+  Package,
+  DollarSign,
+  FileText,
+  Activity,
+  ArrowRight,
+  Layers,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import {
-  useFrappeDoc,
-  useFrappeUpdate,
-  useFrappeDelete,
-} from "@/hooks/generic";
-import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
-import { DataPoint } from "@/components/ui/info-card";
-import { FlowTracker } from "@/components/flows/FlowTracker";
-import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
-import { WhatsNext } from "@/components/smart/WhatsNext";
-import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
+
 import type {
   SalesOrder,
   Address,
   Contact,
   Company,
 } from "@/types/doctype-types";
+import { useFrappeDoc, useFrappeUpdate, useFrappeDelete } from "@/hooks/generic";
+import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
+import { InfoCard, DataPoint } from "@/components/ui/info-card";
+import { FlowTracker } from "@/components/flows/FlowTracker";
+import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { WhatsNext } from "@/components/smart/WhatsNext";
+import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 interface SalesOrderItem {
   item_code: string;
@@ -59,41 +63,61 @@ interface SalesOrderItem {
   uom?: string;
 }
 
-const getStatusBadgeClasses = (status: string) => {
+function getStatusVariant(
+  status: string,
+): "success" | "warning" | "destructive" | "default" {
   switch (status) {
     case "Draft":
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+      return "default";
     case "To Deliver and Bill":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
+      return "warning";
     case "To Deliver":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300";
+      return "warning";
     case "To Bill":
-      return "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300";
+      return "warning";
     case "Completed":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300";
-    case "On Hold":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300";
+      return "success";
     case "Cancelled":
-      return "bg-muted text-muted-foreground";
+      return "destructive";
     case "Closed":
-      return "bg-muted text-muted-foreground";
+      return "destructive";
     default:
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+      return "default";
   }
-};
+}
+
+function formatCurrency(amount: number, currency = "ETB"): string {
+  return new Intl.NumberFormat("en-ET", {
+    style: "currency",
+    currency,
+  }).format(amount || 0);
+}
+
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// ============================================================================
+// Main Page Component
+// ============================================================================
 
 export default function SalesOrderDetailPage() {
-  const params = useParams();
+  const params = useParams<{ name: string }>();
   const router = useRouter();
-  const name = decodeURIComponent(params.name as string);
+  const name = decodeURIComponent(params.name);
   const printRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
 
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Data fetching
   const {
     data: order,
     isLoading,
@@ -118,21 +142,23 @@ export default function SalesOrderDetailPage() {
     { enabled: !!order?.contact_person },
   );
 
-  const updateMutation = useFrappeUpdate<{ data: SalesOrder }, { name: string; data: Record<string, unknown> }>(
-    "Sales Order",
-    {
-      onSuccess: () => {
-        refetch();
-        setShowSubmitDialog(false);
-        setShowCancelDialog(false);
-      },
+  // Mutations
+  const updateMutation = useFrappeUpdate<
+    { data: SalesOrder },
+    { name: string; data: Record<string, unknown> }
+  >("Sales Order", {
+    onSuccess: () => {
+      refetch();
+      setShowSubmitDialog(false);
+      setShowCancelDialog(false);
     },
-  );
+  });
 
   const deleteMutation = useFrappeDelete("Sales Order", {
     onSuccess: () => router.push("/sales/sales-order"),
   });
 
+  // Flow chain
   const flowResult = useMemo(() => {
     if (!order) return null;
     const so = order as SalesOrder;
@@ -141,7 +167,11 @@ export default function SalesOrderDetailPage() {
 
     const stageStatuses: Record<
       string,
-      { status: "completed" | "current" | "pending"; documentName?: string; documentUrl?: string }
+      {
+        status: "completed" | "current" | "pending";
+        documentName?: string;
+        documentUrl?: string;
+      }
     > = {
       "Sales Order": {
         status: "current",
@@ -168,6 +198,7 @@ export default function SalesOrderDetailPage() {
     return resolveFlowChain("Sales Order", name, stageStatuses);
   }, [order, name]);
 
+  // What's Next actions
   const whatsNextActions = useMemo(() => {
     if (!order) return [];
     const so = order as SalesOrder;
@@ -215,6 +246,7 @@ export default function SalesOrderDetailPage() {
     return actions;
   }, [order]);
 
+  // Activity timeline
   const activityItems = useMemo(() => {
     if (!order) return [];
     const so = order as unknown as Record<string, unknown>;
@@ -240,57 +272,23 @@ export default function SalesOrderDetailPage() {
     ];
   }, [order, name]);
 
-  if (isLoading) return <LoadingState type="detail" />;
-  if (!order)
-    return (
-      <div className="p-8 text-center text-destructive">
-        Sales Order not found
-      </div>
-    );
-
-  const so = order as SalesOrder;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: so.currency || "ETB",
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  const displayStatus =
-    so.docstatus === 2 ? "Cancelled" : so.status || "Draft";
-
-  const isDraft = so.docstatus === 0;
-  const isSubmitted = so.docstatus === 1;
-  const isCancelled = so.docstatus === 2;
-
+  // Handlers
   const handleSubmit = async () => {
     await updateMutation.mutateAsync({
-      name: so.name,
+      name: name,
       data: { docstatus: 1 },
     });
-    // Toast is driven by the mutation's onSuccess/onError (showToast: true by default)
   };
 
   const handleCancel = async () => {
     await updateMutation.mutateAsync({
-      name: so.name,
+      name: name,
       data: { docstatus: 2 },
     });
-    // Toast is driven by the mutation's onSuccess/onError (showToast: true by default)
   };
 
   const handleDelete = async () => {
-    await deleteMutation.mutateAsync(so.name);
+    await deleteMutation.mutateAsync(name);
   };
 
   const handleShare = async () => {
@@ -312,7 +310,7 @@ export default function SalesOrderDetailPage() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Sales Order - ${so.name}</title>
+          <title>Sales Order - ${name}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
@@ -368,444 +366,502 @@ export default function SalesOrderDetailPage() {
     }, 250);
   };
 
+  // Loading
+  if (isLoading) return <LoadingState type="detail" />;
+  if (!order)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-destructive">Sales Order not found</p>
+      </div>
+    );
+
+  const so = order as SalesOrder;
   const items = (so.items || []) as unknown as SalesOrderItem[];
+  const displayStatus =
+    so.docstatus === 2 ? "Cancelled" : so.status || "Draft";
+  const statusVariant = getStatusVariant(displayStatus);
+  const isDraft = so.docstatus === 0;
+  const isSubmitted = so.docstatus === 1;
+  const isCancelled = so.docstatus === 2;
 
   return (
-    <motion.div
-      initial={prefersReducedMotion ? {} : { opacity: 0 }}
-      animate={prefersReducedMotion ? {} : { opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-6 pb-10"
-    >
-      <PageHeader
-        title={so.name}
-        subtitle={
-          <div className="flex items-center gap-2">
-            <Badge
-              className={cn(
-                "text-xs font-semibold border-0",
-                getStatusBadgeClasses(displayStatus),
-              )}
-            >
-              {displayStatus}
-            </Badge>
-          </div>
-        }
-        backHref="/sales/sales-order"
-        actions={
-          <div className="flex gap-2 flex-wrap">
-            {isDraft && (
-              <>
-                <Button
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() =>
-                    router.push(
-                      `/sales/sales-order/${encodeURIComponent(name)}/edit`,
-                    )
-                  }
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                <Button
-                  className="rounded-full"
-                  onClick={() => setShowSubmitDialog(true)}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Submit
-                </Button>
-              </>
-            )}
-
-            {isSubmitted && (
-              <Button
-                variant="outline"
-                className="rounded-full"
-                disabled
-                title="Available in Phase 2"
-              >
-                <Truck className="h-4 w-4 mr-2" />
-                Create DN
-              </Button>
-            )}
-
-            {isSubmitted && (
-              <Button
-                variant="outline"
-                className="rounded-full"
-                disabled
-                title="Available in Phase 2"
-              >
-                <FileCheck className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="rounded-xl shadow-xl bg-popover/95 backdrop-blur-xl p-1.5 min-w-[180px]"
-              >
-                <DropdownMenuItem
-                  className="rounded-lg cursor-pointer"
-                  onClick={handlePrint}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="rounded-lg cursor-pointer"
-                  onClick={handleShare}
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Share2 className="h-4 w-4 mr-2" />
-                  )}
-                  {copied ? "Copied!" : "Share Link"}
-                </DropdownMenuItem>
-                {isSubmitted && !isCancelled && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
-                      onClick={() => setShowCancelDialog(true)}
-                    >
-                      <Ban className="h-4 w-4 mr-2" />
-                      Cancel Order
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {isDraft && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
-                      onClick={() => setShowDeleteDialog(true)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
+    <div className="max-w-6xl mx-auto space-y-8 pb-20">
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={showSubmitDialog}
+        onOpenChange={setShowSubmitDialog}
+        title="Submit Sales Order"
+        description="Once submitted, this order will be locked and processed. You won't be able to edit it. Continue?"
+        confirmText="Submit"
+        onConfirm={handleSubmit}
+        loading={updateMutation.isPending}
       />
 
-      {/* Flow Tracker */}
-      {flowResult && (
-        <FlowTracker
-          result={flowResult}
-          compact={false}
-          onCreateAction={() => {
-            // Downstream creation (WO, DN, Invoice) is Phase 2 scope
-            // Buttons in WhatsNext are disabled with Phase 2 tooltip
-          }}
-        />
-      )}
+      <ConfirmDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        title="Cancel Sales Order"
+        description="This action is permanent. The order will be cancelled and cannot be recovered. Continue?"
+        confirmText="Cancel Order"
+        variant="destructive"
+        onConfirm={handleCancel}
+        loading={updateMutation.isPending}
+      />
 
-      {/* Professional Invoice Card */}
-      <div className="bg-card md:rounded-2xl shadow-lg border-y md:border border-border overflow-hidden mx-[-1rem] md:mx-0">
-        {/* Invoice Header */}
-        <div className="p-4 md:p-8 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-6">
-            <div className="w-full md:w-auto flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 relative overflow-hidden rounded-2xl shadow-sm border border-border bg-card p-2">
-                  <img
-                    src="/logo.png"
-                    alt="Obsidian ERP"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
-                    SALES ORDER
-                  </h1>
-                  <p className="text-base md:text-lg font-mono text-primary mt-1">
-                    {so.name}
-                  </p>
-                </div>
-              </div>
-              {company && (
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <p className="font-semibold text-foreground text-base">
-                    {company.company_name || "Obsidian ERP"}
-                  </p>
-                  {company.address_html && <p>{company.address_html}</p>}
-                  {company.phone_no && <p>Tel: {company.phone_no}</p>}
-                  {company.email && <p>Email: {company.email}</p>}
-                </div>
-              )}
-            </div>
-            <div className="w-full md:w-auto md:text-right">
-              <div className="bg-secondary/50 rounded-xl p-4 w-full md:inline-block">
-                <DataPoint
-                  label="Order Date"
-                  value={formatDate(so.transaction_date)}
-                />
-                {so.delivery_date && (
-                  <div className="mt-3">
-                    <DataPoint
-                      label="Delivery Date"
-                      value={formatDate(so.delivery_date)}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Delete Sales Order"
+        description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={handleDelete}
+        loading={deleteMutation.isPending}
+      />
 
-        {/* Bill To Section */}
-        <div className="p-4 md:p-8 border-b border-border">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-3">
-                Bill To
-              </p>
-              <h3 className="font-bold text-xl text-foreground">
-                {so.customer_name || so.customer}
-              </h3>
-              {addressDoc && (
-                <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                  {addressDoc.address_line1 && (
-                    <p>{addressDoc.address_line1}</p>
-                  )}
-                  {addressDoc.address_line2 && (
-                    <p>{addressDoc.address_line2}</p>
-                  )}
-                  <p>
-                    {[addressDoc.city, addressDoc.state, addressDoc.pincode]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
-                  {addressDoc.country && <p>{addressDoc.country}</p>}
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-3">
-                Contact Person
-              </p>
-              {contactDoc ? (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-foreground">
-                    {contactDoc.first_name} {contactDoc.last_name}
-                  </h4>
-                  {contactDoc.email_id && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Mail className="h-3 w-3" />
-                      {contactDoc.email_id}
-                    </p>
-                  )}
-                  {(contactDoc.phone || contactDoc.mobile_no) && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Phone className="h-3 w-3" />
-                      {contactDoc.phone || contactDoc.mobile_no}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No contact specified
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Items Section */}
-        <div className="border-t border-border">
-          {/* Mobile Items View (Card-based) */}
-          <div className="p-4 space-y-4 md:hidden">
-            <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">
-              Items & Services
-            </p>
-            {items.map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-secondary/20 rounded-2xl p-4 border border-border/50 shadow-sm"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-primary">
-                      #{idx + 1}
-                    </span>
-                    <h4 className="font-bold text-foreground">
-                      {item.item_code}
-                    </h4>
-                  </div>
-                  <Badge variant="secondary" className="font-mono text-[10px]">
-                    {item.qty} {item.uom || "Nos"}
-                  </Badge>
-                </div>
-
-                {item.item_name && item.item_name !== item.item_code && (
-                  <p className="text-xs text-foreground/80 mb-2">
-                    {item.item_name}
-                  </p>
-                )}
-
-                {item.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 italic mb-3">
-                    {item.description}
-                  </p>
-                )}
-
-                <div className="flex justify-between items-end pt-3 border-t border-border/50">
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] uppercase text-muted-foreground font-bold tracking-tighter">
-                      Rate
-                    </p>
-                    <p className="text-sm font-medium">
-                      {formatCurrency(item.rate)}
-                    </p>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <p className="text-[9px] uppercase text-muted-foreground font-bold tracking-tighter">
-                      Total
-                    </p>
-                    <p className="text-base font-bold text-foreground">
-                      {formatCurrency(item.amount || item.qty * item.rate)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop Items Table */}
-          <div className="hidden md:block p-8">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-border text-muted-foreground">
-                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                    #
-                  </th>
-                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                    Item / Service
-                  </th>
-                  <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
-                    Description / Specs
-                  </th>
-                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                    Qty
-                  </th>
-                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                    Rate
-                  </th>
-                  <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-border/50 hover:bg-secondary/20 transition-colors"
-                  >
-                    <td className="py-4 text-muted-foreground">{idx + 1}</td>
-                    <td className="py-4">
-                      <span className="font-semibold text-foreground">
-                        {item.item_code}
-                      </span>
-                      {item.item_name && item.item_name !== item.item_code && (
-                        <p className="text-xs text-muted-foreground">
-                          {item.item_name}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-4 text-muted-foreground max-w-xs">
-                      <p className="whitespace-pre-wrap text-xs">
-                        {item.description || "—"}
-                      </p>
-                    </td>
-                    <td className="py-4 text-right font-medium">
-                      {item.qty} {item.uom || "Nos"}
-                    </td>
-                    <td className="py-4 text-right">
-                      {formatCurrency(item.rate)}
-                    </td>
-                    <td className="py-4 text-right font-semibold text-foreground">
-                      {formatCurrency(item.amount || item.qty * item.rate)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Totals */}
-        <div className="p-4 md:p-8 bg-secondary/10 border-t border-border">
-          <div className="ml-auto w-full md:w-80 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(so.total || 0)}
-              </span>
-            </div>
-            {(so.total_taxes_and_charges ?? 0) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Tax ({so.taxes_and_charges || "Applied"})
-                </span>
-                <span className="font-medium">
-                  {formatCurrency(so.total_taxes_and_charges ?? 0)}
-                </span>
-              </div>
-            )}
-            {(so.discount_amount ?? 0) > 0 && (
-              <div className="flex justify-between text-sm text-emerald-600">
-                <span>Discount</span>
-                <span>-{formatCurrency(so.discount_amount ?? 0)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-xl font-bold text-foreground border-t-2 border-foreground pt-3 mt-3">
-              <span>Grand Total</span>
-              <span className="text-primary">
-                {formatCurrency(so.grand_total || 0)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Terms & Conditions */}
-        {so.terms && (
-          <div className="p-4 md:p-8 border-t border-border">
-            <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-3">
-              Terms & Conditions
-            </h3>
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-secondary/20 p-4 rounded-xl">
-              {so.terms}
-            </div>
-          </div>
+      {/* Page Header */}
+      <PageHeader
+        backUrl="/sales/sales-order"
+        label="Sales Order"
+        title={name}
+        status={{ label: displayStatus, variant: statusVariant }}
+      >
+        {isDraft && (
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={() =>
+              router.push(
+                `/sales/sales-order/${encodeURIComponent(name)}/edit`,
+              )
+            }
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
         )}
 
-        {/* Footer */}
-        <div className="p-8 border-t border-border text-center text-xs text-muted-foreground">
-          <p>Thank you for your business!</p>
-          <p className="mt-1">
-            This sales order was created on {formatDate(so.transaction_date)}.
-          </p>
+        {isDraft && (
+          <Button
+            className="rounded-full"
+            onClick={() => setShowSubmitDialog(true)}
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Submit
+          </Button>
+        )}
+
+        {isSubmitted && (
+          <Button
+            variant="outline"
+            className="rounded-full"
+            disabled
+            title="Available in Phase 2"
+          >
+            <Truck className="h-4 w-4 mr-2" />
+            Create DN
+          </Button>
+        )}
+
+        {isSubmitted && (
+          <Button
+            variant="outline"
+            className="rounded-full"
+            disabled
+            title="Available in Phase 2"
+          >
+            <FileCheck className="h-4 w-4 mr-2" />
+            Create Invoice
+          </Button>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-secondary"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="rounded-2xl border-none shadow-xl bg-popover/90 backdrop-blur-xl p-2 w-48"
+          >
+            <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+              Actions
+            </DropdownMenuLabel>
+            <DropdownMenuItem className="rounded-xl" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" /> Print
+            </DropdownMenuItem>
+            <DropdownMenuItem className="rounded-xl" onClick={handleShare}>
+              {copied ? (
+                <Check className="mr-2 h-4 w-4" />
+              ) : (
+                <Share2 className="mr-2 h-4 w-4" />
+              )}
+              {copied ? "Copied!" : "Share Link"}
+            </DropdownMenuItem>
+            {isSubmitted && !isCancelled && (
+              <>
+                <DropdownMenuSeparator className="bg-border/50" />
+                <DropdownMenuItem
+                  className="rounded-xl text-destructive focus:bg-destructive/10"
+                  onClick={() => setShowCancelDialog(true)}
+                >
+                  <Ban className="mr-2 h-4 w-4" /> Cancel Order
+                </DropdownMenuItem>
+              </>
+            )}
+            {isDraft && (
+              <>
+                <DropdownMenuSeparator className="bg-border/50" />
+                <DropdownMenuItem
+                  className="rounded-xl text-destructive focus:bg-destructive/10"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </PageHeader>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Center Panel */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* Order Details */}
+          <InfoCard
+            title={
+              <>
+                <Package className="h-4 w-4" /> Order Details
+              </>
+            }
+            delay={100}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-8 gap-x-12">
+              <DataPoint
+                label="Customer"
+                value={so.customer_name || so.customer}
+              />
+              <DataPoint
+                label="Order Date"
+                value={formatDate(so.transaction_date)}
+              />
+              <DataPoint
+                label="Delivery Date"
+                value={formatDate(so.delivery_date)}
+              />
+              <DataPoint label="PO Number" value={so.po_no} />
+              <DataPoint label="Company" value={so.company} />
+              {contactDoc && (
+                <DataPoint
+                  label="Contact"
+                  value={`${contactDoc.first_name || ""} ${contactDoc.last_name || ""}`.trim() || contactDoc.name}
+                />
+              )}
+            </div>
+          </InfoCard>
+
+          {/* Line Items */}
+          <InfoCard
+            title={
+              <>
+                <Layers className="h-4 w-4" /> Line Items
+              </>
+            }
+            delay={200}
+          >
+            {/* Mobile Cards */}
+            <div className="space-y-4 md:hidden">
+              {items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-secondary/20 rounded-2xl p-4 border border-border/50"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-xs font-bold text-primary">
+                        #{idx + 1}
+                      </span>
+                      <h4 className="font-bold text-foreground">
+                        {item.item_code}
+                      </h4>
+                    </div>
+                    <span className="text-xs font-mono bg-secondary px-2 py-1 rounded-full">
+                      {item.qty} {item.uom || "Nos"}
+                    </span>
+                  </div>
+                  {item.item_name && item.item_name !== item.item_code && (
+                    <p className="text-xs text-foreground/80 mb-2">
+                      {item.item_name}
+                    </p>
+                  )}
+                  {item.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 italic mb-3">
+                      {item.description}
+                    </p>
+                  )}
+                  <div className="flex justify-between items-end pt-3 border-t border-border/50">
+                    <div>
+                      <p className="text-[9px] uppercase text-muted-foreground font-bold">
+                        Rate
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatCurrency(item.rate, so.currency)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] uppercase text-muted-foreground font-bold">
+                        Total
+                      </p>
+                      <p className="text-base font-bold text-foreground">
+                        {formatCurrency(
+                          item.amount || item.qty * item.rate,
+                          so.currency,
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-border text-muted-foreground">
+                    <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                      #
+                    </th>
+                    <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                      Item
+                    </th>
+                    <th className="py-3 text-left font-bold uppercase text-[10px] tracking-wider">
+                      Description
+                    </th>
+                    <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                      Qty
+                    </th>
+                    <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                      Rate
+                    </th>
+                    <th className="py-3 text-right font-bold uppercase text-[10px] tracking-wider">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-border/50 hover:bg-secondary/20 transition-colors"
+                    >
+                      <td className="py-4 text-muted-foreground">{idx + 1}</td>
+                      <td className="py-4">
+                        <span className="font-semibold text-foreground">
+                          {item.item_code}
+                        </span>
+                        {item.item_name &&
+                          item.item_name !== item.item_code && (
+                            <p className="text-xs text-muted-foreground">
+                              {item.item_name}
+                            </p>
+                          )}
+                      </td>
+                      <td className="py-4 text-muted-foreground max-w-xs">
+                        <p className="whitespace-pre-wrap text-xs">
+                          {item.description || "—"}
+                        </p>
+                      </td>
+                      <td className="py-4 text-right font-medium">
+                        {item.qty} {item.uom || "Nos"}
+                      </td>
+                      <td className="py-4 text-right">
+                        {formatCurrency(item.rate, so.currency)}
+                      </td>
+                      <td className="py-4 text-right font-semibold text-foreground">
+                        {formatCurrency(
+                          item.amount || item.qty * item.rate,
+                          so.currency,
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </InfoCard>
+
+          {/* Totals */}
+          <InfoCard
+            title={
+              <>
+                <DollarSign className="h-4 w-4" /> Totals
+              </>
+            }
+            delay={300}
+          >
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">
+                  {formatCurrency(so.total || 0, so.currency)}
+                </span>
+              </div>
+              {(so.total_taxes_and_charges ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Tax ({so.taxes_and_charges || "Applied"})
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      so.total_taxes_and_charges ?? 0,
+                      so.currency,
+                    )}
+                  </span>
+                </div>
+              )}
+              {(so.discount_amount ?? 0) > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600">
+                  <span>Discount</span>
+                  <span>
+                    -{formatCurrency(so.discount_amount ?? 0, so.currency)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-xl font-bold text-foreground border-t-2 border-foreground pt-4 mt-2">
+                <span>Grand Total</span>
+                <span className="text-primary">
+                  {formatCurrency(so.grand_total || 0, so.currency)}
+                </span>
+              </div>
+            </div>
+          </InfoCard>
+
+          {/* Terms */}
+          {so.terms && (
+            <InfoCard
+              title={
+                <>
+                  <FileText className="h-4 w-4" /> Terms & Conditions
+                </>
+              }
+              delay={400}
+            >
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-secondary/20 p-4 rounded-xl">
+                {so.terms}
+              </div>
+            </InfoCard>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="lg:col-span-4 space-y-8">
+          {/* Status */}
+          <InfoCard
+            title={
+              <>
+                <Activity className="h-4 w-4" /> Status
+              </>
+            }
+            delay={300}
+            variant="gradient"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Doc Status</span>
+                <span
+                  className={cn(
+                    "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                    statusVariant === "success" &&
+                      "bg-emerald-500/10 text-emerald-600",
+                    statusVariant === "warning" &&
+                      "bg-amber-500/10 text-amber-600",
+                    statusVariant === "destructive" &&
+                      "bg-destructive/10 text-destructive",
+                    statusVariant === "default" &&
+                      "bg-secondary text-muted-foreground",
+                  )}
+                >
+                  {displayStatus}
+                </span>
+              </div>
+              <div className="h-[1px] bg-border/50" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Docstatus</span>
+                <span className="font-mono text-sm">{so.docstatus}</span>
+              </div>
+              {isSubmitted && (
+                <>
+                  <div className="h-[1px] bg-border/50" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">% Delivered</span>
+                    <span className="font-mono text-sm font-bold">
+                      {so.per_delivered ?? 0}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">% Billed</span>
+                    <span className="font-mono text-sm font-bold">
+                      {so.per_billed ?? 0}%
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </InfoCard>
+
+          {/* Flow Tracker */}
+          {flowResult && (
+            <InfoCard
+              title={
+                <>
+                  <ArrowRight className="h-4 w-4" /> Flow Tracker
+                </>
+              }
+              delay={400}
+              variant="transparent"
+            >
+              <FlowTracker
+                result={flowResult}
+                compact
+                onCreateAction={() => {}}
+              />
+            </InfoCard>
+          )}
+
+          {/* What's Next */}
+          <InfoCard
+            title={
+              <>
+                <ArrowRight className="h-4 w-4" /> What&apos;s Next
+              </>
+            }
+            delay={500}
+            variant="transparent"
+          >
+            <WhatsNext actions={whatsNextActions} />
+          </InfoCard>
+
+          {/* Activity */}
+          <InfoCard
+            title={
+              <>
+                <Activity className="h-4 w-4" /> Activity
+              </>
+            }
+            delay={600}
+            variant="transparent"
+          >
+            <ActivityTimeline items={activityItems} />
+          </InfoCard>
         </div>
       </div>
-
-      {/* What's Next */}
-      <WhatsNext actions={whatsNextActions} />
-
-      {/* Activity Timeline */}
-      <ActivityTimeline items={activityItems} />
 
       {/* Hidden Print Template */}
       <div ref={printRef} className="hidden">
@@ -815,6 +871,7 @@ export default function SalesOrderDetailPage() {
               <img
                 src="/logo.png"
                 style={{ height: "60px", width: "60px", objectFit: "contain" }}
+                alt="Logo"
               />
               <div className="company-info">
                 <h1>{company?.company_name || "Obsidian ERP"}</h1>
@@ -825,7 +882,7 @@ export default function SalesOrderDetailPage() {
             </div>
             <div className="order-info">
               <h2>SALES ORDER</h2>
-              <p className="order-id">{so.name}</p>
+              <p className="order-id">{name}</p>
               <p>Date: {formatDate(so.transaction_date)}</p>
               {so.delivery_date && (
                 <p>Delivery: {formatDate(so.delivery_date)}</p>
@@ -901,9 +958,14 @@ export default function SalesOrderDetailPage() {
                   <td className="right">
                     {item.qty} {item.uom || ""}
                   </td>
-                  <td className="right">{formatCurrency(item.rate)}</td>
                   <td className="right">
-                    {formatCurrency(item.amount || item.qty * item.rate)}
+                    {formatCurrency(item.rate, so.currency)}
+                  </td>
+                  <td className="right">
+                    {formatCurrency(
+                      item.amount || item.qty * item.rate,
+                      so.currency,
+                    )}
                   </td>
                 </tr>
               ))}
@@ -913,17 +975,22 @@ export default function SalesOrderDetailPage() {
           <div className="totals">
             <div className="totals-row subtotal">
               <span>Subtotal</span>
-              <span>{formatCurrency(so.total || 0)}</span>
+              <span>{formatCurrency(so.total || 0, so.currency)}</span>
             </div>
             {(so.total_taxes_and_charges ?? 0) > 0 && (
               <div className="totals-row">
                 <span>Tax</span>
-                <span>{formatCurrency(so.total_taxes_and_charges ?? 0)}</span>
+                <span>
+                  {formatCurrency(
+                    so.total_taxes_and_charges ?? 0,
+                    so.currency,
+                  )}
+                </span>
               </div>
             )}
             <div className="totals-row grand">
               <span>Grand Total</span>
-              <span>{formatCurrency(so.grand_total || 0)}</span>
+              <span>{formatCurrency(so.grand_total || 0, so.currency)}</span>
             </div>
           </div>
 
@@ -939,41 +1006,6 @@ export default function SalesOrderDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Submit Confirmation Dialog */}
-      <ConfirmDialog
-        open={showSubmitDialog}
-        onOpenChange={setShowSubmitDialog}
-        title="Submit Sales Order"
-        description="Once submitted, this order will be locked and processed. You won't be able to edit it. Continue?"
-        confirmText="Submit"
-        onConfirm={handleSubmit}
-        loading={updateMutation.isPending}
-      />
-
-      {/* Cancel Confirmation Dialog */}
-      <ConfirmDialog
-        open={showCancelDialog}
-        onOpenChange={setShowCancelDialog}
-        title="Cancel Sales Order"
-        description="This action is permanent. The order will be cancelled and cannot be recovered. Continue?"
-        confirmText="Cancel Order"
-        variant="destructive"
-        onConfirm={handleCancel}
-        loading={updateMutation.isPending}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Sales Order"
-        description={`Are you sure you want to delete "${so.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        variant="destructive"
-        onConfirm={handleDelete}
-        loading={deleteMutation.isPending}
-      />
-    </motion.div>
+    </div>
   );
 }
