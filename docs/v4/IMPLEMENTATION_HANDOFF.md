@@ -371,6 +371,18 @@ Ordering rationale (why this sequence): **Phase 0** removes brand/debt and stand
 
 ## 9. Per-phase sign-off (fill in before merge)
 
+### Progress tracker (status as of 2026-06-03)
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| Phase 0 — Rebrand/deps/test harness | ✅ Done | deps installed, vitest 8/8, rebrand complete |
+| Pre-Flight Gate B1–B4 | ✅ Decided | `docs/v4/DECISIONS.md` |
+| Phase 1 + 1.5 — Flow engine + **Sales Order golden template** | ✅ Rebuilt & LOCKED (awaiting owner approval to merge) | commit `a8e9944` on `feat/v4-phase-0-foundation`; tsc clean, 8/8 tests; real `FlowWizard` create/edit, real `FlowTracker`, real persistence, OKLCH-only, no `@ts-nocheck`. Pattern doc: `docs/v4/PHASE_2_HANDOFF.md` §0 |
+| Phase 2 — Module completeness | ⏳ Handoff ready | `docs/v4/PHASE_2_HANDOFF.md` |
+| Phase 3 — AI | 🔒 Blocked | needs B1 per-user RBAC (`lib/auth/resolve-user.ts` is a dev stub) |
+
+> **Caveat:** the golden template was verified by `tsc` + unit tests + code inspection, NOT against a live Frappe site (none runs in the build env). Owner manual dev testing against real Frappe is required before merge — see the checklist provided at handoff.
+
 ```
 PHASE: ___   BRANCH: feat/v4-phase-___   DATE: ______
 
