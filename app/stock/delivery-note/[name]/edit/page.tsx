@@ -88,8 +88,9 @@ export default function EditDeliveryNotePage() {
   });
   const { control, getValues, reset, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
-  const watchedItems = useWatch({ control, name: "items" });
-  const watchedCustomer = useWatch({ control, name: "customer" });
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedCustomer = watchedAll?.customer ?? "";
 
   // Prefill from the loaded DN
   useEffect(() => {
@@ -130,14 +131,14 @@ export default function EditDeliveryNotePage() {
   );
 
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), items: watchedItems };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Delivery Note", "step1", values),
       step2: validateWizardStep("Delivery Note", "step2", values),
       step3: { valid: true, errors: {} },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedItems, watchedCustomer, getValues]);
+  }, [watchedAll]);
 
   const updateMutation = useFrappeUpdate<DeliveryNote>("Delivery Note", {
     successMessage: "Delivery Note updated",
@@ -208,7 +209,7 @@ export default function EditDeliveryNotePage() {
         <InfoCard className="max-w-3xl">
           <FlowWizard
             steps={WIZARD_STEPS}
-            formData={getValues() as unknown as Record<string, unknown>}
+            formData={watchedAll as unknown as Record<string, unknown>}
             validationResults={validationResults}
             isSubmitting={updateMutation.isPending}
             onFormDataChange={() => {}}

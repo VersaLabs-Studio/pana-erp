@@ -50,23 +50,6 @@ function getDisplayStatus(dn: DeliveryNote): string {
   return dn.status || "Draft";
 }
 
-function getStatusVariant(
-  status: string
-): "default" | "success" | "warning" | "destructive" {
-  switch (status) {
-    case "Completed":
-      return "success";
-    case "To Bill":
-      return "warning";
-    case "Return":
-    case "Return Issued":
-    case "Cancelled":
-      return "destructive";
-    default:
-      return "default";
-  }
-}
-
 function DeliveryNoteCard({
   dn,
   index,
@@ -116,20 +99,6 @@ function DeliveryNoteCard({
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
-      {/* Status Indicator Bar */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          displayStatus === "Draft" && "bg-muted-foreground/50",
-          displayStatus === "To Bill" && "bg-amber-500",
-          displayStatus === "Completed" && "bg-emerald-500",
-          displayStatus === "Return" && "bg-destructive",
-          displayStatus === "Return Issued" && "bg-destructive",
-          displayStatus === "Cancelled" && "bg-muted-foreground/50",
-          displayStatus === "Closed" && "bg-muted-foreground/50"
-        )}
-      />
-
       <div className="p-5">
         {/* Header Row */}
         <div className="flex items-start justify-between mb-4">

@@ -23,7 +23,8 @@ import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
 import { StatusBadge } from "@/components/smart/status-badge";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
-import { FlowTracker } from "@/components/flows/FlowTracker";
+import { FlowRail } from "@/components/flows/FlowRail";
+import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
@@ -138,9 +139,9 @@ export default function StockEntryDetailPage() {
     },
     isSubmitted && {
       label: "Create Delivery Note",
-      description: "Phase 2 — fulfillment",
-      onClick: () => {},
-      disabled: true,
+      description: "Create fulfillment from this entry",
+      onClick: () => router.push(`/stock/delivery-note/new?stock_entry=${encodeURIComponent(name)}`),
+      disabled: !isModuleBuilt("Delivery Note"),
       disabledReason: "Coming in Phase 2",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
@@ -213,7 +214,7 @@ export default function StockEntryDetailPage() {
       {/* Flow Tracker — upstream Work Order link */}
       {se.work_order && (
         <InfoCard title="Manufacturing Flow" className="overflow-hidden">
-          <FlowTracker result={chain} isLoading={false} />
+          <FlowRail result={chain} isLoading={false} />
         </InfoCard>
       )}
 

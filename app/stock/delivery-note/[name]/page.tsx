@@ -2,7 +2,7 @@
 
 // app/stock/delivery-note/[name]/page.tsx
 // Obsidian ERP v4.0 — Delivery Note Detail (V4 Golden Template)
-// Action-oriented detail with FlowTracker, WhatsNext, ActivityTimeline.
+// Action-oriented detail with FlowRail, WhatsNext, ActivityTimeline.
 // Real flow-chain resolution: upstream SO via items.against_sales_order,
 // downstream Sales Invoice via useFrappeList. OKLCH tokens only.
 
@@ -24,7 +24,8 @@ import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
 import { StatusBadge } from "@/components/smart/status-badge";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
-import { FlowTracker } from "@/components/flows/FlowTracker";
+import { FlowRail } from "@/components/flows/FlowRail";
+import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
@@ -159,9 +160,9 @@ export default function DeliveryNoteDetailPage() {
     },
     isSubmitted && {
       label: "Create Sales Invoice",
-      description: "Phase 2 — billing",
-      onClick: () => {},
-      disabled: true,
+      description: "Create invoice from this delivery",
+      onClick: () => router.push(`/accounting/sales-invoice/new?delivery_note=${encodeURIComponent(name)}`),
+      disabled: !isModuleBuilt("Sales Invoice"),
       disabledReason: "Coming in Phase 2",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
@@ -204,10 +205,22 @@ export default function DeliveryNoteDetailPage() {
               </>
             )}
             {isSubmitted && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/accounting/sales-invoice/new?delivery_note=${encodeURIComponent(name)}`}>
-                  <Receipt className="mr-1.5 h-4 w-4" /> Create Invoice
-                </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!isModuleBuilt("Sales Invoice")}
+                title={!isModuleBuilt("Sales Invoice") ? "Coming in Phase 2" : undefined}
+                asChild={isModuleBuilt("Sales Invoice")}
+              >
+                {isModuleBuilt("Sales Invoice") ? (
+                  <Link href={`/accounting/sales-invoice/new?delivery_note=${encodeURIComponent(name)}`}>
+                    <Receipt className="mr-1.5 h-4 w-4" /> Create Invoice
+                  </Link>
+                ) : (
+                  <>
+                    <Receipt className="mr-1.5 h-4 w-4" /> Create Invoice
+                  </>
+                )}
               </Button>
             )}
           </div>
@@ -292,7 +305,7 @@ export default function DeliveryNoteDetailPage() {
           </InfoCard>
 
           <InfoCard title="Flow Tracker">
-            <FlowTracker result={chain} isLoading={loadingInvoices} />
+            <FlowRail result={chain} isLoading={loadingInvoices} />
           </InfoCard>
 
           <InfoCard title="What's Next">

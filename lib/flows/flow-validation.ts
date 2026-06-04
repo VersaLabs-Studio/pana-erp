@@ -196,6 +196,76 @@ export const stockEntryStepSchemas = {
 };
 
 /**
+ * Purchase Invoice step schemas
+ */
+export const purchaseInvoiceStepSchemas = {
+  step1: z.object({
+    supplier: z.string().min(1, "Supplier is required"),
+    company: z.string().min(1, "Company is required"),
+    posting_date: z.string().min(1, "Posting date is required"),
+  }),
+  step2: z.object({
+    items: z
+      .array(
+        z.object({
+          item_code: z.string().min(1, "Item code is required"),
+          qty: z.number().min(0.01, "Quantity must be greater than 0"),
+          rate: z.number().min(0, "Rate must be non-negative"),
+        })
+      )
+      .min(1, "At least one item is required"),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
+ * Payment Entry step schemas
+ */
+export const paymentEntryStepSchemas = {
+  step1: z.object({
+    payment_type: z.string().min(1, "Payment type is required"),
+    party_type: z.string().min(1, "Party type is required"),
+    party: z.string().min(1, "Party is required"),
+    paid_amount: z.number().min(0.01, "Amount must be greater than 0"),
+    mode_of_payment: z.string().min(1, "Mode of payment is required"),
+  }),
+  step2: z.object({
+    references: z.array(z.object({
+      reference_doctype: z.string(),
+      reference_name: z.string(),
+      allocated_amount: z.number(),
+    })).optional(),
+  }),
+  step3: z.object({
+    posting_date: z.string().min(1, "Posting date is required"),
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
+ * Journal Entry step schemas
+ */
+export const journalEntryStepSchemas = {
+  step1: z.object({
+    voucher_type: z.string().min(1, "Voucher type is required"),
+    posting_date: z.string().min(1, "Posting date is required"),
+  }),
+  step2: z.object({
+    accounts: z
+      .array(
+        z.object({
+          account: z.string().min(1, "Account is required"),
+          debit_in_account_currency: z.number().min(0).optional(),
+          credit_in_account_currency: z.number().min(0).optional(),
+        })
+      )
+      .min(2, "At least two accounts required"),
+  }),
+};
+
+/**
  * All step schemas indexed by doctype
  */
 export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
@@ -203,6 +273,9 @@ export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
   "Quotation": quotationStepSchemas,
   "Delivery Note": deliveryNoteStepSchemas,
   "Sales Invoice": salesInvoiceStepSchemas,
+  "Purchase Invoice": purchaseInvoiceStepSchemas,
+  "Payment Entry": paymentEntryStepSchemas,
+  "Journal Entry": journalEntryStepSchemas,
   "Material Request": materialRequestStepSchemas,
   "Stock Entry": stockEntryStepSchemas,
 };

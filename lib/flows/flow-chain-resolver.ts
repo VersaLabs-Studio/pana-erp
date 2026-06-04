@@ -4,6 +4,7 @@
 
 import type { FlowChainResult, FlowStage, FlowStageStatus } from "@/types/flow-types";
 import { getFlowForDocType } from "./flow-definitions";
+import { isModuleBuilt } from "./module-availability";
 
 /**
  * Resolve the complete flow chain for a document
@@ -80,17 +81,22 @@ export function resolveFlowChain(
   const pendingCount = stages.filter((s) => s.status === "pending").length;
   const isComplete = stages.every((s) => s.status === "completed");
 
-  // Determine next action
+  // Determine next action — the CREATE affordance belongs on the downstream
+  // stage, gated by isModuleBuilt. Never self-referential.
   let nextAction: FlowChainResult["nextAction"];
   if (currentIndex >= 0 && currentIndex < stages.length - 1) {
     const currentStage = stages[currentIndex];
-    const downstreamDoctypes = currentStage.canCreateDownstream
-      ? [stages[currentIndex + 1]?.doctype]
-      : [];
+    const downstreamStage = stages[currentIndex + 1];
+    const downstreamDoctype = downstreamStage?.doctype;
 
-    if (downstreamDoctypes.length > 0 && currentStage.createAction) {
+    if (
+      currentStage.canCreateDownstream &&
+      currentStage.createAction &&
+      downstreamDoctype &&
+      isModuleBuilt(downstreamDoctype)
+    ) {
       nextAction = {
-        label: `Create ${stages[currentIndex + 1]?.label}`,
+        label: `Create ${downstreamStage.label}`,
         stageId: currentStage.id,
         action: currentStage.createAction,
       };

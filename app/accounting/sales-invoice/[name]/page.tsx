@@ -1,578 +1,401 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { toast } from "sonner";
 import {
-  FileText,
-  Printer,
-  Share2,
-  Edit,
-  Trash2,
+  Edit3,
   Send,
   Ban,
-  Building2,
-  Phone,
-  Mail,
-  MoreVertical,
-  Check,
-  CreditCard,
-  HandCoins,
-  Receipt,
-  Download,
-  Calendar,
-  User,
-  AlertCircle,
-  Clock,
-  History as HistoryIcon,
+  Printer,
+  Loader2,
+  Package,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  useFrappeDoc,
-  useFrappeUpdate,
-  useFrappeDelete,
-} from "@/hooks/generic";
-import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
-import { DataPoint } from "@/components/ui/info-card";
-import type {
-  SalesInvoice,
-  Address,
-  Contact,
-  Company,
-} from "@/types/doctype-types";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 
-interface SalesInvoiceItem {
+import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
+import { StatusBadge } from "@/components/smart/status-badge";
+import { InfoCard, DataPoint } from "@/components/ui/info-card";
+import { Button } from "@/components/ui/button";
+import { FlowRail } from "@/components/flows/FlowRail";
+import { isModuleBuilt } from "@/lib/flows/module-availability";
+import { WhatsNext } from "@/components/smart/WhatsNext";
+import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
+import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
+import type { SalesInvoice } from "@/types/doctype-types";
+import type { FlowStageStatus } from "@/types/flow-types";
+import { cn } from "@/lib/utils";
+
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
+
+interface SIItem {
   item_code: string;
   item_name?: string;
-  description: string;
+  description?: string;
   qty: number;
   rate: number;
   amount: number;
   uom?: string;
 }
 
-const getStatusBadgeClasses = (status: string) => {
-  switch (status) {
-    case "Draft":
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-    case "Unpaid":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300";
-    case "Paid":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300";
-    case "Overdue":
-      return "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300";
-    case "Part Paid":
-      return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300";
-    case "Cancelled":
-      return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
-    default:
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-  }
-};
-
 export default function SalesInvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const name = decodeURIComponent(params.name as string);
+  const name = decodeURIComponent(String(params.name));
 
-  // States
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
-  // Fetch Invoice
-  const {
-    data: invoice,
-    isLoading,
-    refetch,
-  } = useFrappeDoc<SalesInvoice>("Sales Invoice", name);
-
-  // Mutations
-  const updateMutation = useFrappeUpdate<{ data: SalesInvoice }, any>(
+  const { data: invoice, isLoading, error } = useFrappeDoc<SalesInvoice>(
     "Sales Invoice",
-    {
-      onSuccess: () => {
-        refetch();
-        setShowSubmitDialog(false);
-        setShowCancelDialog(false);
-      },
-    },
+    name,
   );
 
-  const deleteMutation = useFrappeDelete("Sales Invoice", {
-    onSuccess: () => router.push("/accounting/sales-invoice"),
+  const { data: paymentEntries, isLoading: loadingPE } = useFrappeList<{
+    name: string;
+  }>(
+    "Payment Entry Reference",
+    {
+      filters: [["reference_name", "=", name]],
+      fields: ["parent"],
+      limit: 5,
+    },
+    { enabled: !isLoading && !!invoice },
+  );
+
+  const chain = useMemo(() => {
+    const items = (invoice?.items ?? []) as Array<{
+      delivery_note?: string;
+      sales_order?: string;
+    }>;
+    const dnName = items.find((i) => i?.delivery_note)?.delivery_note;
+    const soName = items.find((i) => i?.sales_order)?.sales_order;
+    const peName = paymentEntries?.[0]?.name;
+
+    const stageStatuses: Record<
+      string,
+      { status: FlowStageStatus; documentName?: string; documentUrl?: string }
+    > = {};
+
+    if (soName) {
+      stageStatuses["Sales Order"] = {
+        status: "completed",
+        documentName: soName,
+        documentUrl: `/sales/sales-order/${encodeURIComponent(soName)}`,
+      };
+    }
+    if (dnName) {
+      stageStatuses["Delivery Note"] = {
+        status: "completed",
+        documentName: dnName,
+        documentUrl: `/stock/delivery-note/${encodeURIComponent(dnName)}`,
+      };
+    }
+    if (peName) {
+      stageStatuses["Payment Entry"] = {
+        status: "completed",
+        documentName: peName,
+        documentUrl: `/accounting/payment-entry/${encodeURIComponent(peName)}`,
+      };
+    }
+
+    return resolveFlowChain("Sales Invoice", name, stageStatuses);
+  }, [invoice, paymentEntries, name]);
+
+  const updateMutation = useFrappeUpdate<SalesInvoice>("Sales Invoice", {
+    showToast: false,
   });
 
-  if (isLoading) return <LoadingState type="detail" />;
-  if (!invoice)
+  const isDraft = invoice?.docstatus === 0;
+  const isSubmitted = invoice?.docstatus === 1;
+  const isUnpaid = isSubmitted && (invoice?.outstanding_amount ?? 0) > 0;
+
+  const handleSubmit = () => {
+    setConfirmSubmit(false);
+    updateMutation.mutate(
+      { name, data: { docstatus: 1 } },
+      {
+        onSuccess: () => toast.success(`Sales Invoice ${name} submitted`),
+        onError: (e) =>
+          toast.error("Submit failed", { description: e.message }),
+      },
+    );
+  };
+
+  const handleCancel = () => {
+    setConfirmCancel(false);
+    updateMutation.mutate(
+      { name, data: { docstatus: 2 } },
+      {
+        onSuccess: () => toast.success(`Sales Invoice ${name} cancelled`),
+        onError: (e) =>
+          toast.error("Cancel failed", { description: e.message }),
+      },
+    );
+  };
+
+  if (isLoading) return <LoadingState />;
+  if (error || !invoice) {
     return (
-      <div className="flex flex-col items-center justify-center p-20">
-        <AlertCircle className="w-12 h-12 text-destructive mb-4" />
-        <h3 className="text-xl font-bold">Invoice Not Found</h3>
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+        <p className="text-sm text-destructive">
+          {error?.message ?? "Sales Invoice not found."}
+        </p>
         <Button
-          variant="link"
+          variant="ghost"
+          className="mt-3"
           onClick={() => router.push("/accounting/sales-invoice")}
         >
-          Back to list
+          Back to Sales Invoices
         </Button>
       </div>
     );
+  }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: invoice.currency || "ETB",
-    }).format(amount || 0);
-  };
+  const items = (invoice.items ?? []) as unknown as SIItem[];
+  const grandTotal = invoice.grand_total ?? invoice.total ?? 0;
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  const isDraft = invoice.docstatus === 0;
-  const isSubmitted = invoice.docstatus === 1;
-  const isCancelled = invoice.docstatus === 2;
-  const canPay = isSubmitted && (invoice.outstanding_amount ?? 0) > 0;
-
-  const handleMakePayment = () => {
-    router.push(
-      `/accounting/payment-entry/new?invoice=${encodeURIComponent(invoice.name)}&party_type=Customer&party=${encodeURIComponent(invoice.customer ?? "")}&amount=${invoice.outstanding_amount ?? 0}`,
-    );
-  };
-
-  const items = (invoice.items || []) as unknown as SalesInvoiceItem[];
+  const whatsNext = [
+    isDraft && {
+      label: "Submit Invoice",
+      description: "Lock the invoice and post accounting entries",
+      onClick: () => setConfirmSubmit(true),
+      isPrimary: true,
+      isLoading: updateMutation.isPending,
+    },
+    isSubmitted && {
+      label: "Create Payment Entry",
+      description: "Record a payment against this invoice",
+      onClick: () =>
+        router.push(
+          `/accounting/payment-entry/new?invoice=${encodeURIComponent(name)}&party_type=Customer&party=${encodeURIComponent(invoice.customer ?? "")}&amount=${invoice.outstanding_amount ?? 0}`,
+        ),
+      disabled: !isModuleBuilt("Payment Entry"),
+      disabledReason: "Payment Entry module not yet available",
+    },
+    isSubmitted && {
+      label: "Print Invoice",
+      description: "Generate a printable PDF",
+      onClick: () => {},
+      disabled: true,
+      disabledReason: "Coming soon",
+    },
+  ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-12">
       <PageHeader
-        title={invoice.name}
-        subtitle={
-          <div className="flex items-center gap-2">
-            <Badge
-              className={cn(
-                "text-xs font-black uppercase tracking-widest border-0",
-                getStatusBadgeClasses(invoice.status || "Draft"),
-              )}
-            >
-              {invoice.status}
-            </Badge>
-            {Number(invoice.is_opening) === 1 && (
-              <Badge
-                variant="outline"
-                className="text-[10px] uppercase font-black tracking-widest text-sky-600 bg-sky-500/5 border-sky-500/20"
-              >
-                Opening Balance
-              </Badge>
-            )}
-          </div>
-        }
         backUrl="/accounting/sales-invoice"
+        label="Sales Invoice"
+        title={invoice.name}
         actions={
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {isDraft && (
               <>
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-card"
-                  onClick={() =>
-                    router.push(
-                      `/accounting/sales-invoice/${encodeURIComponent(name)}/edit`,
-                    )
-                  }
-                >
-                  <Edit className="h-4 w-4 mr-2" /> Edit
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    href={`/accounting/sales-invoice/${encodeURIComponent(name)}/edit`}
+                  >
+                    <Edit3 className="mr-1.5 h-4 w-4" /> Edit
+                  </Link>
                 </Button>
                 <Button
-                  className="rounded-full shadow-lg shadow-primary/20"
-                  onClick={() => setShowSubmitDialog(true)}
+                  size="sm"
+                  onClick={() => setConfirmSubmit(true)}
+                  disabled={updateMutation.isPending}
                 >
-                  <Send className="h-4 w-4 mr-2" /> Submit
+                  {updateMutation.isPending ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-1.5 h-4 w-4" />
+                  )}
+                  Submit
                 </Button>
               </>
             )}
-
-            {canPay && (
+            {isSubmitted && (
               <Button
-                className="rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
-                onClick={handleMakePayment}
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setConfirmCancel(true)}
               >
-                <HandCoins className="h-4 w-4 mr-2" /> Make Payment
+                <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-card"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="rounded-2xl shadow-xl bg-card p-1.5 min-w-[200px]"
-              >
-                <DropdownMenuItem className="rounded-xl cursor-pointer">
-                  <Printer className="h-4 w-4 mr-2" /> Print PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-xl cursor-pointer">
-                  <Download className="h-4 w-4 mr-2" /> Export JSON
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {isSubmitted && !isCancelled && (
-                  <DropdownMenuItem
-                    className="rounded-xl cursor-pointer text-destructive"
-                    onClick={() => setShowCancelDialog(true)}
-                  >
-                    <Ban className="h-4 w-4 mr-2" /> Cancel Invoice
-                  </DropdownMenuItem>
-                )}
-                {isDraft && (
-                  <DropdownMenuItem
-                    className="rounded-xl cursor-pointer text-destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="ghost" size="icon" disabled title="Print (coming soon)">
+              <Printer className="h-4 w-4" />
+            </Button>
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Main Content (Invoice Sheet) */}
-        <div className="lg:col-span-8 space-y-8">
-          <div className="bg-card rounded-[2.5rem] border border-border shadow-xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-8 opacity-5 select-none">
-              <Receipt className="w-32 h-32" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-8">
+          <InfoCard title="Invoice Details">
+            <div className="mb-4 flex items-center justify-between">
+              <StatusBadge status={invoice.status || "Draft"} size="lg" />
+              <span className="text-2xl font-bold tabular-nums text-primary">
+                {ETB.format(grandTotal)}
+              </span>
             </div>
-
-            <div className="p-10 border-b border-border bg-gradient-to-br from-primary/5 to-transparent">
-              <div className="flex flex-col md:flex-row justify-between gap-8">
-                <div>
-                  <h2 className="text-sm font-black uppercase tracking-[0.3em] text-primary mb-2">
-                    Invoice Details
-                  </h2>
-                  <h1 className="text-4xl font-black tracking-tight">
-                    {invoice.name}
-                  </h1>
-                  <p className="text-sm text-muted-foreground mt-4 font-medium flex items-center gap-2">
-                    <Building2 className="w-4 h-4" /> {invoice.company}
-                  </p>
-                </div>
-                <div className="text-md md:text-right space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      Posting Date
-                    </p>
-                    <p className="font-bold flex items-center md:justify-end gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />{" "}
-                      {formatDate(invoice.posting_date)}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      Due Date
-                    </p>
-                    <p className="font-bold flex items-center md:justify-end gap-2 text-rose-500">
-                      <Clock className="w-4 h-4" />{" "}
-                      {formatDate(invoice.due_date ?? "")}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <DataPoint
+                label="Customer"
+                value={invoice.customer_name || invoice.customer}
+              />
+              <DataPoint label="Posting Date" value={invoice.posting_date} />
+              <DataPoint label="Due Date" value={invoice.due_date ?? "\u2014"} />
+              <DataPoint label="Company" value={invoice.company} />
+              <DataPoint label="Currency" value={invoice.currency} />
+              <DataPoint label="Debit To" value={invoice.debit_to ?? "\u2014"} />
             </div>
+          </InfoCard>
 
-            <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-12">
-              <div>
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">
-                  Customer
-                </h4>
-                <div className="flex items-center gap-4 group">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary/50 flex items-center justify-center font-black text-lg group-hover:bg-primary/10 transition-colors">
-                    {(invoice.customer_name || invoice.customer || " ").charAt(
-                      0,
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-black text-lg">
-                      {invoice.customer_name || invoice.customer}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      {invoice.customer}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">
-                  Receivable Account
-                </h4>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600">
-                    <CreditCard className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{invoice.debit_to}</p>
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                      General Ledger
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Table Area */}
-            <div className="overflow-x-auto">
+          <InfoCard
+            title="Items"
+            icon={<Package className="h-5 w-5 text-primary" />}
+          >
+            <div className="overflow-hidden rounded-xl border border-border/60">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-secondary/20 border-y border-border/50 text-muted-foreground">
-                    <th className="px-10 py-5 text-left font-black text-[10px] uppercase tracking-widest">
-                      Item
-                    </th>
-                    <th className="px-6 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                      Qty
-                    </th>
-                    <th className="px-6 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                      Rate
-                    </th>
-                    <th className="px-10 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                      Amount
-                    </th>
+                <thead className="border-b border-border/60 bg-secondary/20">
+                  <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2.5 text-left font-semibold">Item</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/30">
-                  {items.map((item, i) => (
-                    <tr
-                      key={i}
-                      className="hover:bg-primary/5 transition-colors"
-                    >
-                      <td className="px-10 py-6">
-                        <p className="font-black text-foreground">
-                          {item.item_code}
-                        </p>
-                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                          {item.description}
-                        </p>
+                <tbody className="divide-y divide-border/50">
+                  {items.map((it, i) => (
+                    <tr key={`${it.item_code}-${i}`}>
+                      <td className="px-3 py-2.5">
+                        <div className="font-medium text-foreground">
+                          {it.item_name || it.item_code}
+                        </div>
+                        {it.description && (
+                          <div className="text-xs text-muted-foreground line-clamp-1">
+                            {it.description}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-6 text-right font-bold text-muted-foreground">
-                        {item.qty} {item.uom || "Nos"}
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {it.qty} {it.uom}
                       </td>
-                      <td className="px-6 py-6 text-right font-bold text-muted-foreground">
-                        {formatCurrency(item.rate)}
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {ETB.format(it.rate)}
                       </td>
-                      <td className="px-10 py-6 text-right font-black text-foreground">
-                        {formatCurrency(item.amount)}
+                      <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                        {ETB.format(it.amount ?? it.qty * it.rate)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </InfoCard>
 
-            {/* Financial Summary */}
-            <div className="p-10 bg-secondary/5 border-t border-border mt-10">
-              <div className="flex flex-col md:flex-row justify-between gap-10">
-                <div className="md:w-1/2 space-y-6">
-                  {invoice.terms && (
-                    <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                        Terms & Conditions
-                      </h4>
-                      <div className="text-xs text-muted-foreground bg-card p-5 rounded-2xl border border-border/50 leading-relaxed italic">
-                        {invoice.terms}
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="p-4 bg-orange-500/5 rounded-2xl border border-orange-500/10">
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-600 mb-1">
-                        Total Tax
-                      </p>
-                      <p className="text-sm font-black">
-                        {formatCurrency(invoice.total_taxes_and_charges ?? 0)}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary mb-1">
-                        Currency
-                      </p>
-                      <p className="text-sm font-black tracking-widest">
-                        {invoice.currency}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="md:w-1/3 space-y-4">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground font-medium">
-                      Net Total
-                    </span>
-                    <span className="font-bold">
-                      {formatCurrency(invoice.total ?? 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground font-medium">
-                      Taxes & Charges
-                    </span>
-                    <span className="font-bold">
-                      {formatCurrency(invoice.total_taxes_and_charges ?? 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-4 border-t-2 border-border/50 mb-2">
-                    <span className="text-lg font-black uppercase tracking-widest text-foreground">
-                      Grand Total
-                    </span>
-                    <span className="text-2xl font-black text-primary">
-                      {formatCurrency(invoice.grand_total)}
-                    </span>
-                  </div>
-                  <div className="p-6 bg-emerald-500/10 rounded-[1.5rem] border border-emerald-500/20 shadow-xl shadow-emerald-500/5 mt-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
-                        Outstanding
-                      </span>
-                      <span className="text-xl font-black text-emerald-700 tracking-tight">
-                        {formatCurrency(invoice.outstanding_amount ?? 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+          <InfoCard title="Payment Status">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Grand Total
+                </p>
+                <p className="text-xl font-bold tabular-nums text-foreground">
+                  {ETB.format(grandTotal)}
+                </p>
               </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Outstanding Amount
+                </p>
+                <p
+                  className={cn(
+                    "text-xl font-bold tabular-nums",
+                    (invoice.outstanding_amount ?? 0) > 0
+                      ? "text-destructive"
+                      : "text-success",
+                  )}
+                >
+                  {ETB.format(invoice.outstanding_amount ?? 0)}
+                </p>
+              </div>
+              <DataPoint
+                label="Total Taxes"
+                value={ETB.format(invoice.total_taxes_and_charges ?? 0)}
+              />
+              <DataPoint label="Currency" value={invoice.currency} />
             </div>
-          </div>
+          </InfoCard>
         </div>
 
-        {/* Sidebar Widgets */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="rounded-[2.5rem] p-8 border-border/50 bg-card/30 backdrop-blur-sm space-y-6 shadow-sm">
-            <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-3 border-b border-border pb-4">
-              <History className="w-4 h-4 text-primary" /> System Info
-            </h3>
-            <div className="space-y-4">
-              <DataPoint label="Created By" value={invoice.owner} />
-              <DataPoint
-                label="Created On"
-                value={formatDate(invoice.creation ?? "")}
-              />
-              <DataPoint
-                label="Last Modified"
-                value={formatDate(invoice.modified ?? "")}
-              />
-              <DataPoint label="Modified By" value={invoice.modified_by} />
+        <div className="space-y-6 lg:col-span-4">
+          <InfoCard
+            title="Status"
+            variant="gradient"
+          >
+            <div className="flex items-center gap-3">
+              <StatusBadge status={invoice.status || "Draft"} size="lg" />
+              {(invoice.outstanding_amount ?? 0) > 0 && isSubmitted && (
+                <span className="text-xs text-muted-foreground">
+                  {ETB.format(invoice.outstanding_amount ?? 0)} outstanding
+                </span>
+              )}
             </div>
-          </Card>
+          </InfoCard>
 
-          <Card className="rounded-[2.5rem] p-8 bg-black text-white relative overflow-hidden group shadow-2xl">
-            <div className="absolute -right-10 -bottom-10 opacity-10 group-hover:scale-110 transition-transform duration-500">
-              <HandCoins className="w-40 h-40" />
-            </div>
-            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">
-              Automated Flow
-            </h3>
-            <h2 className="text-xl font-black mb-4">Payment Processing</h2>
-            <p className="text-xs text-white/60 leading-relaxed mb-6">
-              Generate a payment entry instantly for this invoice. All
-              accounting ledgers will be synchronized automatically.
-            </p>
-            <Button
-              variant="outline"
-              className="w-full rounded-2xl border-white/20 bg-white/5 hover:bg-white text-white hover:text-black font-black transition-all"
-              onClick={handleMakePayment}
-              disabled={!canPay}
-            >
-              Launch Entry
-            </Button>
-          </Card>
+          <InfoCard title="Flow Rail">
+            <FlowRail result={chain} isLoading={loadingPE} />
+          </InfoCard>
+
+          <WhatsNext actions={whatsNext} />
+
+          <ActivityTimeline
+            items={[
+              {
+                id: "created",
+                type: "created",
+                description: "Sales Invoice created",
+                user: invoice.owner,
+                timestamp: invoice.creation ?? new Date().toISOString(),
+              },
+              ...(isSubmitted
+                ? [
+                    {
+                      id: "submitted",
+                      type: "submitted" as const,
+                      description: "Invoice submitted",
+                      user: invoice.modified_by,
+                      timestamp: invoice.modified ?? new Date().toISOString(),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </div>
       </div>
 
-      {/* Confirmation Dialogs */}
       <ConfirmDialog
-        open={showSubmitDialog}
-        onOpenChange={setShowSubmitDialog}
-        title="Submit Sales Invoice"
-        description="This will lock the document and finalize accounting entries. Proced?"
-        onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: invoice.name,
-            data: { docstatus: 1 },
-          });
-          toast.success("Invoice Submitted");
-        }}
-        loading={updateMutation.isPending}
+        open={confirmSubmit}
+        onOpenChange={setConfirmSubmit}
+        title="Submit this Sales Invoice?"
+        description="Submitting locks the invoice and posts accounting entries. This cannot be undone without cancelling."
+        confirmText="Submit"
+        onConfirm={handleSubmit}
       />
-
       <ConfirmDialog
-        open={showCancelDialog}
-        onOpenChange={setShowCancelDialog}
-        title="Cancel Sales Invoice"
-        description="Are you sure you want to cancel this invoice? This will reverse accounting entries."
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Cancel this Sales Invoice?"
+        description="Cancelling reverses the accounting entries. Linked payment entries must be cancelled first."
         confirmText="Cancel Invoice"
-        onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: invoice.name,
-            data: { docstatus: 2 },
-          });
-          toast.success("Invoice Cancelled");
-        }}
-        loading={updateMutation.isPending}
-      />
-
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Invoice"
-        description="Delete this draft invoice permanently?"
-        onConfirm={async () => {
-          await deleteMutation.mutateAsync(invoice.name);
-          toast.success("Invoice Deleted");
-        }}
-        loading={deleteMutation.isPending}
+        variant="destructive"
+        onConfirm={handleCancel}
       />
     </div>
-  );
-}
-
-function History({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l4 2" />
-    </svg>
   );
 }

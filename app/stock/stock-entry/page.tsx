@@ -113,16 +113,6 @@ function StockEntryCard({
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
-      {/* Status Indicator Bar */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          displayStatus === "Draft" && "bg-slate-400",
-          displayStatus === "Submitted" && "bg-emerald-500",
-          displayStatus === "Cancelled" && "bg-muted-foreground/50"
-        )}
-      />
-
       <div className="p-5">
         {/* Header Row */}
         <div className="flex items-start justify-between mb-4">

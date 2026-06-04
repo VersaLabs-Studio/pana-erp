@@ -1,0 +1,24 @@
+// lib/flows/module-availability.ts
+// Single source of truth for "is this doctype's UI built?"
+// Every header action, WhatsNext action, and FlowTracker create affordance
+// checks isModuleBuilt(target) → enabled link vs disabled+tooltip.
+// As each phase lands, add the doctype to the set.
+
+export const BUILT_MODULES = new Set<string>([
+  // Phase 0/1 — Sales Order golden template
+  "Sales Order",
+  "Quotation",
+  // Phase 2a — Sales/Stock fulfillment
+  "Delivery Note",
+  "Stock Entry",
+  "Material Request",
+  // Phase 2b — Accounting suite
+  "Sales Invoice",
+  "Payment Entry",
+  "Purchase Invoice",
+  "Journal Entry",
+]);
+
+export function isModuleBuilt(doctype: string): boolean {
+  return BUILT_MODULES.has(doctype);
+}

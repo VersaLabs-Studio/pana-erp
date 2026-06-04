@@ -19,9 +19,7 @@ import {
   Building2,
   DollarSign,
   Package,
-  Receipt,
   CheckCircle2,
-  XCircle,
   FileText,
   ArrowRight,
 } from "lucide-react";
@@ -43,54 +41,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { CommandPalette } from "@/components/command/CommandPalette";
 import type { SalesOrder } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
-
-const STATUS_CONFIG: Record<
-  string,
-  { color: string; bgColor: string; icon: React.ElementType; label: string }
-> = {
-  Draft: {
-    color: "text-slate-700 dark:text-slate-300",
-    bgColor: "bg-slate-100 dark:bg-slate-800",
-    icon: FileText,
-    label: "Draft",
-  },
-  "To Deliver and Bill": {
-    color: "text-blue-700 dark:text-blue-300",
-    bgColor: "bg-blue-100 dark:bg-blue-900/50",
-    icon: Truck,
-    label: "To Deliver & Bill",
-  },
-  "To Deliver": {
-    color: "text-amber-700 dark:text-amber-300",
-    bgColor: "bg-amber-100 dark:bg-amber-900/50",
-    icon: Package,
-    label: "To Deliver",
-  },
-  "To Bill": {
-    color: "text-purple-700 dark:text-purple-300",
-    bgColor: "bg-purple-100 dark:bg-purple-900/50",
-    icon: Receipt,
-    label: "To Bill",
-  },
-  Completed: {
-    color: "text-emerald-700 dark:text-emerald-300",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
-    icon: CheckCircle2,
-    label: "Completed",
-  },
-  Cancelled: {
-    color: "text-muted-foreground",
-    bgColor: "bg-muted",
-    icon: XCircle,
-    label: "Cancelled",
-  },
-  Closed: {
-    color: "text-muted-foreground",
-    bgColor: "bg-muted",
-    icon: XCircle,
-    label: "Closed",
-  },
-};
+import { StatusBadge } from "@/components/smart/status-badge";
 
 function getDisplayStatus(order: SalesOrder): string {
   if (order.docstatus === 2) return "Cancelled";
@@ -111,8 +62,6 @@ function SalesOrderCard({
   onDelete: () => void;
 }) {
   const displayStatus = getDisplayStatus(order);
-  const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.Draft;
-  const StatusIcon = statusConfig.icon;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-ET", {
@@ -146,20 +95,6 @@ function SalesOrderCard({
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
-      {/* Status Indicator Bar */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          displayStatus === "Draft" && "bg-slate-400",
-          displayStatus === "To Deliver and Bill" && "bg-blue-500",
-          displayStatus === "To Deliver" && "bg-amber-500",
-          displayStatus === "To Bill" && "bg-purple-500",
-          displayStatus === "Completed" && "bg-emerald-500",
-          displayStatus === "Cancelled" && "bg-muted-foreground/50",
-          displayStatus === "Closed" && "bg-muted-foreground/50"
-        )}
-      />
-
       <div className="p-5">
         {/* Header Row */}
         <div className="flex items-start justify-between mb-4">
@@ -177,16 +112,7 @@ function SalesOrderCard({
           </div>
 
           {/* Status Badge */}
-          <div
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-              statusConfig.bgColor,
-              statusConfig.color
-            )}
-          >
-            <StatusIcon className="h-3.5 w-3.5" />
-            {statusConfig.label}
-          </div>
+          <StatusBadge status={displayStatus} size="sm" />
         </div>
 
         {/* Info Grid */}

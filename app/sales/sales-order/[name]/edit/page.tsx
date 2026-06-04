@@ -74,8 +74,10 @@ export default function EditSalesOrderPage() {
   });
   const { control, getValues, reset, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
-  const watchedItems = useWatch({ control, name: "items" });
-  const watchedCustomer = useWatch({ control, name: "customer" });
+  // Watch the entire form reactively — drives validation gate
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedCustomer = watchedAll?.customer ?? "";
 
   // Prefill from the loaded order
   useEffect(() => {
@@ -109,14 +111,14 @@ export default function EditSalesOrderPage() {
   );
 
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), items: watchedItems };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Sales Order", "step1", values),
       step2: validateWizardStep("Sales Order", "step2", values),
       step3: { valid: true, errors: {} },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedItems, watchedCustomer, getValues]);
+  }, [watchedAll]);
 
   const updateMutation = useFrappeUpdate<SalesOrder>("Sales Order", {
     successMessage: "Sales Order updated",
@@ -180,7 +182,7 @@ export default function EditSalesOrderPage() {
         <InfoCard className="max-w-3xl">
           <FlowWizard
             steps={WIZARD_STEPS}
-            formData={getValues() as unknown as Record<string, unknown>}
+            formData={watchedAll as unknown as Record<string, unknown>}
             validationResults={validationResults}
             isSubmitting={updateMutation.isPending}
             onFormDataChange={() => {}}

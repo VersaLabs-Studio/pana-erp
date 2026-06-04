@@ -97,17 +97,6 @@ function MaterialRequestCard({
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          displayStatus === "Draft" && "bg-muted-foreground/50",
-          displayStatus === "Pending" && "bg-amber-500",
-          displayStatus === "Partially Ordered" && "bg-blue-500",
-          displayStatus === "Ordered" && "bg-emerald-500",
-          displayStatus === "Cancelled" && "bg-destructive/50"
-        )}
-      />
-
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
@@ -163,7 +152,7 @@ function MaterialRequestCard({
                 className={cn(
                   "h-full rounded-full transition-all duration-1000",
                   progress >= 100
-                    ? "bg-emerald-500 shadow-sm"
+                    ? "bg-primary shadow-sm"
                     : "bg-primary"
                 )}
                 style={{ width: `${Math.min(progress, 100)}%` }}

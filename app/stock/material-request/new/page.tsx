@@ -109,18 +109,20 @@ export default function NewMaterialRequestPage() {
   const { control, getValues, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-  const watchedItems = useWatch({ control, name: "items" });
-  const watchedType = useWatch({ control, name: "material_request_type" });
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedType = watchedAll?.material_request_type ?? "";
 
   const isTransfer = watchedType === "Material Transfer";
 
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), items: watchedItems };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Material Request", "step1", values),
       step2: { valid: true, errors: {} },
     };
-  }, [watchedItems, getValues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedAll]);
 
   const createMutation = useFrappeCreate<
     { data: { name: string } },
@@ -167,7 +169,7 @@ export default function NewMaterialRequestPage() {
         <InfoCard className="max-w-3xl">
           <FlowWizard
             steps={WIZARD_STEPS}
-            formData={getValues() as unknown as Record<string, unknown>}
+            formData={watchedAll as unknown as Record<string, unknown>}
             validationResults={validationResults}
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}

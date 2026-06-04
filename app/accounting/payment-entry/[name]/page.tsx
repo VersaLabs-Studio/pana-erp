@@ -1,468 +1,411 @@
 "use client";
 
-import { useState } from "react";
+// app/accounting/payment-entry/[name]/page.tsx
+// Obsidian ERP v4.0 — Payment Entry Detail (V4 Golden Template)
+// FlowRail, WhatsNext, ActivityTimeline, ConfirmDialog.
+// OKLCH semantic tokens only, real persistence.
+
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
-  FileText,
-  Printer,
-  Edit,
-  Trash2,
   Send,
   Ban,
-  Building2,
-  MoreVertical,
-  HandCoins,
-  Receipt,
-  Download,
-  Calendar,
-  AlertCircle,
-  CreditCard,
-  Clock,
-  Landmark,
+  Printer,
+  Loader2,
   Wallet,
-  ArrowRightCircle,
-  History as HistoryIcon,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  useFrappeDoc,
-  useFrappeUpdate,
-  useFrappeDelete,
-} from "@/hooks/generic";
-import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
-import { DataPoint } from "@/components/ui/info-card";
-import { Card } from "@/components/ui/card";
-import type { PaymentEntry } from "@/types/doctype-types";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
-interface PaymentEntryReference {
+import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
+import { StatusBadge } from "@/components/smart/status-badge";
+import { InfoCard, DataPoint } from "@/components/ui/info-card";
+import { Button } from "@/components/ui/button";
+import { FlowRail } from "@/components/flows/FlowRail";
+import { WhatsNext } from "@/components/smart/WhatsNext";
+import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
+import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
+import type { PaymentEntry, SalesInvoice, PurchaseInvoice } from "@/types/doctype-types";
+import type { FlowStageStatus } from "@/types/flow-types";
+import { cn } from "@/lib/utils";
+
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
+
+interface PEReferenceRow {
   reference_doctype: string;
   reference_name: string;
-  total_amount: number;
-  outstanding_amount: number;
-  allocated_amount: number;
+  allocated_amount?: number;
+  total_amount?: number;
+  outstanding_amount?: number;
 }
 
 export default function PaymentEntryDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const name = decodeURIComponent(params.name as string);
+  const name = decodeURIComponent(String(params.name));
 
-  // States
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
-  // Fetch Entry
-  const {
-    data: entry,
-    isLoading,
-    refetch,
-  } = useFrappeDoc<PaymentEntry>("Payment Entry", name);
-
-  // Mutations
-  const updateMutation = useFrappeUpdate<{ data: PaymentEntry }, any>(
+  const { data: entry, isLoading, error } = useFrappeDoc<PaymentEntry>(
     "Payment Entry",
-    {
-      onSuccess: () => {
-        refetch();
-        setShowSubmitDialog(false);
-        setShowCancelDialog(false);
-      },
-    },
+    name,
   );
 
-  const deleteMutation = useFrappeDelete("Payment Entry", {
-    onSuccess: () => router.push("/accounting/payment-entry"),
+  // -- Upstream resolution: Sales Invoice from references --------------------
+  const invoiceRef = useMemo(() => {
+    if (!entry?.references) return null;
+    const refs = entry.references as PEReferenceRow[];
+    return refs.find(
+      (r) =>
+        r.reference_doctype === "Sales Invoice" ||
+        r.reference_doctype === "Purchase Invoice",
+    );
+  }, [entry]);
+
+  const { data: linkedInvoice, isLoading: loadingInvoice } =
+    useFrappeDoc<SalesInvoice>(
+      invoiceRef?.reference_doctype ?? "Sales Invoice",
+      invoiceRef?.reference_name ?? "",
+      { enabled: !!invoiceRef?.reference_name },
+    );
+
+  // -- Build the flow chain from real linked documents -----------------------
+  const chain = useMemo(() => {
+    const stageStatuses: Record<
+      string,
+      { status: FlowStageStatus; documentName?: string; documentUrl?: string }
+    > = {};
+
+    if (invoiceRef?.reference_name) {
+      const invDoctype = invoiceRef.reference_doctype;
+      stageStatuses[invDoctype] = {
+        status: "completed",
+        documentName: invoiceRef.reference_name,
+        documentUrl:
+          invDoctype === "Sales Invoice"
+            ? `/accounting/sales-invoice/${encodeURIComponent(invoiceRef.reference_name)}`
+            : `/accounting/purchase-invoice/${encodeURIComponent(invoiceRef.reference_name)}`,
+      };
+    }
+
+    // Payment Entry is the current stage
+    stageStatuses["Payment Entry"] = {
+      status: entry?.docstatus === 1 ? "completed" : "current",
+      documentName: name,
+      documentUrl: `/accounting/payment-entry/${encodeURIComponent(name)}`,
+    };
+
+    return resolveFlowChain("Payment Entry", name, stageStatuses);
+  }, [entry, invoiceRef, name]);
+
+  // -- Status actions (real mutations) --------------------------------------
+  const updateMutation = useFrappeUpdate<PaymentEntry>("Payment Entry", {
+    showToast: false,
   });
 
-  if (isLoading) return <LoadingState type="detail" />;
-  if (!entry)
+  const isDraft = entry?.docstatus === 0;
+  const isSubmitted = entry?.docstatus === 1;
+
+  const handleSubmit = () => {
+    setConfirmSubmit(false);
+    updateMutation.mutate(
+      { name, data: { docstatus: 1, status: "Submitted" } },
+      {
+        onSuccess: () => toast.success(`Payment Entry ${name} submitted`),
+        onError: (e) =>
+          toast.error("Submit failed", { description: e.message }),
+      },
+    );
+  };
+
+  const handleCancel = () => {
+    setConfirmCancel(false);
+    updateMutation.mutate(
+      { name, data: { docstatus: 2, status: "Cancelled" } },
+      {
+        onSuccess: () => toast.success(`Payment Entry ${name} cancelled`),
+        onError: (e) =>
+          toast.error("Cancel failed", { description: e.message }),
+      },
+    );
+  };
+
+  if (isLoading) return <LoadingState />;
+  if (error || !entry) {
     return (
-      <div className="flex flex-col items-center justify-center p-20">
-        <AlertCircle className="w-12 h-12 text-destructive mb-4" />
-        <h3 className="text-xl font-bold">Payment Entry Not Found</h3>
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+        <p className="text-sm text-destructive">
+          {error?.message ?? "Payment Entry not found."}
+        </p>
         <Button
-          variant="link"
+          variant="ghost"
+          className="mt-3"
           onClick={() => router.push("/accounting/payment-entry")}
         >
-          Back to list
+          Back to Payment Entries
         </Button>
       </div>
     );
+  }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: "ETB",
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  const isDraft = entry.docstatus === 0;
-  const isSubmitted = entry.docstatus === 1;
-  const isCancelled = entry.docstatus === 2;
+  const references = (entry.references ?? []) as PEReferenceRow[];
   const isReceive = entry.payment_type === "Receive";
+  const displayAmount = isReceive
+    ? entry.received_amount ?? entry.paid_amount
+    : entry.paid_amount;
 
-  const references = (entry.references ||
-    []) as unknown as PaymentEntryReference[];
+  // What's-Next actions
+  const whatsNext = [
+    isDraft && {
+      label: "Submit Payment",
+      description: "Lock the payment and update ledger",
+      onClick: () => setConfirmSubmit(true),
+      isPrimary: true,
+      isLoading: updateMutation.isPending,
+    },
+    isSubmitted && {
+      label: "Print Receipt",
+      description: "Generate a printable payment receipt",
+      onClick: () => window.print(),
+    },
+  ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 pb-12">
       <PageHeader
+        backHref="/accounting/payment-entry"
+        label="Payment Entry"
         title={entry.name}
-        subtitle={
-          <div className="flex items-center gap-2">
-            <Badge
-              className={cn(
-                "text-xs font-black uppercase tracking-widest border-0",
-                isSubmitted
-                  ? "bg-emerald-100 text-emerald-700"
-                  : isCancelled
-                    ? "bg-gray-100 text-gray-600"
-                    : "bg-slate-100 text-slate-700",
-              )}
-            >
-              {isSubmitted ? "Submitted" : isCancelled ? "Cancelled" : "Draft"}
-            </Badge>
-            <Badge
-              variant="outline"
-              className="text-[10px] font-black uppercase tracking-widest"
-            >
-              {entry.payment_type}
-            </Badge>
-          </div>
-        }
-        backUrl="/accounting/payment-entry"
+        status={{
+          label: entry.status ?? (isDraft ? "Draft" : isSubmitted ? "Submitted" : "Cancelled"),
+          variant: isDraft
+            ? "default"
+            : isSubmitted
+              ? "success"
+              : "destructive",
+        }}
         actions={
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {isDraft && (
-              <>
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-card"
-                  onClick={() =>
-                    router.push(
-                      `/accounting/payment-entry/${encodeURIComponent(name)}/edit`,
-                    )
-                  }
-                >
-                  <Edit className="h-4 w-4 mr-2" /> Edit
-                </Button>
-                <Button
-                  className="rounded-full shadow-lg shadow-primary/20"
-                  onClick={() => setShowSubmitDialog(true)}
-                >
-                  <Send className="h-4 w-4 mr-2" /> Submit
-                </Button>
-              </>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-card"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="rounded-2xl shadow-xl bg-card p-1.5 min-w-[200px]"
+              <Button
+                size="sm"
+                onClick={() => setConfirmSubmit(true)}
+                disabled={updateMutation.isPending}
               >
-                <DropdownMenuItem className="rounded-xl cursor-pointer">
-                  <Printer className="h-4 w-4 mr-2" /> Print Receipt
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {isSubmitted && !isCancelled && (
-                  <DropdownMenuItem
-                    className="rounded-xl cursor-pointer text-destructive"
-                    onClick={() => setShowCancelDialog(true)}
-                  >
-                    <Ban className="h-4 w-4 mr-2" /> Cancel Entry
-                  </DropdownMenuItem>
+                {updateMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-1.5 h-4 w-4" />
                 )}
-                {isDraft && (
-                  <DropdownMenuItem
-                    className="rounded-xl cursor-pointer text-destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                Submit
+              </Button>
+            )}
+            {isSubmitted && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setConfirmCancel(true)}
+              >
+                <Ban className="mr-1.5 h-4 w-4" /> Cancel
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" disabled title="Print (Phase 2)">
+              <Printer className="h-4 w-4" />
+            </Button>
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
-          <div className="bg-card rounded-[2.5rem] border border-border shadow-2xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-10 opacity-5 select-none text-primary">
-              <Landmark className="w-40 h-40" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Center column */}
+        <div className="space-y-6 lg:col-span-8">
+          <InfoCard title="Payment Details">
+            <div className="mb-4 flex items-center justify-between">
+              <StatusBadge status={entry.status ?? (isDraft ? "Draft" : isSubmitted ? "Submitted" : "Cancelled")} />
+              <span
+                className={cn(
+                  "text-2xl font-bold tabular-nums",
+                  isReceive ? "text-success" : "text-destructive",
+                )}
+              >
+                {isReceive ? (
+                  <ArrowDownLeft className="mr-1 inline h-5 w-5" />
+                ) : (
+                  <ArrowUpRight className="mr-1 inline h-5 w-5" />
+                )}
+                {ETB.format(displayAmount)}
+              </span>
             </div>
-
-            <div className="p-10 border-b border-border bg-gradient-to-br from-primary/5 to-transparent">
-              <div className="flex flex-col md:flex-row justify-between gap-8">
-                <div>
-                  <h2 className="text-sm font-black uppercase tracking-[0.4em] text-primary mb-2">
-                    Financial Voucher
-                  </h2>
-                  <h1 className="text-4xl font-black tracking-tight">
-                    {entry.name}
-                  </h1>
-                  <p className="text-sm text-muted-foreground mt-4 font-bold flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-primary" />{" "}
-                    {entry.company}
-                  </p>
-                </div>
-                <div className="md:text-right space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      Posting Date
-                    </p>
-                    <p className="font-bold flex items-center md:justify-end gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />{" "}
-                      {formatDate(entry.posting_date)}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      Status
-                    </p>
-                    <p className="font-bold text-emerald-600 flex items-center md:justify-end gap-2">
-                      <Clock className="w-4 h-4" /> Real-time Settled
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <DataPoint label="Payment Type" value={entry.payment_type} />
+              <DataPoint label="Party Type" value={entry.party_type ?? "—"} />
+              <DataPoint label="Party" value={entry.party_name || entry.party || "—"} />
+              <DataPoint label="Company" value={entry.company} />
+              <DataPoint label="Mode of Payment" value={entry.mode_of_payment ?? "—"} />
+              <DataPoint label="Posting Date" value={entry.posting_date} />
+              <DataPoint label="Reference No" value={entry.reference_no ?? "—"} />
+              <DataPoint label="Reference Date" value={entry.reference_date ?? "—"} />
+              <DataPoint label="Paid From" value={entry.paid_from} mono />
+              <DataPoint label="Paid To" value={entry.paid_to} mono />
             </div>
+          </InfoCard>
 
-            <div className="p-10 grid grid-cols-1 md:grid-cols-3 gap-12">
-              <div>
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">
-                  {entry.party_type}
-                </h4>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-secondary/50 flex items-center justify-center font-black text-lg text-primary">
-                    {(entry.party || " ").charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-black text-lg truncate max-w-[150px]">
-                      {entry.party}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest leading-none mt-1">
-                      Beneficiary
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">
-                  Paid To/By
-                </h4>
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600">
-                    <Wallet className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold truncate max-w-[150px]">
-                      {isReceive ? entry.paid_to : entry.paid_from}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest leading-none mt-1">
-                      {isReceive ? "Bank/Cash Account" : "Source Account"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-primary/5 rounded-[2rem] p-6 border border-primary/10">
-                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-2">
-                  Net Amount
-                </h4>
-                <p className="text-2xl font-black tracking-tighter">
-                  {formatCurrency(
-                    isReceive ? entry.received_amount : entry.paid_amount,
-                  )}
-                </p>
-                <p className="text-[10px] text-primary/60 font-medium mt-1">
-                  Via {entry.mode_of_payment}
+          <InfoCard
+            title="Allocated Invoices"
+            icon={<Wallet className="h-5 w-5 text-primary" />}
+          >
+            {references.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No invoices allocated
                 </p>
               </div>
-            </div>
-
-            {/* References Table */}
-            {references.length > 0 && (
-              <div className="border-t border-border">
-                <div className="p-10 pb-4">
-                  <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                    <ArrowRightCircle className="w-4 h-4 text-primary" />{" "}
-                    Invoice Allocations
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-secondary/20 border-y border-border/50 text-muted-foreground">
-                        <th className="px-10 py-5 text-left font-black text-[10px] uppercase tracking-widest">
-                          Reference ID
-                        </th>
-                        <th className="px-6 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                          Total Amount
-                        </th>
-                        <th className="px-6 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                          Remaining
-                        </th>
-                        <th className="px-10 py-5 text-right font-black text-[10px] uppercase tracking-widest">
-                          Allocated
-                        </th>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border/60">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border/60 bg-secondary/20">
+                    <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2.5 text-left font-semibold">Invoice</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Total</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Outstanding</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Allocated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {references.map((ref, i) => (
+                      <tr
+                        key={`${ref.reference_name}-${i}`}
+                        className="cursor-pointer hover:bg-primary/5 transition-colors"
+                        onClick={() => {
+                          const basePath =
+                            ref.reference_doctype === "Sales Invoice"
+                              ? "/accounting/sales-invoice"
+                              : "/accounting/purchase-invoice";
+                          router.push(
+                            `${basePath}/${encodeURIComponent(ref.reference_name)}`,
+                          );
+                        }}
+                      >
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium text-foreground">
+                            {ref.reference_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {ref.reference_doctype}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">
+                          {ETB.format(ref.total_amount ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">
+                          {ETB.format(ref.outstanding_amount ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                          {ETB.format(ref.allocated_amount ?? 0)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {references.map((ref, i) => (
-                        <tr
-                          key={i}
-                          className="hover:bg-primary/5 transition-colors group"
-                        >
-                          <td className="px-10 py-6">
-                            <p className="font-black text-foreground">
-                              {ref.reference_name}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 group-hover:text-primary transition-colors">
-                              {ref.reference_doctype}
-                            </p>
-                          </td>
-                          <td className="px-6 py-6 text-right font-bold text-muted-foreground">
-                            {formatCurrency(ref.total_amount)}
-                          </td>
-                          <td className="px-6 py-6 text-right font-bold text-muted-foreground">
-                            {formatCurrency(ref.outstanding_amount)}
-                          </td>
-                          <td className="px-10 py-6 text-right font-black text-emerald-600">
-                            {formatCurrency(ref.allocated_amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-
-            {entry.remarks && (
-              <div className="p-10 bg-secondary/10 border-t border-border">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                  Remarks / Internal Notes
-                </h4>
-                <p className="text-xs text-muted-foreground font-medium leading-relaxed bg-card p-6 rounded-[2rem] border border-border/50 italic">
-                  {entry.remarks}
-                </p>
-              </div>
-            )}
-          </div>
+          </InfoCard>
         </div>
 
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="rounded-[2.5rem] p-8 border-border/50 bg-card/30 backdrop-blur-sm space-y-6 shadow-sm">
-            <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-3 border-b border-border pb-4">
-              <HistoryIcon className="w-4 h-4 text-primary" /> Audit Info
-            </h3>
-            <div className="space-y-4">
-              <DataPoint label="Prepared By" value={entry.owner} />
-              <DataPoint
-                label="Created At"
-                value={formatDate(entry.creation ?? "")}
-              />
-              <DataPoint
-                label="Last Modified"
-                value={formatDate(entry.modified ?? "")}
-              />
+        {/* Sidebar */}
+        <div className="space-y-6 lg:col-span-4">
+          <InfoCard title="Status" variant="gradient">
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-xl",
+                  isReceive
+                    ? "bg-success/10 text-success"
+                    : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {isReceive ? (
+                  <ArrowDownLeft className="h-6 w-6" />
+                ) : (
+                  <ArrowUpRight className="h-6 w-6" />
+                )}
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">
+                  {ETB.format(displayAmount)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {entry.payment_type} · {entry.mode_of_payment || "Cash"}
+                </p>
+              </div>
             </div>
-          </Card>
+            <StatusBadge
+              status={entry.status ?? (isDraft ? "Draft" : isSubmitted ? "Submitted" : "Cancelled")}
+              size="lg"
+            />
+          </InfoCard>
 
-          <Card className="rounded-[2.5rem] p-8 bg-black text-white relative overflow-hidden group shadow-2xl">
-            <div className="absolute -left-10 -bottom-10 opacity-10 group-hover:scale-110 transition-transform duration-500">
-              <Receipt className="w-40 h-40" />
-            </div>
-            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">
-              Accounting Integrity
-            </h3>
-            <h2 className="text-xl font-black mb-4">GL Impact</h2>
-            <p className="text-xs text-white/60 leading-relaxed mb-6">
-              This entry has impacted the General Ledger. All balances for
-              bank/cash and party accounts are updated.
-            </p>
-            <Button
-              variant="outline"
-              className="w-full rounded-2xl border-white/20 bg-white/5 hover:bg-white text-white hover:text-black font-black transition-all"
-            >
-              View Ledger
-            </Button>
-          </Card>
+          <InfoCard title="Flow Rail">
+            <FlowRail result={chain} isLoading={loadingInvoice} />
+          </InfoCard>
+
+          <InfoCard title="What's Next">
+            <WhatsNext actions={whatsNext} />
+          </InfoCard>
+
+          <InfoCard title="Activity">
+            <ActivityTimeline
+              items={[
+                {
+                  id: "created",
+                  type: "created",
+                  description: "Payment Entry created",
+                  user: entry.owner,
+                  timestamp: entry.creation ?? new Date().toISOString(),
+                },
+                ...(isSubmitted
+                  ? [
+                      {
+                        id: "submitted",
+                        type: "submitted" as const,
+                        description: "Payment submitted",
+                        user: entry.modified_by,
+                        timestamp: entry.modified ?? new Date().toISOString(),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </InfoCard>
         </div>
       </div>
 
       <ConfirmDialog
-        open={showSubmitDialog}
-        onOpenChange={setShowSubmitDialog}
-        title="Submit Payment Voucher"
-        description="This will finalize the payment and cannot be undone without cancellation. Confirm?"
-        onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: entry.name,
-            data: { docstatus: 1 },
-          });
-          toast.success("Payment Submitted");
-        }}
-        loading={updateMutation.isPending}
+        open={confirmSubmit}
+        onOpenChange={setConfirmSubmit}
+        title="Submit this Payment Entry?"
+        description="Submitting locks the payment and updates the ledger. This cannot be undone without cancelling."
+        confirmText="Submit"
+        onConfirm={handleSubmit}
       />
-
       <ConfirmDialog
-        open={showCancelDialog}
-        onOpenChange={setShowCancelDialog}
-        title="Cancel Payment Entry"
-        description="Cancellation will reverse all accounting impacts. Proceed?"
-        confirmText="Cancel Entry"
-        onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: entry.name,
-            data: { docstatus: 2 },
-          });
-          toast.success("Payment Cancelled");
-        }}
-        loading={updateMutation.isPending}
-      />
-
-      <ConfirmDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Payment"
-        description="Delete this draft payment entry permanently?"
-        onConfirm={async () => {
-          await deleteMutation.mutateAsync(entry.name);
-          toast.success("Payment Deleted");
-        }}
-        loading={deleteMutation.isPending}
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Cancel this Payment Entry?"
+        description="Cancelling reverses the payment. Linked documents must be cancelled first."
+        confirmText="Cancel Payment"
+        variant="destructive"
+        onConfirm={handleCancel}
       />
     </div>
   );
 }
+
+

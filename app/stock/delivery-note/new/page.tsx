@@ -156,8 +156,9 @@ export default function NewDeliveryNotePage() {
   const { control, getValues, reset, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-  const watchedItems = useWatch({ control, name: "items" });
-  const watchedCustomer = useWatch({ control, name: "customer" });
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedCustomer = watchedAll?.customer ?? "";
 
   // -- Auto-fill from upstream Sales Order via the registry ------------------
   const { data: salesOrder, isLoading: loadingSO } =
@@ -235,14 +236,14 @@ export default function NewDeliveryNotePage() {
 
   // -- Per-step validation (gates the wizard's Next button) ------------------
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), items: watchedItems };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Delivery Note", "step1", values),
       step2: validateWizardStep("Delivery Note", "step2", values),
       step3: { valid: true, errors: {} },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedItems, watchedCustomer, step, getValues]);
+  }, [watchedAll]);
 
   // -- Persistence ------------------------------------------------------------
   const createMutation = useFrappeCreate<
@@ -298,7 +299,7 @@ export default function NewDeliveryNotePage() {
         <InfoCard className="max-w-3xl">
           <FlowWizard
             steps={WIZARD_STEPS}
-            formData={getValues() as unknown as Record<string, unknown>}
+            formData={watchedAll as unknown as Record<string, unknown>}
             validationResults={validationResults}
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}

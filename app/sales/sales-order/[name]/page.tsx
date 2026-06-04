@@ -23,7 +23,8 @@ import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
 import { StatusBadge } from "@/components/smart/status-badge";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
-import { FlowTracker } from "@/components/flows/FlowTracker";
+import { FlowRail } from "@/components/flows/FlowRail";
+import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
@@ -155,14 +156,14 @@ export default function SalesOrderDetailPage() {
       label: "Create Work Order(s)",
       description: "Phase 2 — production automation",
       onClick: () => {},
-      disabled: true,
+      disabled: !isModuleBuilt("Work Order"),
       disabledReason: "Coming in Phase 2",
     },
     isSubmitted && {
       label: "Create Delivery Note",
-      description: "Phase 2 — fulfillment",
-      onClick: () => {},
-      disabled: true,
+      description: "Create fulfillment from this order",
+      onClick: () => router.push(`/stock/delivery-note/new?sales_order=${encodeURIComponent(name)}`),
+      disabled: !isModuleBuilt("Delivery Note"),
       disabledReason: "Coming in Phase 2",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
@@ -215,7 +216,7 @@ export default function SalesOrderDetailPage() {
 
       {/* Flow Tracker — clickable upstream, resolved downstream */}
       <InfoCard title="Lead-to-Cash Flow" className="overflow-hidden">
-        <FlowTracker result={chain} isLoading={loadingWO} />
+        <FlowRail result={chain} isLoading={loadingWO} />
       </InfoCard>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

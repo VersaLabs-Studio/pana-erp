@@ -129,8 +129,9 @@ export default function NewStockEntryPage() {
   const { control, getValues, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-  const watchedItems = useWatch({ control, name: "items" });
-  const watchedPurpose = useWatch({ control, name: "purpose" });
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedPurpose = watchedAll?.purpose ?? "";
 
   // Keep stock_entry_type in sync with purpose
   useEffect(() => {
@@ -149,13 +150,13 @@ export default function NewStockEntryPage() {
 
   // -- Per-step validation ----------------------------------------------------
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), items: watchedItems };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Stock Entry", "step1", values),
       step2: { valid: true, errors: {} },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedItems, watchedPurpose, step, getValues]);
+  }, [watchedAll]);
 
   // -- Persistence ------------------------------------------------------------
   const createMutation = useFrappeCreate<
@@ -206,7 +207,7 @@ export default function NewStockEntryPage() {
         <InfoCard className="max-w-3xl">
           <FlowWizard
             steps={WIZARD_STEPS}
-            formData={getValues() as unknown as Record<string, unknown>}
+            formData={watchedAll as unknown as Record<string, unknown>}
             validationResults={validationResults}
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}

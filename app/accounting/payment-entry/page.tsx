@@ -1,27 +1,24 @@
 "use client";
 
+// app/accounting/payment-entry/page.tsx
+// Obsidian ERP v4.0 — Payment Entry List (Golden Template)
+// KPI bar, StatusBadge, card grid. OKLCH semantic tokens only.
+
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   MoreVertical,
   Pencil,
   Trash2,
   Eye,
-  CalendarDays,
-  Clock,
-  Building2,
   DollarSign,
-  CheckCircle2,
-  XCircle,
-  FileText,
-  ArrowRight,
   ArrowDownLeft,
   ArrowUpRight,
-  Landmark,
+  ArrowRight,
   Wallet,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,32 +34,32 @@ import {
   LoadingState,
   ConfirmDialog,
 } from "@/components/smart";
+import { KPICard } from "@/components/dashboard/KPICard";
+import { StatusBadge } from "@/components/smart/status-badge";
 import type { PaymentEntry } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<
-  string,
-  { color: string; bgColor: string; icon: React.ElementType; label: string }
-> = {
-  Draft: {
-    color: "text-slate-700 dark:text-slate-300",
-    bgColor: "bg-slate-100 dark:bg-slate-800",
-    icon: FileText,
-    label: "Draft",
-  },
-  Submitted: {
-    color: "text-emerald-700 dark:text-emerald-300",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
-    icon: CheckCircle2,
-    label: "Submitted",
-  },
-  Cancelled: {
-    color: "text-gray-600 dark:text-gray-400",
-    bgColor: "bg-gray-100 dark:bg-gray-800",
-    icon: XCircle,
-    label: "Cancelled",
-  },
-};
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getDisplayStatus(entry: PaymentEntry): string {
+  if (entry.docstatus === 2) return "Cancelled";
+  if (entry.docstatus === 1) return "Submitted";
+  return "Draft";
+}
 
 function PaymentEntryCard({
   entry,
@@ -77,31 +74,7 @@ function PaymentEntryCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const status =
-    entry.docstatus === 1
-      ? "Submitted"
-      : entry.docstatus === 2
-        ? "Cancelled"
-        : "Draft";
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.Draft;
-  const StatusIcon = statusConfig.icon;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: "ETB",
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
+  const displayStatus = getDisplayStatus(entry);
   const isEditable = entry.docstatus === 0;
   const isDeletable = entry.docstatus === 0;
   const isReceive = entry.payment_type === "Receive";
@@ -120,7 +93,7 @@ function PaymentEntryCard({
       <div
         className={cn(
           "absolute top-0 left-0 right-0 h-1",
-          isReceive ? "bg-emerald-500" : "bg-rose-500",
+          isReceive ? "bg-success" : "bg-destructive",
         )}
       />
 
@@ -135,24 +108,15 @@ function PaymentEntryCard({
             </div>
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 font-medium">
               {isReceive ? (
-                <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" />
+                <ArrowDownLeft className="h-3.5 w-3.5 text-success" />
               ) : (
-                <ArrowUpRight className="h-3.5 w-3.5 text-rose-500" />
+                <ArrowUpRight className="h-3.5 w-3.5 text-destructive" />
               )}
-              {entry.party || "No party"}
+              {entry.party_type}: {entry.party || "No party"}
             </p>
           </div>
 
-          <div
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest",
-              statusConfig.bgColor,
-              statusConfig.color,
-            )}
-          >
-            <StatusIcon className="h-3 w-3" />
-            {statusConfig.label}
-          </div>
+          <StatusBadge status={displayStatus} size="sm" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -181,8 +145,8 @@ function PaymentEntryCard({
               className={cn(
                 "h-10 w-10 rounded-xl flex items-center justify-center",
                 isReceive
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-rose-500/10 text-rose-600",
+                  ? "bg-success/10 text-success"
+                  : "bg-destructive/10 text-destructive",
               )}
             >
               <DollarSign className="h-5 w-5" />
@@ -192,8 +156,10 @@ function PaymentEntryCard({
                 {isReceive ? "Received" : "Paid"}
               </p>
               <p className="text-lg font-black text-foreground tracking-tight">
-                {formatCurrency(
-                  isReceive ? entry.received_amount : entry.paid_amount,
+                {ETB.format(
+                  isReceive
+                    ? entry.received_amount ?? entry.paid_amount
+                    : entry.paid_amount,
                 )}
               </p>
             </div>
@@ -296,17 +262,40 @@ export default function PaymentEntryListPage() {
     return entries.filter((ent) => ent.payment_type === typeFilter);
   }, [entries, typeFilter]);
 
+  const kpis = useMemo(() => {
+    if (!entries) return { total: 0, receivedToday: 0, paidToday: 0, unallocated: 0 };
+    const today = new Date().toISOString().split("T")[0];
+    return {
+      total: entries.length,
+      receivedToday: entries.filter(
+        (e) => e.payment_type === "Receive" && e.posting_date === today,
+      ).length,
+      paidToday: entries.filter(
+        (e) => e.payment_type === "Pay" && e.posting_date === today,
+      ).length,
+      unallocated: entries.filter(
+        (e) => e.docstatus === 0,
+      ).length,
+    };
+  }, [entries]);
+
   if (isLoading) return <LoadingState type="cards" count={6} />;
+  if (error)
+    return (
+      <div className="p-8 text-center text-destructive">
+        Failed to load payment entries
+      </div>
+    );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6">
       <PageHeader
         title="Payment Entries"
-        subtitle="Manage cash and bank transactions"
+        subtitle={`${filteredEntries.length} entr${filteredEntries.length !== 1 ? "ies" : "y"}`}
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Entry # or party..."
+        searchPlaceholder="Search by ID, party..."
         actions={
           <Button
             className="rounded-full shadow-lg shadow-primary/20 h-10 px-6 font-bold"
@@ -318,12 +307,42 @@ export default function PaymentEntryListPage() {
         }
       />
 
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KPICard
+          title="Total Payments"
+          value={kpis.total}
+          icon={DollarSign}
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Received Today"
+          value={kpis.receivedToday}
+          icon={ArrowDownLeft}
+          variant="success"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Paid Today"
+          value={kpis.paidToday}
+          icon={ArrowUpRight}
+          variant="warning"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Unallocated"
+          value={kpis.unallocated}
+          icon={FileText}
+          variant="default"
+          isLoading={isLoading}
+        />
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all", label: "All Transactions", icon: Landmark },
-          { key: "Receive", label: "Receipts", icon: ArrowDownLeft },
-          { key: "Pay", label: "Payments", icon: ArrowUpRight },
-          { key: "Internal Transfer", label: "Transfers", icon: ArrowRight },
+          { key: "all", label: "All Transactions" },
+          { key: "Receive", label: "Receipts" },
+          { key: "Pay", label: "Payments" },
+          { key: "Internal Transfer", label: "Transfers" },
         ].map((type) => (
           <Button
             key={type.key}
@@ -337,7 +356,6 @@ export default function PaymentEntryListPage() {
             )}
             onClick={() => setTypeFilter(type.key)}
           >
-            <type.icon className="h-3.5 w-3.5" />
             {type.label}
           </Button>
         ))}
@@ -347,6 +365,15 @@ export default function PaymentEntryListPage() {
         <EmptyState
           title="No payments found"
           description="Record bank or cash vouchers to track money flow"
+          action={
+            <Button
+              onClick={() => router.push("/accounting/payment-entry/new")}
+              className="rounded-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Payment
+            </Button>
+          }
         />
       ) : filteredEntries.length === 0 ? (
         <div className="text-center py-24 border-2 border-dashed border-border rounded-[2.5rem]">
@@ -356,7 +383,7 @@ export default function PaymentEntryListPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredEntries.map((entry, i) => (
             <PaymentEntryCard
               key={entry.name}
