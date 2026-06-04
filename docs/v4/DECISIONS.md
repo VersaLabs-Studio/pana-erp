@@ -341,6 +341,50 @@ export interface CronRunRecord {
 
 ---
 
+## B5 — Server-Error Guided Resolution
+
+**Blocks:** Nothing (reusable architecture, implemented in Phase 2c)
+**Status:** Decided and implemented; every future phase adds strategies as it meets new error classes.
+
+### Problem
+
+Frappe rejects business-rule violations (HTTP 417 / `ValidationError`) with technical strings flashed as raw toasts. Users see raw Frappe jargon like *"1.0 units of Item P-001: Raw Paper needed in Warehouse Stores - P to complete this transaction."* and must manually navigate to fix the issue.
+
+### Decision
+
+**No raw Frappe error may reach the user as a toast.** All mutation errors pass through `resolveFrappeError` → typed `Resolution` → `GuidedErrorDialog` or `GuidedErrorInline`.
+
+### Architecture
+
+```
+lib/errors/frappe-error-resolver.ts
+  resolveFrappeError(err, ctx) → Resolution
+
+components/errors/GuidedErrorDialog.tsx
+  useGuidedError() → { resolution, showError, dismiss }
+  <GuidedErrorDialog resolution={r} onDismiss={dismiss} />
+```
+
+### Strategy Table (ordered — first match wins)
+
+| Code | Signature | Resolution |
+|------|-----------|------------|
+| `INSUFFICIENT_STOCK` | "units of … needed in Warehouse … to complete" | Explain shortfall; action: Create Material Request (prefilled) |
+| `MANDATORY_MISSING` | "is mandatory" / "Mandatory fields required" | Name field in plain language; action: Go to field (focus) |
+| `LINK_VALIDATION` | "Could not find" / "not found" | Explain missing link; action: Pick another |
+| `DUPLICATE` | "Duplicate" / "already exists" | Offer Open existing vs Change entry |
+| `GENERIC_FALLBACK` | anything else | Clean error card with collapsed technical details |
+
+### Rule
+
+Every `useFrappe{Create,Update,Delete}` `onError` callback calls `resolveFrappeError` and surfaces the result via `GuidedErrorDialog`. Each future phase adds strategies as it encounters new Frappe error classes.
+
+### Tests
+
+Unit tests per strategy in `tests/smoke.test.ts` — each test asserts the expected `code`, `title`, and action labels for a representative error message.
+
+---
+
 ## Summary — Gate Status
 
 | Gate | Status | Resolution |

@@ -266,6 +266,88 @@ export const journalEntryStepSchemas = {
 };
 
 /**
+ * Purchase Order step schemas
+ */
+export const purchaseOrderStepSchemas = {
+  step1: z.object({
+    supplier: z.string().min(1, "Supplier is required"),
+    company: z.string().min(1, "Company is required"),
+    transaction_date: z.string().min(1, "Transaction date is required"),
+    schedule_date: z.string().optional(),
+  }),
+  step2: z.object({
+    items: z
+      .array(
+        z.object({
+          item_code: z.string().min(1, "Item code is required"),
+          qty: z.number().min(0.01, "Quantity must be greater than 0"),
+          rate: z.number().min(0, "Rate must be non-negative"),
+          warehouse: z.string().optional(),
+        })
+      )
+      .min(1, "At least one item is required"),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
+ * Request for Quotation step schemas
+ */
+export const rfqStepSchemas = {
+  step1: z.object({
+    company: z.string().min(1, "Company is required"),
+    transaction_date: z.string().min(1, "Transaction date is required"),
+  }),
+  step2: z.object({
+    items: z
+      .array(
+        z.object({
+          item_code: z.string().min(1, "Item code is required"),
+          qty: z.number().min(0.01, "Quantity must be greater than 0"),
+        })
+      )
+      .min(1, "At least one item is required"),
+    suppliers: z
+      .array(
+        z.object({
+          supplier: z.string().min(1, "Supplier is required"),
+        })
+      )
+      .min(1, "At least one supplier required"),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
+ * Supplier Quotation step schemas
+ */
+export const supplierQuotationStepSchemas = {
+  step1: z.object({
+    supplier: z.string().min(1, "Supplier is required"),
+    company: z.string().min(1, "Company is required"),
+    transaction_date: z.string().min(1, "Transaction date is required"),
+  }),
+  step2: z.object({
+    items: z
+      .array(
+        z.object({
+          item_code: z.string().min(1, "Item code is required"),
+          qty: z.number().min(0.01, "Quantity must be greater than 0"),
+          rate: z.number().min(0.01, "Rate must be greater than 0"),
+        })
+      )
+      .min(1, "At least one item is required"),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
  * All step schemas indexed by doctype
  */
 export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
@@ -278,6 +360,9 @@ export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
   "Journal Entry": journalEntryStepSchemas,
   "Material Request": materialRequestStepSchemas,
   "Stock Entry": stockEntryStepSchemas,
+  "Purchase Order": purchaseOrderStepSchemas,
+  "Request for Quotation": rfqStepSchemas,
+  "Supplier Quotation": supplierQuotationStepSchemas,
 };
 
 /**

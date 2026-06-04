@@ -132,6 +132,8 @@ function getDocTypeRoute(doctype: string): string {
     "Purchase Receipt": "stock/purchase-receipt",
     "Purchase Invoice": "accounting/purchase-invoice",
     "Material Request": "stock/material-request",
+    "Request for Quotation": "buying/request-for-quotation",
+    "Supplier Quotation": "buying/supplier-quotation",
     "Stock Entry": "stock/stock-entry",
     BOM: "manufacturing/bom",
   };

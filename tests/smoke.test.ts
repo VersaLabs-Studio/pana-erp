@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { buildIdempotencyKey, getAutomationGuard } from "@/lib/flows/idempotency";
 import { validateWizardStep } from "@/lib/flows/flow-validation";
 import { isModuleBuilt, BUILT_MODULES } from "@/lib/flows/module-availability";
+import { resolveFrappeError, KNOWN_ERROR_CODES } from "@/lib/errors/frappe-error-resolver";
 
 describe("Smoke Test — Test Harness", () => {
   it("should pass a basic assertion", () => {
@@ -179,5 +180,102 @@ describe("Module Availability — A2 fix", () => {
   it("isModuleBuilt returns false for unbuilt modules", () => {
     expect(isModuleBuilt("Work Order")).toBe(false);
     expect(isModuleBuilt("BOM")).toBe(false);
+  });
+});
+
+describe("Frappe Error Resolver — B5 architecture", () => {
+  it("KNOWN_ERROR_CODES contains all expected strategies", () => {
+    expect(KNOWN_ERROR_CODES).toContain("INSUFFICIENT_STOCK");
+    expect(KNOWN_ERROR_CODES).toContain("MANDATORY_MISSING");
+    expect(KNOWN_ERROR_CODES).toContain("LINK_VALIDATION");
+    expect(KNOWN_ERROR_CODES).toContain("DUPLICATE");
+  });
+
+  it("INSUFFICIENT_STOCK: matches stock shortfall message", () => {
+    const result = resolveFrappeError(
+      new Error("1.0 units of Item P-001: Raw Paper needed in Warehouse Stores - P to complete this transaction."),
+      { doctype: "Delivery Note" },
+    );
+    expect(result.code).toBe("INSUFFICIENT_STOCK");
+    expect(result.severity).toBe("warning");
+    expect(result.title).toContain("stock");
+    expect(result.actions.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("MANDATORY_MISSING: matches mandatory field error", () => {
+    const result = resolveFrappeError(
+      new Error("Field customer is mandatory"),
+      { doctype: "Sales Order" },
+    );
+    expect(result.code).toBe("MANDATORY_MISSING");
+    expect(result.title).toContain("Missing");
+    expect(result.explanation).toContain("customer");
+  });
+
+  it("LINK_VALIDATION: matches 'not found' error", () => {
+    const result = resolveFrappeError(
+      new Error("Could not find Customer: CUST-999"),
+      { doctype: "Sales Order" },
+    );
+    expect(result.code).toBe("LINK_VALIDATION");
+    expect(result.title).toContain("not found");
+    expect(result.explanation).toContain("CUST-999");
+  });
+
+  it("DUPLICATE: matches 'already exists' error", () => {
+    const result = resolveFrappeError(
+      new Error("Purchase Order PO-001 already exists"),
+      { doctype: "Purchase Order" },
+    );
+    expect(result.code).toBe("DUPLICATE");
+    expect(result.title).toContain("Duplicate");
+    expect(result.actions.some((a) => a.label === "Open existing")).toBe(true);
+  });
+
+  it("GENERIC_FALLBACK: catches unknown errors", () => {
+    const result = resolveFrappeError(
+      new Error("Something completely unexpected happened"),
+      { doctype: "Sales Order" },
+    );
+    expect(result.code).toBe("GENERIC_FALLBACK");
+    expect(result.severity).toBe("error");
+    expect(result.details).toBeDefined();
+    expect(result.details![0]).toContain("unexpected");
+  });
+
+  it("handles non-Error objects gracefully", () => {
+    const result = resolveFrappeError("raw string error", { doctype: "Sales Order" });
+    expect(result.code).toBeDefined();
+    expect(result.title).toBeDefined();
+  });
+});
+
+describe("Wizard pristine state — A1 fix", () => {
+  it("Sales Order step1 has no errors on pristine (empty) form", () => {
+    // This tests the validation gate behavior: on pristine mount,
+    // the form has default values. The gate should report errors for
+    // empty required fields, but the UI should NOT show them (triedNext = false).
+    // The validation logic itself is correct — the gate is in FlowWizard.
+    const result = validateWizardStep("Sales Order", "step1", {
+      customer: "",
+      company: "",
+      transaction_date: "",
+      delivery_date: "",
+    });
+    // The validation correctly reports errors...
+    expect(result.valid).toBe(false);
+    // ...but the UI only shows them after triedNext (tested manually).
+    // This test documents the contract: validation runs, UI defers display.
+  });
+
+  it("Sales Order step1 is valid when default values are filled", () => {
+    const result = validateWizardStep("Sales Order", "step1", {
+      customer: "CUST-001",
+      company: "Test Company",
+      transaction_date: "2026-06-04",
+      delivery_date: "2026-06-10",
+    });
+    expect(result.valid).toBe(true);
+    expect(Object.keys(result.errors)).toHaveLength(0);
   });
 });

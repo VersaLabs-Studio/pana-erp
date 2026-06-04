@@ -17,6 +17,9 @@ export const BUILT_MODULES = new Set<string>([
   "Payment Entry",
   "Purchase Invoice",
   "Journal Entry",
+  // Phase 3 — Buying module
+  "Request for Quotation",
+  "Supplier Quotation",
 ]);
 
 export function isModuleBuilt(doctype: string): boolean {

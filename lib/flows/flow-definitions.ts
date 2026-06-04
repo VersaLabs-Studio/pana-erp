@@ -165,6 +165,22 @@ export const PURCHASE_FLOW: FlowDefinition = {
       icon: "ClipboardList",
     },
     {
+      id: "request-for-quotation",
+      label: "Request for Quotation",
+      doctype: "Request for Quotation",
+      status: "pending",
+      icon: "FileSearch",
+      isOptional: true,
+    },
+    {
+      id: "supplier-quotation",
+      label: "Supplier Quotation",
+      doctype: "Supplier Quotation",
+      status: "pending",
+      icon: "FileText",
+      isOptional: true,
+    },
+    {
       id: "purchase-order",
       label: "Purchase Order",
       doctype: "Purchase Order",

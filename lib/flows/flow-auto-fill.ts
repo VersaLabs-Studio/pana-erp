@@ -297,6 +297,72 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
       naming_series: "PUR-ORD-.YYYY.-",
     },
   },
+
+  // =========================================================================
+  // MATERIAL REQUEST → REQUEST FOR QUOTATION
+  // =========================================================================
+  "Material Request->Request for Quotation": {
+    sourceDoctype: "Material Request",
+    targetDoctype: "Request for Quotation",
+    headerMappings: [
+      { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
+    ],
+    itemMappings: [
+      { sourceField: "item_code", targetField: "item_code", isReadOnly: true, sourceLabel: "Item Code" },
+      { sourceField: "item_name", targetField: "item_name", isReadOnly: true, sourceLabel: "Item Name" },
+      { sourceField: "qty", targetField: "qty", isReadOnly: false, sourceLabel: "Quantity" },
+      { sourceField: "schedule_date", targetField: "schedule_date", isReadOnly: false, sourceLabel: "Required Date" },
+    ],
+    userMustFill: ["suppliers"],
+    defaults: {
+      naming_series: "PUR-RFQ-.YYYY.-",
+    },
+  },
+
+  // =========================================================================
+  // REQUEST FOR QUOTATION → SUPPLIER QUOTATION
+  // =========================================================================
+  "Request for Quotation->Supplier Quotation": {
+    sourceDoctype: "Request for Quotation",
+    targetDoctype: "Supplier Quotation",
+    headerMappings: [
+      { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
+    ],
+    itemMappings: [
+      { sourceField: "item_code", targetField: "item_code", isReadOnly: true, sourceLabel: "Item Code" },
+      { sourceField: "item_name", targetField: "item_name", isReadOnly: true, sourceLabel: "Item Name" },
+      { sourceField: "qty", targetField: "qty", isReadOnly: false, sourceLabel: "Quantity" },
+    ],
+    userMustFill: ["supplier", "rate"],
+    defaults: {
+      naming_series: "PUR-SQTN-.YYYY.-",
+    },
+  },
+
+  // =========================================================================
+  // SUPPLIER QUOTATION → PURCHASE ORDER
+  // =========================================================================
+  "Supplier Quotation->Purchase Order": {
+    sourceDoctype: "Supplier Quotation",
+    targetDoctype: "Purchase Order",
+    headerMappings: [
+      { sourceField: "supplier", targetField: "supplier", isReadOnly: true, sourceLabel: "Supplier" },
+      { sourceField: "supplier_name", targetField: "supplier_name", isReadOnly: true, sourceLabel: "Supplier Name" },
+      { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
+      { sourceField: "currency", targetField: "currency", isReadOnly: true, sourceLabel: "Currency" },
+    ],
+    itemMappings: [
+      { sourceField: "item_code", targetField: "item_code", isReadOnly: true, sourceLabel: "Item Code" },
+      { sourceField: "item_name", targetField: "item_name", isReadOnly: true, sourceLabel: "Item Name" },
+      { sourceField: "qty", targetField: "qty", isReadOnly: false, sourceLabel: "Quantity" },
+      { sourceField: "rate", targetField: "rate", isReadOnly: true, sourceLabel: "Rate" },
+      { sourceField: "warehouse", targetField: "warehouse", isReadOnly: false, sourceLabel: "Warehouse" },
+    ],
+    userMustFill: ["schedule_date"],
+    defaults: {
+      naming_series: "PUR-ORD-.YYYY.-",
+    },
+  },
 };
 
 /**

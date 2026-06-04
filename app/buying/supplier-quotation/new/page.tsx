@@ -1,18 +1,15 @@
 "use client";
 
-// app/sales/sales-order/new/page.tsx
-// Obsidian ERP v4.0 — Sales Order Create (V4 SmartForm Wizard)
-// GOLDEN TEMPLATE — every transactional create page copies this pattern.
-// Per Architecture V4 Part 2 §2 (SmartForm Wizard) + §3.3 (Create Template).
-// Flow engine: FlowWizard (Zod step gating) + AUTO_FILL_REGISTRY (Quotation→Sales Order).
-// Premium UI: OKLCH semantic tokens only, glassmorphism, Framer Motion via FlowWizard.
+// app/buying/supplier-quotation/new/page.tsx
+// Supplier Quotation Create — 3-step FlowWizard, Zod gating, AUTO_FILL from RFQ.
+// GOLDEN TEMPLATE: FlowWizard + validateWizardStep + useWatch gate + error resolver.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
-  UserRound,
+  Truck,
   Package,
   ClipboardCheck,
   Plus,
@@ -22,15 +19,14 @@ import {
 
 import { PageHeader } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
-import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
+import {
+  GuidedErrorDialog,
+  useGuidedError,
+} from "@/components/errors/GuidedErrorDialog";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  FormInput,
-  FormFrappeSelect,
-  FormDatePicker,
-} from "@/components/form";
+import { FormInput, FormFrappeSelect, FormDatePicker } from "@/components/form";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
@@ -42,15 +38,13 @@ import {
 import { validateWizardStep } from "@/lib/flows/flow-validation";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
-import type { Quotation } from "@/types/doctype-types";
+import type { RequestForQuotation } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// Form model — concrete item shape so the field array is fully typed
-// (avoids the z.array(z.unknown()) inference pain; the factory route's Zod
-// schema remains the authoritative server-side gate).
+// Form model
 // ---------------------------------------------------------------------------
-interface SOItem {
+interface SQItem {
   item_code: string;
   item_name?: string;
   description?: string;
@@ -58,34 +52,21 @@ interface SOItem {
   rate: number;
   amount?: number;
   uom?: string;
-  warehouse?: string;
 }
 
-interface SOForm {
+interface SQForm {
   naming_series: string;
-  customer: string;
-  customer_name?: string;
+  supplier: string;
   company: string;
   transaction_date: string;
-  delivery_date: string;
-  order_type: string;
+  valid_till?: string;
   currency: string;
-  selling_price_list: string;
-  price_list_currency: string;
   conversion_rate: number;
-  plc_conversion_rate: number;
-  customer_address?: string;
-  contact_person?: string;
-  taxes_and_charges?: string;
-  tc_name?: string;
-  terms?: string;
-  po_no?: string;
-  po_date?: string;
   status: string;
-  items: SOItem[];
+  items: SQItem[];
 }
 
-const EMPTY_ITEM: SOItem = {
+const EMPTY_ITEM: SQItem = {
   item_code: "",
   item_name: "",
   description: "",
@@ -98,24 +79,24 @@ const EMPTY_ITEM: SOItem = {
 const WIZARD_STEPS: WizardStep[] = [
   {
     id: "step1",
-    label: "Customer & Dates",
-    description: "Confirm the customer and set the delivery timeline",
+    label: "Supplier & Date",
+    description: "Select the supplier and set quotation date",
     schema: null,
-    fields: ["customer", "company", "transaction_date", "delivery_date"],
-    icon: "UserRound",
+    fields: ["supplier", "company", "transaction_date"],
+    icon: "Truck",
   },
   {
     id: "step2",
-    label: "Order Items",
-    description: "Review and adjust the items on this order",
+    label: "Items & Rates",
+    description: "Set rates for each quoted item",
     schema: null,
     fields: ["items"],
     icon: "Package",
   },
   {
     id: "step3",
-    label: "Review & Confirm",
-    description: "Review the order before creating it",
+    label: "Review",
+    description: "Review the quotation before creating it",
     schema: null,
     fields: [],
     icon: "ClipboardCheck",
@@ -127,29 +108,24 @@ const ETB = new Intl.NumberFormat("en-ET", {
   currency: "ETB",
 });
 
-export default function NewSalesOrderPage() {
+export default function NewSupplierQuotationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const quotationId = searchParams.get("quotation");
+  const rfqId = searchParams.get("request_for_quotation");
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set(),
   );
 
-  const form = useForm<SOForm>({
+  const form = useForm<SQForm>({
     defaultValues: {
-      naming_series: "SAL-ORD-.YYYY.-",
-      customer: "",
+      naming_series: "PUR-SQTN-.YYYY.-",
+      supplier: "",
       company: "",
       transaction_date: new Date().toISOString().split("T")[0],
-      delivery_date: "",
-      order_type: "Sales",
       currency: "ETB",
-      selling_price_list: "Standard Selling",
-      price_list_currency: "ETB",
       conversion_rate: 1,
-      plc_conversion_rate: 1,
       status: "Draft",
       items: [{ ...EMPTY_ITEM }],
     },
@@ -158,37 +134,39 @@ export default function NewSalesOrderPage() {
   const { control, getValues, reset, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-  // Watch the entire form reactively — drives validation gate + FlowWizard formData
   const watchedAll = useWatch({ control });
   const watchedItems = watchedAll?.items ?? [];
-  const watchedCustomer = watchedAll?.customer ?? "";
 
-  // -- Auto-fill from upstream Quotation via the registry --------------------
-  const { data: quotation, isLoading: loadingQuotation } =
-    useFrappeDoc<Quotation>("Quotation", quotationId ?? "", {
-      enabled: !!quotationId,
+  // -- Auto-fill from upstream RFQ via the registry -------------------------
+  const { data: rfq, isLoading: loadingRFQ } =
+    useFrappeDoc<RequestForQuotation>("Request for Quotation", rfqId ?? "", {
+      enabled: !!rfqId,
     });
 
   useEffect(() => {
-    if (!quotation) return;
-    const mapping = getAutoFillMapping("Quotation", "Sales Order");
+    if (!rfq) return;
+    const mapping = getAutoFillMapping(
+      "Request for Quotation",
+      "Supplier Quotation",
+    );
     if (!mapping) return;
 
     const header = applyAutoFill(
-      quotation as unknown as Record<string, unknown>,
+      rfq as unknown as Record<string, unknown>,
       mapping,
     );
     const items = applyItemAutoFill(
-      (quotation as { items?: Record<string, unknown>[] }).items ?? [],
+      (rfq as { items?: Record<string, unknown>[] }).items ?? [],
       mapping,
-    ) as unknown as SOItem[];
+    ) as unknown as SQItem[];
 
     reset({
       ...getValues(),
-      ...(header as Partial<SOForm>),
-      items: items.length ? items : [{ ...EMPTY_ITEM }],
-      // Auto-fill never carries the delivery date — the user must set it.
-      delivery_date: "",
+      ...(header as Partial<SQForm>),
+      items: items.length
+        ? items.map((it) => ({ ...it, rate: 0, amount: 0 }))
+        : [{ ...EMPTY_ITEM }],
+      supplier: "",
     });
 
     const filled = new Set<string>([
@@ -199,17 +177,17 @@ export default function NewSalesOrderPage() {
     ]);
     setAutoFilledFields(filled);
 
-    toast.success(`Loaded from Quotation ${quotationId}`, {
-      description: "Set the delivery date to continue.",
+    toast.success(`Loaded from RFQ ${rfqId}`, {
+      description: "Set supplier and rates to continue.",
     });
-  }, [quotation, quotationId, reset, getValues]);
+  }, [rfq, rfqId, reset, getValues]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),
     [autoFilledFields],
   );
 
-  // -- Live subtotal ----------------------------------------------------------
+  // -- Live subtotal ---------------------------------------------------------
   const subtotal = useMemo(
     () =>
       (watchedItems ?? []).reduce(
@@ -219,17 +197,23 @@ export default function NewSalesOrderPage() {
     [watchedItems],
   );
 
-  // -- Per-step validation (gates the wizard's Next button) ------------------
-  // Drive off watchedAll (reactive) so any field change re-runs validation.
-  const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
-    return {
-      step1: validateWizardStep("Sales Order", "step1", values),
-      step2: validateWizardStep("Sales Order", "step2", values),
-      step3: { valid: true, errors: {} },
-    };
+  // -- Per-step validation ---------------------------------------------------
+  const validationResults = useMemo<Record<string, StepValidationResult>>(
+    () => {
+      const values = {
+        ...getValues(),
+        ...watchedAll,
+        items: watchedAll?.items ?? [],
+      };
+      return {
+        step1: validateWizardStep("Supplier Quotation", "step1", values),
+        step2: validateWizardStep("Supplier Quotation", "step2", values),
+        step3: { valid: true, errors: {} },
+      };
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedAll]);
+    [watchedAll],
+  );
 
   // -- Persistence ------------------------------------------------------------
   const { resolution, showError, dismiss } = useGuidedError();
@@ -237,16 +221,21 @@ export default function NewSalesOrderPage() {
   const createMutation = useFrappeCreate<
     { data: { name: string } },
     Record<string, unknown>
-  >("Sales Order", {
-    successMessage: "Sales Order created",
+  >("Supplier Quotation", {
+    successMessage: "Supplier Quotation created",
     onSuccess: (res) => {
       const name = res?.data?.name;
       if (name) {
-        router.push(`/sales/sales-order/${encodeURIComponent(name)}`);
+        router.push(
+          `/buying/supplier-quotation/${encodeURIComponent(name)}`,
+        );
       }
     },
     onError: (err) => {
-      const r = resolveFrappeError(err, { doctype: "Sales Order", values: getValues() });
+      const r = resolveFrappeError(err, {
+        doctype: "Supplier Quotation",
+        values: getValues(),
+      });
       showError(r);
     },
   });
@@ -257,33 +246,33 @@ export default function NewSalesOrderPage() {
       (it) => it.item_code && Number(it.qty) > 0,
     );
     if (items.length === 0) {
-      toast.error("Add at least one valid item before creating the order.");
+      toast.error("Add at least one valid item before creating the quotation.");
       setStep(1);
       return;
     }
+
     createMutation.mutate({
       ...values,
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
+        doctype: "Supplier Quotation Item",
       })),
       conversion_rate: 1,
-      plc_conversion_rate: 1,
-      currency: "ETB",
-      price_list_currency: "ETB",
+      currency: values.currency || "ETB",
     });
   }, [createMutation, getValues]);
 
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
-        title="New Sales Order"
+        title="New Supplier Quotation"
         subtitle={
-          quotationId
-            ? `From Quotation ${quotationId}`
-            : "Create a sales order in three steps"
+          rfqId
+            ? `From RFQ ${rfqId}`
+            : "Record a supplier's quotation in three steps"
         }
-        backHref="/sales/sales-order"
+        backHref="/buying/supplier-quotation"
       />
 
       <Form {...form}>
@@ -297,32 +286,29 @@ export default function NewSalesOrderPage() {
             onStepChange={setStep}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
-            submitLabel="Create Sales Order"
+            submitLabel="Create Supplier Quotation"
             submittingLabel="Creating..."
             renderStep={(s) => {
-              // ---- STEP 1 — Customer & Dates ----------------------------
+              // ---- STEP 1 — Supplier & Date ---------------------------
               if (s.id === "step1") {
                 return (
                   <div className="space-y-6">
                     <StepHeading
-                      icon={<UserRound className="h-5 w-5 text-primary" />}
-                      title="Customer & Dates"
-                      description="Confirm who this order is for and when it's due."
+                      icon={<Truck className="h-5 w-5 text-primary" />}
+                      title="Supplier & Date"
+                      description="Select the supplier providing this quotation."
                     />
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                      <FieldWrap
-                        auto={isAuto("customer")}
-                        loading={loadingQuotation}
-                      >
+                      <FieldWrap auto={isAuto("supplier")} loading={loadingRFQ}>
                         <FormFrappeSelect
                           control={control}
-                          name="customer"
-                          label="Customer"
+                          name="supplier"
+                          label="Supplier"
                           required
-                          doctype="Customer"
-                          labelField="customer_name"
-                          placeholder="Search customer..."
-                          disabled={isAuto("customer")}
+                          doctype="Supplier"
+                          labelField="supplier_name"
+                          placeholder="Select supplier..."
+                          disabled={isAuto("supplier")}
                         />
                       </FieldWrap>
                       <FieldWrap auto={isAuto("company")}>
@@ -340,60 +326,33 @@ export default function NewSalesOrderPage() {
                       <FormDatePicker
                         control={control}
                         name="transaction_date"
-                        label="Order Date"
+                        label="Quotation Date"
                         required
                       />
                       <FormDatePicker
                         control={control}
-                        name="delivery_date"
-                        label="Delivery Date"
-                        required
-                      />
-                      <FormFrappeSelect
-                        control={control}
-                        name="customer_address"
-                        label="Shipping Address"
-                        doctype="Address"
-                        labelField="address_title"
-                        disabled={!watchedCustomer}
-                        filters={
-                          watchedCustomer
-                            ? ([
-                                ["Dynamic Link", "link_name", "=", watchedCustomer],
-                              ] as unknown as [string, string, unknown][])
-                            : []
-                        }
-                        placeholder={
-                          watchedCustomer
-                            ? "Select address..."
-                            : "Select a customer first"
-                        }
-                      />
-                      <FormInput
-                        control={control}
-                        name="po_no"
-                        label="Customer PO No"
-                        placeholder="Optional reference"
+                        name="valid_till"
+                        label="Valid Till"
                       />
                     </div>
                   </div>
                 );
               }
 
-              // ---- STEP 2 — Items ---------------------------------------
+              // ---- STEP 2 — Items & Rates -----------------------------
               if (s.id === "step2") {
                 return (
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <StepHeading
                         icon={<Package className="h-5 w-5 text-primary" />}
-                        title="Order Items"
-                        description="Adjust quantities and rates as needed."
+                        title="Items & Rates"
+                        description="Set the supplier's rate for each item."
                       />
                       {isAuto("items") && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                           <Lock className="h-3 w-3" />
-                          Auto-filled
+                          Items auto-filled
                         </span>
                       )}
                     </div>
@@ -402,17 +361,27 @@ export default function NewSalesOrderPage() {
                       <table className="w-full text-sm">
                         <thead className="border-b border-border/60 bg-secondary/20">
                           <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            <th className="px-3 py-2.5 text-left font-semibold">Item</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                            <th className="px-3 py-2.5 text-left font-semibold">
+                              Item
+                            </th>
+                            <th className="px-3 py-2.5 text-right font-semibold">
+                              Qty
+                            </th>
+                            <th className="px-3 py-2.5 text-right font-semibold">
+                              Rate
+                            </th>
+                            <th className="px-3 py-2.5 text-right font-semibold">
+                              Amount
+                            </th>
                             <th className="w-10" />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
                           {fields.map((field, index) => {
-                            const qty = Number(watchedItems?.[index]?.qty) || 0;
-                            const rate = Number(watchedItems?.[index]?.rate) || 0;
+                            const qty =
+                              Number(watchedItems?.[index]?.qty) || 0;
+                            const rate =
+                              Number(watchedItems?.[index]?.rate) || 0;
                             return (
                               <tr key={field.id} className="group">
                                 <td className="px-3 py-2 align-top">
@@ -423,39 +392,65 @@ export default function NewSalesOrderPage() {
                                     hideLabel
                                     placeholder="Item..."
                                     extraFields={[
-                                      "standard_rate",
-                                      "stock_uom",
                                       "item_name",
                                       "description",
+                                      "stock_uom",
                                     ]}
                                     onValueChange={(_val, doc) => {
                                       if (doc) {
                                         setValue(
-                                          `items.${index}.rate`,
-                                          Number(doc.standard_rate) || 0,
+                                          `items.${index}.item_name`,
+                                          doc.item_name || "",
                                         );
                                         setValue(
                                           `items.${index}.uom`,
                                           doc.stock_uom || "Nos",
                                         );
-                                        setValue(
-                                          `items.${index}.item_name`,
-                                          doc.item_name || "",
-                                        );
                                       }
                                     }}
+                                    disabled={isAuto("items")}
                                   />
                                 </td>
                                 <td className="px-3 py-2 align-top">
-                                  <NumberCell
+                                  <FormField
                                     control={control}
                                     name={`items.${index}.qty`}
+                                    render={({ field: f }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <Input
+                                            {...f}
+                                            type="number"
+                                            inputMode="decimal"
+                                            className="h-10 rounded-lg border-0 bg-secondary/30 text-right tabular-nums"
+                                            onChange={(e) =>
+                                              f.onChange(Number(e.target.value))
+                                            }
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
                                   />
                                 </td>
                                 <td className="px-3 py-2 align-top">
-                                  <NumberCell
+                                  <FormField
                                     control={control}
                                     name={`items.${index}.rate`}
+                                    render={({ field: f }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <Input
+                                            {...f}
+                                            type="number"
+                                            inputMode="decimal"
+                                            className="h-10 rounded-lg border-0 bg-secondary/30 text-right tabular-nums"
+                                            onChange={(e) =>
+                                              f.onChange(Number(e.target.value))
+                                            }
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
                                   />
                                 </td>
                                 <td className="px-3 py-3 text-right align-middle font-semibold tabular-nums text-foreground">
@@ -490,7 +485,7 @@ export default function NewSalesOrderPage() {
                         </Button>
                         <div className="text-right">
                           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                            Subtotal
+                            Grand Total
                           </p>
                           <p className="text-xl font-bold tabular-nums text-foreground">
                             {ETB.format(subtotal)}
@@ -502,21 +497,24 @@ export default function NewSalesOrderPage() {
                 );
               }
 
-              // ---- STEP 3 — Review --------------------------------------
+              // ---- STEP 3 — Review ------------------------------------
               const v = getValues();
               return (
                 <div className="space-y-5">
                   <StepHeading
                     icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
-                    title="Review & Confirm"
-                    description="Confirm the details below to create the order."
+                    title="Review"
+                    description="Confirm the details below to create the quotation."
                   />
                   <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                      <Summary label="Customer" value={v.customer_name || v.customer} />
+                      <Summary
+                        label="Supplier"
+                        value={v.supplier || "—"}
+                      />
                       <Summary label="Company" value={v.company} />
-                      <Summary label="Order Date" value={v.transaction_date} />
-                      <Summary label="Delivery Date" value={v.delivery_date} />
+                      <Summary label="Date" value={v.transaction_date} />
+                      <Summary label="Valid Till" value={v.valid_till || "—"} />
                     </div>
                     <div className="mt-4 border-t border-border/60 pt-4">
                       <div className="flex items-center justify-between">
@@ -601,34 +599,5 @@ function Summary({ label, value }: { label: string; value?: string }) {
       </p>
       <p className="font-medium text-foreground">{value || "—"}</p>
     </div>
-  );
-}
-
-// Typed numeric cell for the items table (no @ts-nocheck needed).
-function NumberCell({
-  control,
-  name,
-}: {
-  control: ReturnType<typeof useForm<SOForm>>["control"];
-  name: `items.${number}.qty` | `items.${number}.rate`;
-}) {
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormControl>
-            <Input
-              {...field}
-              type="number"
-              inputMode="decimal"
-              className="h-10 rounded-lg border-0 bg-secondary/30 text-right tabular-nums"
-              onChange={(e) => field.onChange(Number(e.target.value))}
-            />
-          </FormControl>
-        </FormItem>
-      )}
-    />
   );
 }
