@@ -1,5 +1,9 @@
 "use client";
 
+// app/accounting/purchase-invoice/page.tsx
+// Obsidian ERP v4.0 — Purchase Invoice List (V4 Golden Template)
+// KPICard + StatusBadge + card grid. OKLCH semantic tokens only.
+
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -7,20 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   MoreVertical,
-  Pencil,
   Trash2,
   Eye,
   CalendarDays,
-  Clock,
-  Building2,
   DollarSign,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
   FileText,
   ArrowRight,
   Truck,
-  HandCoins,
+  Clock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -35,88 +33,29 @@ import {
   EmptyState,
   LoadingState,
   ConfirmDialog,
+  StatusBadge,
 } from "@/components/smart";
+import { KPICard } from "@/components/dashboard/KPICard";
 import type { PurchaseInvoice } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<
-  string,
-  { color: string; bgColor: string; icon: React.ElementType; label: string }
-> = {
-  Draft: {
-    color: "text-slate-700 dark:text-slate-300",
-    bgColor: "bg-slate-100 dark:bg-slate-800",
-    icon: FileText,
-    label: "Draft",
-  },
-  Unpaid: {
-    color: "text-amber-700 dark:text-amber-300",
-    bgColor: "bg-amber-100 dark:bg-amber-900/50",
-    icon: Clock,
-    label: "Unpaid",
-  },
-  Paid: {
-    color: "text-emerald-700 dark:text-emerald-300",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
-    icon: CheckCircle2,
-    label: "Paid",
-  },
-  Overdue: {
-    color: "text-rose-700 dark:text-rose-300",
-    bgColor: "bg-rose-100 dark:bg-rose-900/50",
-    icon: AlertTriangle,
-    label: "Overdue",
-  },
-  "Part Paid": {
-    color: "text-indigo-700 dark:text-indigo-300",
-    bgColor: "bg-indigo-100 dark:bg-indigo-900/50",
-    icon: HandCoins,
-    label: "Part Paid",
-  },
-  Cancelled: {
-    color: "text-gray-600 dark:text-gray-400",
-    bgColor: "bg-gray-100 dark:bg-gray-800",
-    icon: XCircle,
-    label: "Cancelled",
-  },
-};
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
 
 function PurchaseInvoiceCard({
   invoice,
   index,
   onView,
-  onEdit,
   onDelete,
 }: {
   invoice: PurchaseInvoice;
   index: number;
   onView: () => void;
-  onEdit: () => void;
   onDelete: () => void;
 }) {
-  const statusConfig =
-    STATUS_CONFIG[invoice.status || "Draft"] || STATUS_CONFIG.Draft;
-  const StatusIcon = statusConfig.icon;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: invoice.currency || "ETB",
-      minimumFractionDigits: 2,
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const isEditable = invoice.docstatus === 0;
-  const isDeletable = invoice.docstatus === 0;
+  const isDraft = invoice.docstatus === 0;
 
   return (
     <div
@@ -132,11 +71,12 @@ function PurchaseInvoiceCard({
       <div
         className={cn(
           "absolute top-0 left-0 right-0 h-1",
-          invoice.status === "Draft" && "bg-slate-400",
-          invoice.status === "Unpaid" && "bg-amber-500",
-          invoice.status === "Paid" && "bg-emerald-500",
-          invoice.status === "Overdue" && "bg-rose-500",
-          invoice.status === "Cancelled" && "bg-gray-400",
+          invoice.status === "Draft" && "bg-muted-foreground/30",
+          invoice.status === "Unpaid" && "bg-warning",
+          invoice.status === "Paid" && "bg-success",
+          invoice.status === "Overdue" && "bg-destructive",
+          invoice.status === "Partly Paid" && "bg-info",
+          invoice.status === "Cancelled" && "bg-muted-foreground/20",
         )}
       />
 
@@ -155,50 +95,46 @@ function PurchaseInvoiceCard({
             </p>
           </div>
 
-          <div
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm",
-              statusConfig.bgColor,
-              statusConfig.color,
-            )}
-          >
-            <StatusIcon className="h-3 w-3" />
-            {statusConfig.label}
-          </div>
+          <StatusBadge status={invoice.status || "Draft"} size="sm" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">
-              Billing Date
+            <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
+              Posting Date
             </p>
-            <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+            <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-              {formatDate(invoice.posting_date)}
+              {invoice.posting_date
+                ? new Date(invoice.posting_date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—"}
             </p>
           </div>
           <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">
-              Liability Type
+            <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
+              Grand Total
             </p>
-            <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="truncate">{invoice.company}</span>
+            <p className="text-sm font-bold text-foreground">
+              {ETB.format(invoice.grand_total ?? 0)}
             </p>
           </div>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-rose-600" />
+            <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mb-0.5">
+              <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
                 Outstanding
               </p>
-              <p className="text-lg font-black text-foreground tracking-tight">
-                {formatCurrency(invoice.outstanding_amount)}
+              <p className="text-lg font-bold text-foreground">
+                {ETB.format(invoice.outstanding_amount ?? 0)}
               </p>
             </div>
           </div>
@@ -208,17 +144,17 @@ function PurchaseInvoiceCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-xl border-border bg-card/50 opacity-0 group-hover:opacity-100 transition-all"
+                className="h-9 w-9 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="rounded-2xl border-border/50 shadow-xl bg-card p-1.5 min-w-[180px]"
+              className="rounded-xl border-border/50 shadow-xl bg-card p-1.5 min-w-[160px]"
             >
               <DropdownMenuItem
-                className="rounded-xl cursor-pointer"
+                className="rounded-lg cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   onView();
@@ -227,23 +163,11 @@ function PurchaseInvoiceCard({
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </DropdownMenuItem>
-              {isEditable && (
-                <DropdownMenuItem
-                  className="rounded-xl cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-              )}
-              {isDeletable && (
+              {isDraft && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="rounded-xl cursor-pointer text-destructive focus:text-destructive"
+                    className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
                       onDelete();
@@ -304,7 +228,7 @@ export default function PurchaseInvoiceListPage() {
   }, [invoices, statusFilter]);
 
   const statusCounts = useMemo(() => {
-    if (!invoices) return {};
+    if (!invoices) return {} as Record<string, number>;
     return invoices.reduce(
       (acc, inv) => {
         const status = inv.status || "Draft";
@@ -315,20 +239,36 @@ export default function PurchaseInvoiceListPage() {
     );
   }, [invoices]);
 
+  const kpis = useMemo(() => {
+    if (!invoices) return { total: 0, unpaid: 0, overdue: 0, paid: 0 };
+    return {
+      total: invoices.length,
+      unpaid: invoices.filter((i) => i.status === "Unpaid").length,
+      overdue: invoices.filter((i) => i.status === "Overdue").length,
+      paid: invoices.filter((i) => i.status === "Paid").length,
+    };
+  }, [invoices]);
+
   if (isLoading) return <LoadingState type="cards" count={6} />;
+  if (error)
+    return (
+      <div className="p-8 text-center text-destructive">
+        Failed to load purchase invoices
+      </div>
+    );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <PageHeader
         title="Purchase Invoices"
-        subtitle="Track vendor bills and manage outgoing payments"
+        subtitle={`${filteredInvoices.length} invoice${filteredInvoices.length !== 1 ? "s" : ""}`}
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Invoice # or supplier..."
         actions={
           <Button
-            className="rounded-full shadow-xl shadow-primary/20 h-10 px-6 font-bold"
+            className="rounded-full shadow-lg shadow-primary/20"
             onClick={() => router.push("/accounting/purchase-invoice/new")}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -337,31 +277,58 @@ export default function PurchaseInvoiceListPage() {
         }
       />
 
+      {/* KPI Bar */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KPICard
+          title="Total Bills"
+          value={kpis.total}
+          icon={FileText}
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Unpaid"
+          value={kpis.unpaid}
+          icon={Clock}
+          variant="warning"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Overdue"
+          value={kpis.overdue}
+          icon={DollarSign}
+          variant="danger"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Paid"
+          value={kpis.paid}
+          icon={DollarSign}
+          variant="success"
+          isLoading={isLoading}
+        />
+      </div>
+
+      {/* Status Filter Pills */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all", label: "All Bills", count: invoices?.length || 0 },
+          { key: "all", label: "All", count: invoices?.length || 0 },
+          { key: "Draft", label: "Draft", count: statusCounts.Draft || 0 },
           { key: "Unpaid", label: "Unpaid", count: statusCounts.Unpaid || 0 },
           { key: "Paid", label: "Paid", count: statusCounts.Paid || 0 },
           {
             key: "Overdue",
             label: "Overdue",
-            count: statusCounts.Overdue || 0,
-          },
-          {
-            key: "Draft",
-            label: "Draft Bills",
-            count: statusCounts.Draft || 0,
-          },
+            count: statusCounts.Overdue || 0 },
         ].map((status) => (
           <Button
             key={status.key}
             variant={statusFilter === status.key ? "default" : "outline"}
             size="sm"
             className={cn(
-              "rounded-full gap-2 transition-all font-bold px-4",
+              "rounded-full gap-2 transition-all",
               statusFilter === status.key
                 ? "shadow-lg shadow-primary/20"
-                : "hover:bg-secondary/80 bg-card",
+                : "hover:bg-secondary/80",
             )}
             onClick={() => setStatusFilter(status.key)}
           >
@@ -369,7 +336,7 @@ export default function PurchaseInvoiceListPage() {
             <Badge
               variant="secondary"
               className={cn(
-                "h-5 min-w-[20px] px-1.5 text-[10px] font-black",
+                "h-5 min-w-[20px] px-1.5 text-[10px] font-bold",
                 statusFilter === status.key
                   ? "bg-primary-foreground/20 text-primary-foreground"
                   : "bg-secondary",
@@ -381,6 +348,7 @@ export default function PurchaseInvoiceListPage() {
         ))}
       </div>
 
+      {/* Card Grid */}
       {!invoices || invoices.length === 0 ? (
         <EmptyState
           title="No purchase invoices"
@@ -395,14 +363,14 @@ export default function PurchaseInvoiceListPage() {
           }
         />
       ) : filteredInvoices.length === 0 ? (
-        <div className="text-center py-24 border-2 border-dashed border-border rounded-[2.5rem] bg-card/10">
-          <FileText className="h-16 w-16 mx-auto mb-6 opacity-10" />
-          <p className="text-muted-foreground font-black uppercase tracking-widest text-sm">
-            No bills found for this category
+        <div className="text-center py-20 border-2 border-dashed border-border rounded-[2.5rem]">
+          <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-muted-foreground font-medium">
+            No invoices match this filter
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredInvoices.map((inv, i) => (
             <PurchaseInvoiceCard
               key={inv.name}
@@ -411,11 +379,6 @@ export default function PurchaseInvoiceListPage() {
               onView={() =>
                 router.push(
                   `/accounting/purchase-invoice/${encodeURIComponent(inv.name)}`,
-                )
-              }
-              onEdit={() =>
-                router.push(
-                  `/accounting/purchase-invoice/${encodeURIComponent(inv.name)}/edit`,
                 )
               }
               onDelete={() => setDeleteTarget(inv)}
@@ -428,7 +391,7 @@ export default function PurchaseInvoiceListPage() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete Bill"
-        description={`Are you sure you want to delete bill "${deleteTarget?.name}"? This action reverses any draft ledger impacts.`}
+        description={`Are you sure you want to delete bill "${deleteTarget?.name}"? This action cannot be undone.`}
         onConfirm={() => deleteMutation.mutate(deleteTarget!.name)}
         loading={deleteMutation.isPending}
       />

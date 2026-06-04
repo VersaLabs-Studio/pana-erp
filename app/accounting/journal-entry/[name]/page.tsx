@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   FileText,
   Printer,
@@ -14,7 +13,6 @@ import {
   Building2,
   MoreVertical,
   BookOpen,
-  Receipt,
   Download,
   Calendar,
   AlertCircle,
@@ -35,8 +33,8 @@ import {
   useFrappeUpdate,
   useFrappeDelete,
 } from "@/hooks/generic";
-import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
-import { DataPoint } from "@/components/ui/info-card";
+import { PageHeader, LoadingState, ConfirmDialog, StatusBadge } from "@/components/smart";
+import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Card } from "@/components/ui/card";
 import type { JournalEntry } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
@@ -57,19 +55,16 @@ export default function JournalEntryDetailPage() {
   const router = useRouter();
   const name = decodeURIComponent(params.name as string);
 
-  // States
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Fetch Entry
   const {
     data: entry,
     isLoading,
     refetch,
   } = useFrappeDoc<JournalEntry>("Journal Entry", name);
 
-  // Mutations
   const updateMutation = useFrappeUpdate<{ data: JournalEntry }, any>(
     "Journal Entry",
     {
@@ -128,24 +123,10 @@ export default function JournalEntryDetailPage() {
         title={entry.name}
         subtitle={
           <div className="flex items-center gap-2">
-            <Badge
-              className={cn(
-                "text-xs font-black uppercase tracking-widest border-0",
-                isSubmitted
-                  ? "bg-emerald-100 text-emerald-700"
-                  : isCancelled
-                    ? "bg-gray-100 text-gray-600"
-                    : "bg-slate-100 text-slate-700",
-              )}
-            >
-              {isSubmitted ? "Submitted" : isCancelled ? "Cancelled" : "Draft"}
-            </Badge>
-            <Badge
-              variant="outline"
-              className="text-[10px] font-black uppercase tracking-widest"
-            >
+            <StatusBadge status={entry.docstatus ?? 0} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground border border-border rounded-full px-2.5 py-0.5">
               {entry.voucher_type}
-            </Badge>
+            </span>
           </div>
         }
         backUrl="/accounting/journal-entry"
@@ -216,21 +197,21 @@ export default function JournalEntryDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
           <div className="bg-card rounded-[2.5rem] border border-border shadow-2xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-10 opacity-5 select-none text-blue-600">
+            <div className="absolute top-0 right-0 p-10 opacity-5 select-none text-primary">
               <BookOpen className="w-40 h-40" />
             </div>
 
-            <div className="p-10 border-b border-border bg-gradient-to-br from-blue-500/5 to-transparent">
+            <div className="p-10 border-b border-border bg-gradient-to-br from-primary/5 to-transparent">
               <div className="flex flex-col md:flex-row justify-between gap-8">
                 <div>
-                  <h2 className="text-sm font-black uppercase tracking-[0.4em] text-blue-600 mb-2">
+                  <h2 className="text-sm font-black uppercase tracking-[0.4em] text-primary mb-2">
                     Voucher Entry
                   </h2>
                   <h1 className="text-4xl font-black tracking-tight">
                     {entry.name}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-4 font-bold flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-blue-600" />{" "}
+                    <Building2 className="w-4 h-4 text-primary" />{" "}
                     {entry.company}
                   </p>
                 </div>
@@ -240,7 +221,7 @@ export default function JournalEntryDetailPage() {
                       Posting Date
                     </p>
                     <p className="font-bold flex items-center md:justify-end gap-2">
-                      <Calendar className="w-4 h-4 text-blue-600" />{" "}
+                      <Calendar className="w-4 h-4 text-primary" />{" "}
                       {formatDate(entry.posting_date)}
                     </p>
                   </div>
@@ -248,7 +229,7 @@ export default function JournalEntryDetailPage() {
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                       Status
                     </p>
-                    <p className="font-bold text-emerald-600 flex items-center md:justify-end gap-2">
+                    <p className="font-bold text-success flex items-center md:justify-end gap-2">
                       <Clock className="w-4 h-4" /> Real-time Audit
                     </p>
                   </div>
@@ -275,14 +256,14 @@ export default function JournalEntryDetailPage() {
                   {accounts.map((acc, i) => (
                     <tr
                       key={i}
-                      className="hover:bg-blue-500/5 transition-colors group"
+                      className="hover:bg-primary/5 transition-colors group"
                     >
                       <td className="px-10 py-6">
                         <p className="font-black text-foreground">
                           {acc.account}
                         </p>
                         {acc.party && (
-                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 group-hover:text-blue-600 transition-colors">
+                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 group-hover:text-primary transition-colors">
                             {acc.party_type}: {acc.party}
                           </p>
                         )}
@@ -292,10 +273,10 @@ export default function JournalEntryDetailPage() {
                           </p>
                         )}
                       </td>
-                      <td className="px-6 py-6 text-right font-black text-emerald-600">
+                      <td className="px-6 py-6 text-right font-black text-success">
                         {acc.debit > 0 ? formatCurrency(acc.debit) : "—"}
                       </td>
-                      <td className="px-10 py-6 text-right font-black text-rose-600">
+                      <td className="px-10 py-6 text-right font-black text-destructive">
                         {acc.credit > 0 ? formatCurrency(acc.credit) : "—"}
                       </td>
                     </tr>
@@ -306,11 +287,11 @@ export default function JournalEntryDetailPage() {
                     <td className="px-10 py-6 text-right uppercase tracking-[0.2em] text-[10px] text-muted-foreground">
                       Total Balanced
                     </td>
-                    <td className="px-6 py-6 text-right text-emerald-600">
-                      {formatCurrency(entry.total_debit)}
+                    <td className="px-6 py-6 text-right text-success">
+                      {formatCurrency(entry.total_debit ?? 0)}
                     </td>
-                    <td className="px-10 py-6 text-right text-rose-600">
-                      {formatCurrency(entry.total_credit)}
+                    <td className="px-10 py-6 text-right text-destructive">
+                      {formatCurrency(entry.total_credit ?? 0)}
                     </td>
                   </tr>
                 </tfoot>
@@ -333,7 +314,7 @@ export default function JournalEntryDetailPage() {
         <div className="lg:col-span-4 space-y-6">
           <Card className="rounded-[2.5rem] p-8 border-border/50 bg-card/30 backdrop-blur-sm space-y-6 shadow-sm">
             <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-3 border-b border-border pb-4">
-              <HistoryIcon className="w-4 h-4 text-blue-600" /> Audit Trail
+              <HistoryIcon className="w-4 h-4 text-primary" /> Audit Trail
             </h3>
             <div className="space-y-4">
               <DataPoint label="Authorized By" value={entry.owner} />

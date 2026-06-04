@@ -1,374 +1,580 @@
 "use client";
 
-import { useMemo, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
+  UserRound,
+  Package,
+  ClipboardCheck,
   Plus,
   Trash2,
-  Loader2,
-  FileText,
-  MapPin,
-  Calculator,
-  Briefcase,
-  Building2,
-  Package,
-  CreditCard,
+  Lock,
 } from "lucide-react";
-import { useFrappeCreate, useFrappeList, useFrappeDoc } from "@/hooks/generic";
+
 import { PageHeader } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   FormInput,
-  FormSelect,
   FormFrappeSelect,
   FormDatePicker,
 } from "@/components/form";
-import { SalesInvoiceCreateSchema } from "@/lib/schemas/doctype-schemas";
-import type { SalesInvoice, Customer } from "@/types/doctype-types";
+import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
+import { FlowWizard } from "@/components/flows/FlowWizard";
+import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import {
+  getAutoFillMapping,
+  applyAutoFill,
+  applyItemAutoFill,
+} from "@/lib/flows/flow-auto-fill";
+import { validateWizardStep } from "@/lib/flows/flow-validation";
+import type { StepValidationResult } from "@/lib/flows/flow-validation";
+import type { WizardStep } from "@/types/flow-types";
+import type { DeliveryNote } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-export default function CreateSalesInvoicePage() {
-  const router = useRouter();
+interface SIItem {
+  item_code: string;
+  item_name?: string;
+  description?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  uom?: string;
+}
 
-  const form = useForm({
-    resolver: zodResolver(SalesInvoiceCreateSchema),
+interface SIForm {
+  naming_series: string;
+  customer: string;
+  customer_name?: string;
+  company: string;
+  posting_date: string;
+  due_date: string;
+  delivery_note?: string;
+  currency: string;
+  conversion_rate: number;
+  selling_price_list?: string;
+  debit_to: string;
+  cost_center?: string;
+  items: SIItem[];
+}
+
+const EMPTY_ITEM: SIItem = {
+  item_code: "",
+  item_name: "",
+  description: "",
+  qty: 1,
+  rate: 0,
+  amount: 0,
+  uom: "Nos",
+};
+
+const WIZARD_STEPS: WizardStep[] = [
+  {
+    id: "step1",
+    label: "Customer & Source",
+    description: "Confirm the customer and invoice dates",
+    schema: null,
+    fields: ["customer", "company", "posting_date", "due_date", "delivery_note"],
+    icon: "UserRound",
+  },
+  {
+    id: "step2",
+    label: "Items & Taxes",
+    description: "Review and adjust the invoice items",
+    schema: null,
+    fields: ["items"],
+    icon: "Package",
+  },
+  {
+    id: "step3",
+    label: "Review & Submit",
+    description: "Review the invoice before creating it",
+    schema: null,
+    fields: [],
+    icon: "ClipboardCheck",
+  },
+];
+
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
+
+export default function NewSalesInvoicePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deliveryNoteId = searchParams.get("delivery_note");
+
+  const [step, setStep] = useState(0);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const form = useForm<SIForm>({
     defaultValues: {
       naming_series: "ACC-SINV-.YYYY.-",
       customer: "",
+      company: "",
       posting_date: new Date().toISOString().split("T")[0],
       due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0],
-      company: "",
       currency: "ETB",
       conversion_rate: 1,
+      selling_price_list: "Standard Selling",
       debit_to: "",
-      cost_center: "",
-      items: [{ item_code: "", description: "", qty: 1, rate: 0 }],
-      taxes_and_charges: "",
-      terms: "",
+      items: [{ ...EMPTY_ITEM }],
     },
   });
 
-  const { control, handleSubmit, watch, setValue } = form;
+  const { control, getValues, reset, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-  const watchedItems = useWatch({ control, name: "items" });
-  const selectedCustomer = watch("customer");
+  const watchedAll = useWatch({ control });
+  const watchedItems = watchedAll?.items ?? [];
+  const watchedCustomer = watchedAll?.customer ?? "";
 
-  const { data: customerData } = useFrappeDoc<Customer>(
-    "Customer",
-    selectedCustomer || "",
-    { enabled: !!selectedCustomer },
-  );
+  const { data: deliveryNote, isLoading: loadingDN } =
+    useFrappeDoc<DeliveryNote>("Delivery Note", deliveryNoteId ?? "", {
+      enabled: !!deliveryNoteId,
+    });
 
   useEffect(() => {
-    if (customerData) {
-      if (customerData.customer_primary_address) {
-        // setValue("customer_address", customerData.customer_primary_address);
-      }
-    }
-  }, [customerData, setValue]);
+    if (!deliveryNote) return;
+    const mapping = getAutoFillMapping("Delivery Note", "Sales Invoice");
+    if (!mapping) return;
 
-  const subtotal = useMemo(() => {
-    if (!watchedItems || !Array.isArray(watchedItems)) return 0;
-    return watchedItems.reduce((acc, item) => {
-      const qty = Number(item?.qty) || 0;
-      const rate = Number(item?.rate) || 0;
-      return acc + qty * rate;
-    }, 0);
-  }, [watchedItems]);
+    const header = applyAutoFill(
+      deliveryNote as unknown as Record<string, unknown>,
+      mapping,
+    );
+    const items = applyItemAutoFill(
+      (deliveryNote as { items?: Record<string, unknown>[] }).items ?? [],
+      mapping,
+    ) as unknown as SIItem[];
 
-  const formatCurrency = useCallback((amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: "ETB",
-    }).format(amount || 0);
-  }, []);
+    reset({
+      ...getValues(),
+      ...(header as Partial<SIForm>),
+      items: items.length ? items : [{ ...EMPTY_ITEM }],
+      due_date: "",
+    });
 
-  const createMutation = useFrappeCreate<{ data: SalesInvoice }, any>(
-    "Sales Invoice",
-    {
-      onSuccess: (data) =>
-        router.push(
-          `/accounting/sales-invoice/${encodeURIComponent(data.data.name)}`,
-        ),
-    },
+    const filled = new Set<string>([
+      ...mapping.headerMappings
+        .filter((m) => m.isReadOnly)
+        .map((m) => m.targetField),
+      "items",
+    ]);
+    setAutoFilledFields(filled);
+
+    toast.success(`Loaded from Delivery Note ${deliveryNoteId}`, {
+      description: "Set the due date to continue.",
+    });
+  }, [deliveryNote, deliveryNoteId, reset, getValues]);
+
+  const isAuto = useCallback(
+    (field: string) => autoFilledFields.has(field),
+    [autoFilledFields],
   );
 
-  const onSubmit = async (values: any) => {
-    const validItems = (values.items || []).filter(
-      (item: any) => item.item_code && item.qty > 0,
-    );
+  const subtotal = useMemo(
+    () =>
+      (watchedItems ?? []).reduce(
+        (sum, it) => sum + (Number(it?.qty) || 0) * (Number(it?.rate) || 0),
+        0,
+      ),
+    [watchedItems],
+  );
 
-    if (validItems.length === 0) {
-      form.setError("items", {
-        type: "manual",
-        message: "At least one item is required",
-      });
+  const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
+    return {
+      step1: validateWizardStep("Sales Invoice", "step1", values),
+      step2: validateWizardStep("Sales Invoice", "step2", values),
+      step3: { valid: true, errors: {} },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedAll]);
+
+  const createMutation = useFrappeCreate<
+    { data: { name: string } },
+    Record<string, unknown>
+  >("Sales Invoice", {
+    successMessage: "Sales Invoice created",
+    onSuccess: (res) => {
+      const name = res?.data?.name;
+      if (name) {
+        router.push(`/accounting/sales-invoice/${encodeURIComponent(name)}`);
+      }
+    },
+  });
+
+  const handleSubmit = useCallback(() => {
+    const values = getValues();
+    const items = (values.items ?? []).filter(
+      (it) => it.item_code && Number(it.qty) > 0,
+    );
+    if (items.length === 0) {
+      toast.error("Add at least one valid item before creating the invoice.");
+      setStep(1);
       return;
     }
-
-    const payload = {
+    createMutation.mutate({
       ...values,
-      items: validItems,
-    };
-    await createMutation.mutateAsync(payload);
-  };
+      items: items.map((it) => ({
+        ...it,
+        amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
+      })),
+      conversion_rate: 1,
+      currency: "ETB",
+    });
+  }, [createMutation, getValues]);
 
   return (
-    <div className="space-y-8 pb-24 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-12">
       <PageHeader
         title="New Sales Invoice"
-        subtitle="Generate a professional billing statement for your clients"
-        backUrl="/accounting/sales-invoice"
+        subtitle={
+          deliveryNoteId
+            ? `From Delivery Note ${deliveryNoteId}`
+            : "Create a sales invoice in three steps"
+        }
+        backHref="/accounting/sales-invoice"
       />
 
       <Form {...form}>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <InfoCard
-            title="Entity & Schedule"
-            icon={<Briefcase className="h-4 w-4" />}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <FormFrappeSelect
-                control={control}
-                name="company"
-                label="Company"
-                required
-                doctype="Company"
-                labelField="company_name"
-                placeholder="Select company..."
-              />
-              <FormFrappeSelect
-                control={control}
-                name="customer"
-                label="Customer"
-                required
-                doctype="Customer"
-                labelField="customer_name"
-                placeholder="Search customers..."
-              />
-              <FormDatePicker
-                control={control}
-                name="posting_date"
-                label="Posting Date"
-                required
-              />
-              <FormDatePicker
-                control={control}
-                name="due_date"
-                label="Payment Due Date"
-                required
-              />
-            </div>
-          </InfoCard>
+        <InfoCard className="max-w-3xl">
+          <FlowWizard
+            steps={WIZARD_STEPS}
+            formData={watchedAll as unknown as Record<string, unknown>}
+            validationResults={validationResults}
+            isSubmitting={createMutation.isPending}
+            onFormDataChange={() => {}}
+            onStepChange={setStep}
+            onSubmit={handleSubmit}
+            onCancel={() => router.back()}
+            submitLabel="Create Sales Invoice"
+            submittingLabel="Creating..."
+            renderStep={(s) => {
+              if (s.id === "step1") {
+                return (
+                  <div className="space-y-6">
+                    <StepHeading
+                      icon={<UserRound className="h-5 w-5 text-primary" />}
+                      title="Customer & Source"
+                      description="Confirm who this invoice is for and set the dates."
+                    />
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <FieldWrap
+                        auto={isAuto("customer")}
+                        loading={loadingDN}
+                      >
+                        <FormFrappeSelect
+                          control={control}
+                          name="customer"
+                          label="Customer"
+                          required
+                          doctype="Customer"
+                          labelField="customer_name"
+                          placeholder="Search customer..."
+                          disabled={isAuto("customer")}
+                        />
+                      </FieldWrap>
+                      <FieldWrap auto={isAuto("company")}>
+                        <FormFrappeSelect
+                          control={control}
+                          name="company"
+                          label="Company"
+                          required
+                          doctype="Company"
+                          labelField="company_name"
+                          placeholder="Select company..."
+                          disabled={isAuto("company")}
+                        />
+                      </FieldWrap>
+                      <FormDatePicker
+                        control={control}
+                        name="posting_date"
+                        label="Posting Date"
+                        required
+                      />
+                      <FormDatePicker
+                        control={control}
+                        name="due_date"
+                        label="Due Date"
+                        required
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="debit_to"
+                        label="Receivable Account"
+                        required
+                        doctype="Account"
+                        filters={[
+                          ["account_type", "=", "Receivable"],
+                          ["is_group", "=", 0],
+                        ]}
+                        placeholder="Select account..."
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="cost_center"
+                        label="Cost Center"
+                        doctype="Cost Center"
+                        filters={[["is_group", "=", 0]]}
+                        placeholder="Select cost center..."
+                      />
+                    </div>
+                  </div>
+                );
+              }
 
-          <InfoCard
-            title="Accounting Configuration"
-            icon={<CreditCard className="h-4 w-4" />}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormFrappeSelect
-                control={control}
-                name="debit_to"
-                label="Receivable Account (Debit To)"
-                required
-                doctype="Account"
-                filters={[
-                  ["account_type", "=", "Receivable"],
-                  ["is_group", "=", 0],
-                ]}
-                placeholder="Select account..."
-              />
-              <FormFrappeSelect
-                control={control}
-                name="cost_center"
-                label="Cost Center"
-                doctype="Cost Center"
-                filters={[["is_group", "=", 0]]}
-                placeholder="Select cost center..."
-              />
-            </div>
-          </InfoCard>
+              if (s.id === "step2") {
+                return (
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <StepHeading
+                        icon={<Package className="h-5 w-5 text-primary" />}
+                        title="Invoice Items"
+                        description="Adjust quantities and rates as needed."
+                      />
+                      {isAuto("items") && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <Lock className="h-3 w-3" />
+                          Auto-filled
+                        </span>
+                      )}
+                    </div>
 
-          <InfoCard
-            title="Invoice Items"
-            icon={<Package className="h-4 w-4" />}
-          >
-            <div className="rounded-[2rem] border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-secondary/20 border-b border-border">
-                    <tr>
-                      <th className="px-6 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[30%]">
-                        Item / Service
-                      </th>
-                      <th className="px-6 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[40%]">
-                        Description
-                      </th>
-                      <th className="px-4 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[10%] text-right">
-                        Qty
-                      </th>
-                      <th className="px-4 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[15%] text-right">
-                        Rate (ETB)
-                      </th>
-                      <th className="px-6 py-4 w-12 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {fields.map((field, index) => {
-                      return (
-                        <tr
-                          key={field.id}
-                          className="group hover:bg-secondary/10 transition-colors"
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-card/40 backdrop-blur-sm">
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-border/60 bg-secondary/20">
+                          <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            <th className="px-3 py-2.5 text-left font-semibold">Item</th>
+                            <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+                            <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
+                            <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                            <th className="w-10" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {fields.map((field, index) => {
+                            const qty = Number(watchedItems?.[index]?.qty) || 0;
+                            const rate = Number(watchedItems?.[index]?.rate) || 0;
+                            return (
+                              <tr key={field.id} className="group">
+                                <td className="px-3 py-2 align-top">
+                                  <FormFrappeSelect
+                                    control={control}
+                                    name={`items.${index}.item_code`}
+                                    doctype="Item"
+                                    hideLabel
+                                    placeholder="Item..."
+                                    extraFields={[
+                                      "standard_rate",
+                                      "stock_uom",
+                                      "item_name",
+                                      "description",
+                                    ]}
+                                    onValueChange={(_val, doc) => {
+                                      if (doc) {
+                                        setValue(
+                                          `items.${index}.rate`,
+                                          Number(doc.standard_rate) || 0,
+                                        );
+                                        setValue(
+                                          `items.${index}.uom`,
+                                          doc.stock_uom || "Nos",
+                                        );
+                                        setValue(
+                                          `items.${index}.item_name`,
+                                          doc.item_name || "",
+                                        );
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 align-top">
+                                  <NumberCell
+                                    control={control}
+                                    name={`items.${index}.qty`}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 align-top">
+                                  <NumberCell
+                                    control={control}
+                                    name={`items.${index}.rate`}
+                                  />
+                                </td>
+                                <td className="px-3 py-3 text-right align-middle font-semibold tabular-nums text-foreground">
+                                  {ETB.format(qty * rate)}
+                                </td>
+                                <td className="px-2 py-2 text-center align-middle">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                    onClick={() => remove(index)}
+                                    disabled={fields.length === 1}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="flex items-center justify-between border-t border-border/60 bg-secondary/10 px-3 py-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full border-dashed"
+                          onClick={() => append({ ...EMPTY_ITEM })}
                         >
-                          <td className="p-4 align-top">
-                            <FormFrappeSelect
-                              control={control}
-                              name={`items.${index}.item_code`}
-                              doctype="Item"
-                              placeholder="Search item..."
-                              hideLabel
-                              className="h-10 rounded-xl bg-secondary/30 border-0"
-                            />
-                          </td>
-                          <td className="p-4 align-top">
-                            <FormField
-                              control={control}
-                              name={`items.${index}.description`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Textarea
-                                      {...field}
-                                      className="min-h-[80px] rounded-xl bg-secondary/30 border-0 text-sm resize-none focus:bg-card transition-all"
-                                      placeholder="Details..."
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          </td>
-                          <td className="p-4 align-top">
-                            <FormField
-                              control={control}
-                              name={`items.${index}.qty`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      type="number"
-                                      min="0"
-                                      className="h-10 rounded-xl bg-secondary/30 border-0 text-right font-bold"
-                                      onChange={(e) =>
-                                        field.onChange(Number(e.target.value))
-                                      }
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          </td>
-                          <td className="p-4 align-top">
-                            <FormField
-                              control={control}
-                              name={`items.${index}.rate`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      type="number"
-                                      min="0"
-                                      className="h-10 rounded-xl bg-secondary/30 border-0 text-right font-bold"
-                                      onChange={(e) =>
-                                        field.onChange(Number(e.target.value))
-                                      }
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          </td>
-                          <td className="p-4 align-top text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                              onClick={() => remove(index)}
-                              disabled={fields.length === 1}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          <Plus className="mr-1.5 h-4 w-4" /> Add Item
+                        </Button>
+                        <div className="text-right">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            Subtotal
+                          </p>
+                          <p className="text-xl font-bold tabular-nums text-foreground">
+                            {ETB.format(subtotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
-              <div className="p-6 bg-secondary/5 border-t border-border flex justify-between items-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full px-6 border-dashed"
-                  onClick={() =>
-                    append({ item_code: "", description: "", qty: 1, rate: 0 })
-                  }
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Item
-                </Button>
-
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">
-                    Subtotal (Net)
-                  </p>
-                  <p className="text-3xl font-black text-primary">
-                    {formatCurrency(subtotal)}
-                  </p>
+              const v = getValues();
+              return (
+                <div className="space-y-5">
+                  <StepHeading
+                    icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
+                    title="Review & Confirm"
+                    description="Confirm the details below to create the invoice."
+                  />
+                  <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <Summary label="Customer" value={v.customer_name || v.customer} />
+                      <Summary label="Company" value={v.company} />
+                      <Summary label="Posting Date" value={v.posting_date} />
+                      <Summary label="Due Date" value={v.due_date} />
+                    </div>
+                    <div className="mt-4 border-t border-border/60 pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {(watchedItems ?? []).filter((i) => i?.item_code).length}{" "}
+                          item(s)
+                        </span>
+                        <div className="text-right">
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            Grand Total
+                          </span>
+                          <p className="text-2xl font-bold tabular-nums text-primary">
+                            {ETB.format(subtotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </InfoCard>
-
-          <div className="flex justify-end gap-3 sticky bottom-6 z-10 glass-card p-4 rounded-[2rem] shadow-2xl">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full px-10"
-              onClick={() => router.push("/accounting/sales-invoice")}
-            >
-              Discard Changes
-            </Button>
-            <Button
-              type="submit"
-              className="rounded-full px-12 shadow-lg shadow-primary/20"
-              disabled={createMutation.isPending}
-            >
-              {createMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Save Invoice
-            </Button>
-          </div>
-        </form>
+              );
+            }}
+          />
+        </InfoCard>
       </Form>
     </div>
+  );
+}
+
+function StepHeading({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+        {icon}
+      </div>
+      <div>
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function FieldWrap({
+  auto,
+  loading,
+  children,
+}: {
+  auto?: boolean;
+  loading?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("relative", loading && "animate-pulse")}>
+      {children}
+      {auto && (
+        <span className="pointer-events-none absolute right-2 top-0 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <Lock className="h-3 w-3" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Summary({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className="font-medium text-foreground">{value || "\u2014"}</p>
+    </div>
+  );
+}
+
+function NumberCell({
+  control,
+  name,
+}: {
+  control: ReturnType<typeof useForm<SIForm>>["control"];
+  name: `items.${number}.qty` | `items.${number}.rate`;
+}) {
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormControl>
+            <Input
+              {...field}
+              type="number"
+              inputMode="decimal"
+              className="h-10 rounded-lg border-0 bg-secondary/30 text-right tabular-nums"
+              onChange={(e) => field.onChange(Number(e.target.value))}
+            />
+          </FormControl>
+        </FormItem>
+      )}
+    />
   );
 }

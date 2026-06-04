@@ -1,97 +1,89 @@
 // components/smart/status-badge.tsx
-// Pana ERP v3.0 - Auto-colored Status Badge Component
+// Obsidian ERP v4.0 - Auto-colored Status Badge Component
+// Uses semantic OKLCH tokens only — no raw Tailwind color classes.
 
 import { cn } from "@/lib/utils";
 
+type Accent = "neutral" | "info" | "warning" | "success" | "danger";
+
 /**
- * Status configuration with auto-coloring based on ERP conventions
+ * Accent → CSS class mapping using semantic tokens.
  */
-const statusConfig: Record<string, { label: string; className: string }> = {
-  // Document Status (docstatus)
-  draft: {
-    label: "Draft",
-    className: "bg-zinc-100 text-zinc-600 border-zinc-200",
-  },
-  submitted: {
-    label: "Submitted",
-    className: "bg-blue-50 text-blue-600 border-blue-200",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "bg-red-50 text-red-600 border-red-200",
-  },
+const ACCENT_CLASSES: Record<Accent, string> = {
+  neutral: "bg-muted text-muted-foreground border-border",
+  info: "bg-info/10 text-info border-info/20",
+  warning: "bg-warning/10 text-warning border-warning/20",
+  success: "bg-success/10 text-success border-success/20",
+  danger: "bg-destructive/10 text-destructive border-destructive/20",
+};
 
-  // Active/Inactive
-  active: {
-    label: "Active",
-    className: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  },
-  enabled: {
-    label: "Enabled",
-    className: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  },
-  disabled: {
-    label: "Disabled",
-    className: "bg-zinc-100 text-zinc-500 border-zinc-200",
-  },
-  inactive: {
-    label: "Inactive",
-    className: "bg-zinc-100 text-zinc-500 border-zinc-200",
-  },
+/**
+ * Status → accent mapping.
+ */
+const STATUS_ACCENT: Record<string, { accent: Accent; label: string }> = {
+  // Document status (docstatus)
+  draft: { accent: "neutral", label: "Draft" },
+  submitted: { accent: "info", label: "Submitted" },
+  cancelled: { accent: "danger", label: "Cancelled" },
 
-  // Workflow states
-  pending: {
-    label: "Pending",
-    className: "bg-amber-50 text-amber-600 border-amber-200",
-  },
-  approved: {
-    label: "Approved",
-    className: "bg-green-50 text-green-600 border-green-200",
-  },
-  rejected: {
-    label: "Rejected",
-    className: "bg-red-50 text-red-600 border-red-200",
-  },
-  completed: {
-    label: "Completed",
-    className: "bg-green-50 text-green-600 border-green-200",
-  },
-  "in progress": {
-    label: "In Progress",
-    className: "bg-blue-50 text-blue-600 border-blue-200",
-  },
+  // Sales Order statuses
+  "to deliver and bill": { accent: "warning", label: "To Deliver & Bill" },
+  "to deliver": { accent: "warning", label: "To Deliver" },
+  "to bill": { accent: "warning", label: "To Bill" },
+  completed: { accent: "success", label: "Completed" },
+  closed: { accent: "neutral", label: "Closed" },
 
-  // Stock specific
-  "in stock": {
-    label: "In Stock",
-    className: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  },
-  "out of stock": {
-    label: "Out of Stock",
-    className: "bg-red-50 text-red-600 border-red-200",
-  },
-  "low stock": {
-    label: "Low Stock",
-    className: "bg-amber-50 text-amber-600 border-amber-200",
-  },
+  // Quotation statuses
+  open: { accent: "info", label: "Open" },
+  "partially ordered": { accent: "warning", label: "Partially Ordered" },
+  ordered: { accent: "success", label: "Ordered" },
+  lost: { accent: "danger", label: "Lost" },
+  expired: { accent: "danger", label: "Expired" },
+
+  // Material Request statuses
+  pending: { accent: "warning", label: "Pending" },
+  "partially received": { accent: "warning", label: "Partially Received" },
+  received: { accent: "success", label: "Received" },
+  issued: { accent: "success", label: "Issued" },
+  transferred: { accent: "success", label: "Transferred" },
+  stopped: { accent: "danger", label: "Stopped" },
+
+  // Delivery Note
+  "return": { accent: "danger", label: "Return" },
+  "return issued": { accent: "danger", label: "Return Issued" },
+
+  // Payment / Invoice
+  unpaid: { accent: "warning", label: "Unpaid" },
+  paid: { accent: "success", label: "Paid" },
+  "partly paid": { accent: "warning", label: "Partly Paid" },
+  overdue: { accent: "danger", label: "Overdue" },
+
+  // Generic
+  active: { accent: "success", label: "Active" },
+  enabled: { accent: "success", label: "Enabled" },
+  disabled: { accent: "neutral", label: "Disabled" },
+  inactive: { accent: "neutral", label: "Inactive" },
+  approved: { accent: "success", label: "Approved" },
+  rejected: { accent: "danger", label: "Rejected" },
+  "in progress": { accent: "info", label: "In Progress" },
+  "in stock": { accent: "success", label: "In Stock" },
+  "out of stock": { accent: "danger", label: "Out of Stock" },
+  "low stock": { accent: "warning", label: "Low Stock" },
+
+  // Work Order
+  "not started": { accent: "neutral", label: "Not Started" },
+  "in process": { accent: "info", label: "In Process" },
 };
 
 interface StatusBadgeProps {
-  /** Status value - will be auto-colored if recognized */
   status: string | number;
-  /** Custom label override */
   label?: string;
-  /** Additional CSS classes */
   className?: string;
-  /** Size variant */
   size?: "sm" | "default" | "lg";
 }
 
 /**
- * Auto-colored Status Badge component
- *
- * Automatically applies styling based on common ERP status values.
- * For docstatus numbers: 0 = Draft, 1 = Submitted, 2 = Cancelled
+ * Auto-colored Status Badge using semantic OKLCH tokens.
  *
  * @example
  * ```tsx
@@ -106,33 +98,23 @@ export function StatusBadge({
   className,
   size = "default",
 }: StatusBadgeProps) {
-  // Handle docstatus numbers
   let normalizedStatus: string;
   if (typeof status === "number") {
     switch (status) {
-      case 0:
-        normalizedStatus = "draft";
-        break;
-      case 1:
-        normalizedStatus = "submitted";
-        break;
-      case 2:
-        normalizedStatus = "cancelled";
-        break;
-      default:
-        normalizedStatus = String(status);
+      case 0: normalizedStatus = "draft"; break;
+      case 1: normalizedStatus = "submitted"; break;
+      case 2: normalizedStatus = "cancelled"; break;
+      default: normalizedStatus = String(status);
     }
   } else {
     normalizedStatus = status.toLowerCase();
   }
 
-  // Get config or fallback
-  const config = statusConfig[normalizedStatus] || {
+  const config = STATUS_ACCENT[normalizedStatus] ?? {
+    accent: "neutral" as Accent,
     label: label || String(status),
-    className: "bg-gray-100 text-gray-600 border-gray-200",
   };
 
-  // Size classes
   const sizeClasses = {
     sm: "px-2 py-0.5 text-[10px]",
     default: "px-2.5 py-0.5 text-xs",
@@ -144,8 +126,8 @@ export function StatusBadge({
       className={cn(
         "inline-flex items-center rounded-full font-medium border",
         sizeClasses[size],
-        config.className,
-        className
+        ACCENT_CLASSES[config.accent],
+        className,
       )}
     >
       {label || config.label}

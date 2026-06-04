@@ -1,477 +1,602 @@
 "use client";
 
-import { useMemo, useEffect, useCallback, Suspense } from "react";
+// app/accounting/payment-entry/new/page.tsx
+// Obsidian ERP v4.0 — Payment Entry Create (FlowWizard, 3-step)
+// Zod gating via validateWizardStep, reactive validation via useWatch.
+// OKLCH semantic tokens only, real persistence.
+
+import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
+  Wallet,
+  FileText,
+  ClipboardCheck,
   Plus,
   Trash2,
-  Loader2,
-  Briefcase,
-  Landmark,
-  Wallet,
+  Lock,
   ArrowDownLeft,
-  ArrowUpRight,
-  ArrowRightCircle,
-  AlertCircle,
 } from "lucide-react";
-import { useFrappeCreate, useFrappeDoc, useFrappeList } from "@/hooks/generic";
-import { PageHeader } from "@/components/smart";
+
+import { PageHeader, LoadingState } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  FormSelect,
+  FormInput,
   FormFrappeSelect,
   FormDatePicker,
+  FormSelect,
 } from "@/components/form";
-import { PaymentEntryCreateSchema } from "@/lib/schemas/doctype-schemas";
-import type {
-  PaymentEntry,
-  Customer,
-  Supplier,
-  SalesInvoice,
-  PurchaseInvoice,
-} from "@/types/doctype-types";
+import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
+import { FlowWizard } from "@/components/flows/FlowWizard";
+import { useFrappeCreate, useFrappeDoc, useFrappeList } from "@/hooks/generic";
+import {
+  getAutoFillMapping,
+  applyAutoFill,
+} from "@/lib/flows/flow-auto-fill";
+import { validateWizardStep } from "@/lib/flows/flow-validation";
+import type { StepValidationResult } from "@/lib/flows/flow-validation";
+import type { WizardStep } from "@/types/flow-types";
+import type { PaymentEntry, SalesInvoice } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+
+// ---------------------------------------------------------------------------
+// Form model
+// ---------------------------------------------------------------------------
+interface PEReference {
+  reference_doctype: string;
+  reference_name: string;
+  allocated_amount: number;
+  total_amount?: number;
+  outstanding_amount?: number;
+}
+
+interface PEForm {
+  payment_type: string;
+  party_type: string;
+  party: string;
+  party_name?: string;
+  paid_amount: number;
+  received_amount: number;
+  mode_of_payment: string;
+  company: string;
+  posting_date: string;
+  reference_no?: string;
+  reference_date?: string;
+  paid_from: string;
+  paid_to: string;
+  remarks?: string;
+  references: PEReference[];
+}
+
+const WIZARD_STEPS: WizardStep[] = [
+  {
+    id: "step1",
+    label: "Payment Type",
+    description: "Set the payment type, party, and amount",
+    schema: null,
+    fields: ["payment_type", "party_type", "party", "paid_amount", "mode_of_payment"],
+    icon: "Wallet",
+  },
+  {
+    id: "step2",
+    label: "Allocate to Invoices",
+    description: "Allocate payment to outstanding invoices",
+    schema: null,
+    fields: ["references"],
+    icon: "FileText",
+  },
+  {
+    id: "step3",
+    label: "Review & Post",
+    description: "Review details and post the payment",
+    schema: null,
+    fields: [],
+    icon: "ClipboardCheck",
+  },
+];
+
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
 
 function CreatePaymentEntryForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const salesInvoiceId = searchParams.get("sales_invoice");
 
-  // Initial values from URL
-  const initialInvoice = searchParams.get("invoice");
-  const initialPartyType = searchParams.get("party_type") as
-    | "Customer"
-    | "Supplier"
-    | null;
-  const initialParty = searchParams.get("party");
-  const initialAmount = parseFloat(searchParams.get("amount") || "0");
-  const initialPaymentType = searchParams.get("payment_type") as
-    | "Receive"
-    | "Pay"
-    | "Internal Transfer"
-    | null;
+  const [step, setStep] = useState(0);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const form = useForm({
-    resolver: zodResolver(PaymentEntryCreateSchema),
+  const form = useForm<PEForm>({
     defaultValues: {
-      naming_series: "ACC-PAY-.YYYY.-",
-      payment_type:
-        initialPaymentType ||
-        (initialPartyType === "Supplier" ? "Pay" : "Receive"),
-      posting_date: new Date().toISOString().split("T")[0],
+      payment_type: "Receive",
+      party_type: "Customer",
+      party: "",
+      party_name: "",
+      paid_amount: 0,
+      received_amount: 0,
+      mode_of_payment: "Cash",
       company: "",
-      party_type: initialPartyType || "Customer",
-      party: initialParty || "",
+      posting_date: new Date().toISOString().split("T")[0],
+      reference_no: "",
+      reference_date: "",
       paid_from: "",
       paid_to: "",
-      paid_amount: initialAmount || 0,
-      received_amount: initialAmount || 0,
-      mode_of_payment: "Cash",
-      references: initialInvoice
-        ? [
-            {
-              reference_doctype:
-                initialPartyType === "Supplier"
-                  ? "Purchase Invoice"
-                  : "Sales Invoice",
-              reference_name: initialInvoice,
-              allocated_amount: initialAmount,
-            },
-          ]
-        : [],
-      remarks: initialInvoice ? `Settlement for ${initialInvoice}` : "",
+      remarks: "",
+      references: [],
     },
   });
 
-  const { control, handleSubmit, watch, setValue } = form;
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "references",
-  });
+  const { control, getValues, reset, setValue } = form;
+  const { fields, append, remove } = useFieldArray({ control, name: "references" });
 
-  const watchedPaymentType = watch("payment_type");
-  const watchedPartyType = watch("party_type");
-  const watchedParty = watch("party");
-  const watchedPaidAmount = watch("paid_amount");
+  // Watch the entire form reactively — drives validation gate + FlowWizard formData
+  const watchedAll = useWatch({ control });
+  const watchedPartyType = watchedAll?.party_type ?? "Customer";
+  const watchedParty = watchedAll?.party ?? "";
+  const watchedPaymentType = watchedAll?.payment_type ?? "Receive";
+  const watchedPaidAmount = watchedAll?.paid_amount ?? 0;
+  const watchedReferences = watchedAll?.references ?? [];
 
-  // Sync received amount with paid amount for standard ETB transactions
+  // -- Auto-fill from upstream Sales Invoice via the registry ----------------
+  const { data: salesInvoice, isLoading: loadingInvoice } =
+    useFrappeDoc<SalesInvoice>("Sales Invoice", salesInvoiceId ?? "", {
+      enabled: !!salesInvoiceId,
+    });
+
+  useEffect(() => {
+    if (!salesInvoice) return;
+    const mapping = getAutoFillMapping("Sales Invoice", "Payment Entry");
+    if (!mapping) return;
+
+    const header = applyAutoFill(
+      salesInvoice as unknown as Record<string, unknown>,
+      mapping,
+    );
+
+    // Build a reference from the invoice
+    const ref: PEReference = {
+      reference_doctype: "Sales Invoice",
+      reference_name: salesInvoice.name,
+      allocated_amount: salesInvoice.outstanding_amount ?? salesInvoice.grand_total ?? 0,
+      total_amount: salesInvoice.grand_total ?? 0,
+      outstanding_amount: salesInvoice.outstanding_amount ?? 0,
+    };
+
+    reset({
+      ...getValues(),
+      ...(header as Partial<PEForm>),
+      party_type: "Customer",
+      payment_type: "Receive",
+      references: [ref],
+    });
+
+    const filled = new Set<string>([
+      ...mapping.headerMappings
+        .filter((m) => m.isReadOnly)
+        .map((m) => m.targetField),
+      "references",
+    ]);
+    setAutoFilledFields(filled);
+
+    toast.success(`Loaded from Sales Invoice ${salesInvoiceId}`, {
+      description: "Set the payment amount and mode to continue.",
+    });
+  }, [salesInvoice, salesInvoiceId, reset, getValues]);
+
+  // Sync received_amount with paid_amount for ETB
   useEffect(() => {
     setValue("received_amount", watchedPaidAmount);
   }, [watchedPaidAmount, setValue]);
 
-  // Fetch Party Details for default account
-  const { data: customerData } = useFrappeDoc<Customer>(
-    "Customer",
-    watchedParty || "",
+  // Fetch outstanding invoices for the selected party
+  const invoiceDoctype = watchedPartyType === "Supplier" ? "Purchase Invoice" : "Sales Invoice";
+  const partyField = watchedPartyType === "Supplier" ? "supplier" : "customer";
+
+  const { data: outstandingInvoices } = useFrappeList<SalesInvoice>(
+    invoiceDoctype,
     {
-      enabled: watchedPartyType === "Customer" && !!watchedParty,
+      fields: ["name", "grand_total", "outstanding_amount", "posting_date"],
+      filters: [
+        [partyField, "=", watchedParty],
+        ["docstatus", "=", 1],
+        ["outstanding_amount", ">", 0],
+      ],
+      orderBy: { field: "posting_date", order: "desc" },
+      limit: 20,
     },
-  );
-  const { data: supplierData } = useFrappeDoc<Supplier>(
-    "Supplier",
-    watchedParty || "",
-    {
-      enabled: watchedPartyType === "Supplier" && !!watchedParty,
-    },
+    { enabled: !!watchedParty && watchedPaymentType !== "Internal Transfer" },
   );
 
-  // Fetch Invoice Details if we have references but no accounts
-  useEffect(() => {
-    if (watchedPartyType === "Customer" && customerData) {
-      if (watchedPaymentType === "Receive") {
-        // setValue("paid_from", customerData.receivable_account || "");
-      } else if (watchedPaymentType === "Pay") {
-        // setValue("paid_to", customerData.receivable_account || "");
+  const isAuto = useCallback(
+    (field: string) => autoFilledFields.has(field),
+    [autoFilledFields],
+  );
+
+  // -- Per-step validation (gates the wizard's Next button) ------------------
+  const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
+    const values = { ...getValues(), ...watchedAll, references: watchedAll?.references ?? [] };
+    return {
+      step1: validateWizardStep("Payment Entry", "step1", values),
+      step2: validateWizardStep("Payment Entry", "step2", values),
+      step3: validateWizardStep("Payment Entry", "step3", values),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedAll]);
+
+  // -- Live total allocated --------------------------------------------------
+  const totalAllocated = useMemo(
+    () =>
+      (watchedReferences ?? []).reduce(
+        (sum, ref) => sum + (Number(ref?.allocated_amount) || 0),
+        0,
+      ),
+    [watchedReferences],
+  );
+
+  // -- Persistence ------------------------------------------------------------
+  const createMutation = useFrappeCreate<
+    { data: { name: string } },
+    Record<string, unknown>
+  >("Payment Entry", {
+    successMessage: "Payment Entry created",
+    onSuccess: (res) => {
+      const name = res?.data?.name;
+      if (name) {
+        router.push(`/accounting/payment-entry/${encodeURIComponent(name)}`);
       }
-    }
-    if (watchedPartyType === "Supplier" && supplierData) {
-      if (watchedPaymentType === "Pay") {
-        // setValue("paid_to", supplierData.payable_account || "");
-      }
-    }
-  }, [
-    watchedPartyType,
-    customerData,
-    supplierData,
-    watchedPaymentType,
-    setValue,
-  ]);
-
-  const createMutation = useFrappeCreate<{ data: PaymentEntry }, any>(
-    "Payment Entry",
-    {
-      onSuccess: (data) =>
-        router.push(
-          `/accounting/payment-entry/${encodeURIComponent(data.data.name)}`,
-        ),
     },
-  );
+  });
 
-  const onSubmit = async (values: any) => {
-    await createMutation.mutateAsync(values);
-    toast.success("Payment recorded successfully");
-  };
+  const handleSubmit = useCallback(() => {
+    const values = getValues();
+    createMutation.mutate({
+      ...values,
+      naming_series: "ACC-PAY-.YYYY.-",
+      received_amount: values.paid_amount,
+      source_exchange_rate: 1,
+      target_exchange_rate: 1,
+      base_paid_amount: values.paid_amount,
+      base_received_amount: values.paid_amount,
+      references: (values.references ?? []).filter(
+        (ref) => ref.reference_name && ref.allocated_amount > 0,
+      ),
+    });
+  }, [createMutation, getValues]);
 
   return (
-    <div className="space-y-8 pb-24 max-w-7xl mx-auto">
+    <div className="space-y-6 pb-12">
       <PageHeader
         title="New Payment Entry"
-        subtitle="Record a financial transaction and allocate it to invoices"
-        backUrl="/accounting/payment-entry"
+        subtitle={
+          salesInvoiceId
+            ? `From Sales Invoice ${salesInvoiceId}`
+            : "Record a payment in three steps"
+        }
+        backHref="/accounting/payment-entry"
       />
 
       <Form {...form}>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          <InfoCard
-            title="Transaction Type & Party"
-            icon={<ArrowRightCircle className="h-4 w-4" />}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <FormFrappeSelect
-                control={control}
-                name="company"
-                label="Company"
-                required
-                doctype="Company"
-                labelField="company_name"
-              />
-              <FormSelect
-                control={control}
-                name="payment_type"
-                label="Payment Type"
-                required
-                options={[
-                  { value: "Receive", label: "Receive (Receipt)" },
-                  { value: "Pay", label: "Pay (Payment)" },
-                  { value: "Internal Transfer", label: "Internal Transfer" },
-                ]}
-              />
-              <FormSelect
-                control={control}
-                name="party_type"
-                label="Party Type"
-                options={[
-                  { value: "Customer", label: "Customer" },
-                  { value: "Supplier", label: "Supplier" },
-                  { value: "Employee", label: "Employee" },
-                  { value: "Shareholder", label: "Shareholder" },
-                ]}
-                disabled={watchedPaymentType === "Internal Transfer"}
-              />
-              <FormFrappeSelect
-                control={control}
-                name="party"
-                label="Party Name"
-                doctype={watchedPartyType}
-                labelField={
-                  watchedPartyType === "Customer"
-                    ? "customer_name"
-                    : watchedPartyType === "Supplier"
-                      ? "supplier_name"
-                      : "name"
-                }
-                disabled={watchedPaymentType === "Internal Transfer"}
-              />
-            </div>
-          </InfoCard>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <InfoCard
-              title="Inflow/Outflow Accounts"
-              icon={<Landmark className="h-4 w-4" />}
-            >
-              <div className="space-y-6">
-                <FormFrappeSelect
-                  control={control}
-                  name="paid_from"
-                  label="Account Paid From (Source)"
-                  required
-                  doctype="Account"
-                  filters={[["is_group", "=", 0]]}
-                  placeholder="Select source account..."
-                />
-                <FormFrappeSelect
-                  control={control}
-                  name="paid_to"
-                  label="Account Paid To (Destination)"
-                  required
-                  doctype="Account"
-                  filters={[["is_group", "=", 0]]}
-                  placeholder="Select destination account..."
-                />
-              </div>
-            </InfoCard>
-
-            <InfoCard
-              title="Amount & Mode"
-              icon={<Wallet className="h-4 w-4" />}
-            >
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={control}
-                    name="paid_amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">
-                          Paid Amount
-                        </p>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            className="h-12 rounded-2xl bg-secondary/30 border-0 text-right font-black text-xl"
-                            onChange={(e) =>
-                              field.onChange(Number(e.target.value))
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={control}
-                    name="received_amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-2">
-                          Received Amount
-                        </p>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            readOnly
-                            className="h-12 rounded-2xl bg-secondary/10 border-0 text-right font-black text-xl opacity-50"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormFrappeSelect
-                  control={control}
-                  name="mode_of_payment"
-                  label="Mode of Payment"
-                  doctype="Mode of Payment"
-                  placeholder="Select mode..."
-                />
-                <FormDatePicker
-                  control={control}
-                  name="posting_date"
-                  label="Payment Date"
-                  required
-                />
-              </div>
-            </InfoCard>
-          </div>
-
-          <InfoCard
-            title="Invoice Allocations"
-            icon={<ArrowDownLeft className="h-4 w-4" />}
-          >
-            <div className="rounded-[2rem] border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
-              <table className="w-full text-sm">
-                <thead className="bg-secondary/20 border-b border-border">
-                  <tr>
-                    <th className="px-6 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[30%]">
-                      Invoice Type
-                    </th>
-                    <th className="px-6 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[40%]">
-                      Invoice ID
-                    </th>
-                    <th className="px-6 py-4 font-black text-muted-foreground uppercase tracking-widest text-[10px] w-[20%] text-right">
-                      Allocated
-                    </th>
-                    <th className="px-6 py-4 w-12 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {fields.map((field, index) => (
-                    <tr
-                      key={field.id}
-                      className="group hover:bg-primary/5 transition-colors"
-                    >
-                      <td className="p-4">
+        <InfoCard className="max-w-3xl">
+          <FlowWizard
+            steps={WIZARD_STEPS}
+            formData={watchedAll as unknown as Record<string, unknown>}
+            validationResults={validationResults}
+            isSubmitting={createMutation.isPending}
+            onFormDataChange={() => {}}
+            onStepChange={setStep}
+            onSubmit={handleSubmit}
+            onCancel={() => router.back()}
+            submitLabel="Create Payment Entry"
+            submittingLabel="Creating..."
+            renderStep={(s) => {
+              // ---- STEP 1 — Payment Type --------------------------------
+              if (s.id === "step1") {
+                return (
+                  <div className="space-y-6">
+                    <StepHeading
+                      icon={<Wallet className="h-5 w-5 text-primary" />}
+                      title="Payment Type & Party"
+                      description="Set the payment type, party, and amount."
+                    />
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <FormFrappeSelect
+                        control={control}
+                        name="company"
+                        label="Company"
+                        required
+                        doctype="Company"
+                        labelField="company_name"
+                        placeholder="Select company..."
+                      />
+                      <FormSelect
+                        control={control}
+                        name="payment_type"
+                        label="Payment Type"
+                        required
+                        options={[
+                          { value: "Receive", label: "Receive (Receipt)" },
+                          { value: "Pay", label: "Pay (Payment)" },
+                          { value: "Internal Transfer", label: "Internal Transfer" },
+                        ]}
+                      />
+                      <FieldWrap
+                        auto={isAuto("party_type")}
+                        loading={loadingInvoice}
+                      >
                         <FormSelect
                           control={control}
-                          name={`references.${index}.reference_doctype`}
+                          name="party_type"
+                          label="Party Type"
                           options={[
-                            { value: "Sales Invoice", label: "Sales Invoice" },
-                            {
-                              value: "Purchase Invoice",
-                              label: "Purchase Invoice",
-                            },
+                            { value: "Customer", label: "Customer" },
+                            { value: "Supplier", label: "Supplier" },
+                            { value: "Employee", label: "Employee" },
+                            { value: "Shareholder", label: "Shareholder" },
                           ]}
-                          hideLabel
-                          className="h-10 rounded-xl bg-secondary/30 border-0"
+                          disabled={
+                            watchedPaymentType === "Internal Transfer" ||
+                            isAuto("party_type")
+                          }
                         />
-                      </td>
-                      <td className="p-4 text-center">
-                        <FormField
+                      </FieldWrap>
+                      <FieldWrap
+                        auto={isAuto("party")}
+                        loading={loadingInvoice}
+                      >
+                        <FormFrappeSelect
                           control={control}
-                          name={`references.${index}.reference_name`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder="Invoice ID..."
-                                  className="h-10 rounded-xl bg-secondary/30 border-0 text-center font-bold"
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
+                          name="party"
+                          label="Party"
+                          required
+                          doctype={watchedPartyType ?? ""}
+                          labelField={
+                            watchedPartyType === "Customer"
+                              ? "customer_name"
+                              : watchedPartyType === "Supplier"
+                                ? "supplier_name"
+                                : "name"
+                          }
+                          placeholder="Search party..."
+                          disabled={
+                            watchedPaymentType === "Internal Transfer" ||
+                            isAuto("party")
+                          }
                         />
-                      </td>
-                      <td className="p-4">
-                        <FormField
-                          control={control}
-                          name={`references.${index}.allocated_amount`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="number"
-                                  className="h-10 rounded-xl bg-secondary/30 border-0 text-right font-bold"
-                                  onChange={(e) =>
-                                    field.onChange(Number(e.target.value))
-                                  }
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </td>
-                      <td className="p-4 text-right">
+                      </FieldWrap>
+                      <FormField
+                        control={control}
+                        name="paid_amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider mb-2">
+                              Paid Amount
+                            </p>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                inputMode="decimal"
+                                className="h-12 rounded-2xl bg-secondary/30 border-0 text-right font-black text-xl"
+                                onChange={(e) =>
+                                  field.onChange(Number(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="mode_of_payment"
+                        label="Mode of Payment"
+                        doctype="Mode of Payment"
+                        placeholder="Select mode..."
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // ---- STEP 2 — Allocate to Invoices ------------------------
+              if (s.id === "step2") {
+                return (
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <StepHeading
+                        icon={<ArrowDownLeft className="h-5 w-5 text-primary" />}
+                        title="Allocate to Invoices"
+                        description="Allocate payment to outstanding invoices."
+                      />
+                      {isAuto("references") && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <Lock className="h-3 w-3" />
+                          Auto-filled
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Outstanding invoices quick-add */}
+                    {outstandingInvoices && outstandingInvoices.length > 0 && (
+                      <div className="rounded-xl border border-border/60 bg-secondary/10 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                          Outstanding Invoices — click to add
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {outstandingInvoices.map((inv) => {
+                            const alreadyAdded = watchedReferences.some(
+                              (r) => r?.reference_name === inv.name,
+                            );
+                            return (
+                              <Button
+                                key={inv.name}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full text-xs"
+                                disabled={alreadyAdded}
+                                onClick={() =>
+                                  append({
+                                    reference_doctype: invoiceDoctype,
+                                    reference_name: inv.name,
+                                    allocated_amount:
+                                      inv.outstanding_amount ?? 0,
+                                    total_amount: inv.grand_total ?? 0,
+                                    outstanding_amount:
+                                      inv.outstanding_amount ?? 0,
+                                  })
+                                }
+                              >
+                                {inv.name} — {ETB.format(inv.outstanding_amount ?? 0)}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="overflow-hidden rounded-xl border border-border/60 bg-card/40 backdrop-blur-sm">
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-border/60 bg-secondary/20">
+                          <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            <th className="px-3 py-2.5 text-left font-semibold">Invoice</th>
+                            <th className="px-3 py-2.5 text-right font-semibold">Outstanding</th>
+                            <th className="px-3 py-2.5 text-right font-semibold">Allocate</th>
+                            <th className="w-10" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {fields.map((field, index) => {
+                            const outstanding = watchedReferences?.[index]?.outstanding_amount ?? 0;
+                            return (
+                              <tr key={field.id} className="group">
+                                <td className="px-3 py-2 align-top">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-foreground">
+                                      {watchedReferences?.[index]?.reference_name || "—"}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {watchedReferences?.[index]?.reference_doctype}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-right tabular-nums font-medium text-muted-foreground">
+                                  {ETB.format(outstanding)}
+                                </td>
+                                <td className="px-3 py-2 align-top">
+                                  <NumberCell
+                                    control={control}
+                                    name={`references.${index}.allocated_amount`}
+                                  />
+                                </td>
+                                <td className="px-2 py-2 text-center align-middle">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                    onClick={() => remove(index)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="flex items-center justify-between border-t border-border/60 bg-secondary/10 px-3 py-3">
                         <Button
                           type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/10"
-                          onClick={() => remove(index)}
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full border-dashed"
+                          onClick={() =>
+                            append({
+                              reference_doctype: invoiceDoctype,
+                              reference_name: "",
+                              allocated_amount: 0,
+                            })
+                          }
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Plus className="mr-1.5 h-4 w-4" /> Add Reference
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="p-4 border-t border-border bg-secondary/5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full px-6 border-dashed"
-                  onClick={() =>
-                    append({
-                      reference_doctype:
-                        watchedPartyType === "Supplier"
-                          ? "Purchase Invoice"
-                          : "Sales Invoice",
-                      reference_name: "",
-                      allocated_amount: 0,
-                    })
-                  }
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Reference
-                </Button>
-              </div>
-            </div>
-          </InfoCard>
+                        <div className="text-right">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            Total Allocated
+                          </p>
+                          <p className="text-xl font-bold tabular-nums text-foreground">
+                            {ETB.format(totalAllocated)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
-          <InfoCard title="Remarks" icon={<FileText className="h-4 w-4" />}>
-            <FormField
-              control={control}
-              name="remarks"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Internal notes, bank ref, cheque details..."
-                      className="min-h-[100px] rounded-[1.5rem] bg-secondary/30 border-0 text-sm resize-none focus:bg-card transition-all"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </InfoCard>
+              // ---- STEP 3 — Review & Post --------------------------------
+              const v = getValues();
+              return (
+                <div className="space-y-5">
+                  <StepHeading
+                    icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
+                    title="Review & Post"
+                    description="Confirm the details below to create the payment."
+                  />
+                  <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <Summary label="Payment Type" value={v.payment_type} />
+                      <Summary label="Party Type" value={v.party_type} />
+                      <Summary label="Party" value={v.party_name || v.party} />
+                      <Summary label="Company" value={v.company} />
+                      <Summary label="Mode of Payment" value={v.mode_of_payment} />
+                      <Summary label="Posting Date" value={v.posting_date} />
+                    </div>
 
-          <div className="flex justify-end gap-3 sticky bottom-6 z-10 glass-card p-4 rounded-[2rem] shadow-2xl">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full px-10"
-              onClick={() => router.push("/accounting/payment-entry")}
-            >
-              Discard
-            </Button>
-            <Button
-              type="submit"
-              className="rounded-full px-12 shadow-lg shadow-primary/20"
-              disabled={createMutation.isPending}
-            >
-              {createMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Save Payment
-            </Button>
-          </div>
-        </form>
+                    {/* Reference no/date */}
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormInput
+                        control={control}
+                        name="reference_no"
+                        label="Reference No"
+                        placeholder="Cheque / transaction ref"
+                      />
+                      <FormDatePicker
+                        control={control}
+                        name="reference_date"
+                        label="Reference Date"
+                      />
+                    </div>
+
+                    <div className="mt-4 border-t border-border/60 pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {(watchedReferences ?? []).filter((r) => r?.reference_name).length}{" "}
+                          invoice(s) allocated
+                        </span>
+                        <div className="text-right">
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            Grand Total
+                          </span>
+                          <p className="text-2xl font-bold tabular-nums text-primary">
+                            {ETB.format(v.paid_amount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </InfoCard>
       </Form>
     </div>
   );
@@ -482,5 +607,90 @@ export default function NewPaymentEntryPage() {
     <Suspense fallback={<LoadingState type="detail" />}>
       <CreatePaymentEntryForm />
     </Suspense>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Local presentational helpers
+// ---------------------------------------------------------------------------
+function StepHeading({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+        {icon}
+      </div>
+      <div>
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function FieldWrap({
+  auto,
+  loading,
+  children,
+}: {
+  auto?: boolean;
+  loading?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("relative", loading && "animate-pulse")}>
+      {children}
+      {auto && (
+        <span className="pointer-events-none absolute right-2 top-0 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <Lock className="h-3 w-3" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Summary({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className="font-medium text-foreground">{value || "—"}</p>
+    </div>
+  );
+}
+
+function NumberCell({
+  control,
+  name,
+}: {
+  control: ReturnType<typeof useForm<PEForm>>["control"];
+  name: `references.${number}.allocated_amount`;
+}) {
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormControl>
+            <Input
+              {...field}
+              type="number"
+              inputMode="decimal"
+              className="h-10 rounded-lg border-0 bg-secondary/30 text-right tabular-nums"
+              onChange={(e) => field.onChange(Number(e.target.value))}
+            />
+          </FormControl>
+        </FormItem>
+      )}
+    />
   );
 }

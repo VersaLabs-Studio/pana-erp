@@ -1,5 +1,9 @@
 "use client";
 
+// app/accounting/journal-entry/page.tsx
+// Obsidian ERP v4.0 — Journal Entry List (V4 Golden Template)
+// KPICard + StatusBadge + card grid. OKLCH semantic tokens only.
+
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -7,19 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   MoreVertical,
-  Pencil,
   Trash2,
   Eye,
   CalendarDays,
-  Clock,
-  Building2,
-  CheckCircle2,
-  XCircle,
   BookOpen,
   ArrowRight,
-  Receipt,
-  History,
-  AlertCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,87 +30,56 @@ import {
   EmptyState,
   LoadingState,
   ConfirmDialog,
+  StatusBadge,
 } from "@/components/smart";
+import { KPICard } from "@/components/dashboard/KPICard";
 import type { JournalEntry } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-const VOUCHER_TYPE_CONFIG: Record<
-  string,
-  { color: string; bgColor: string; label: string }
-> = {
-  "Journal Entry": {
-    color: "text-blue-700 dark:text-blue-300",
-    bgColor: "bg-blue-100 dark:bg-blue-900/50",
-    label: "Journal",
-  },
-  "Bank Entry": {
-    color: "text-emerald-700 dark:text-emerald-300",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
-    label: "Bank",
-  },
-  "Cash Entry": {
-    color: "text-amber-700 dark:text-amber-300",
-    bgColor: "bg-amber-100 dark:bg-amber-900/50",
-    label: "Cash",
-  },
-  "Opening Entry": {
-    color: "text-indigo-700 dark:text-indigo-300",
-    bgColor: "bg-indigo-100 dark:bg-indigo-900/50",
-    label: "Opening",
-  },
-};
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
 
 function JournalEntryCard({
   entry,
   index,
   onView,
-  onEdit,
   onDelete,
 }: {
   entry: JournalEntry;
   index: number;
   onView: () => void;
-  onEdit: () => void;
   onDelete: () => void;
 }) {
+  const isDraft = entry.docstatus === 0;
   const status =
     entry.docstatus === 1
       ? "Submitted"
       : entry.docstatus === 2
         ? "Cancelled"
         : "Draft";
-  const typeConfig =
-    VOUCHER_TYPE_CONFIG[entry.voucher_type] ||
-    VOUCHER_TYPE_CONFIG["Journal Entry"];
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: "ETB",
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const isEditable = entry.docstatus === 0;
 
   return (
     <div
       className={cn(
         "group relative bg-card rounded-2xl border border-border/50",
         "hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5",
-        "transition-all duration-300 cursor-pointer overflow-hidden animate-slide-up",
+        "transition-all duration-300 cursor-pointer overflow-hidden",
+        "animate-slide-up hover:-translate-y-1",
       )}
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
+      <div
+        className={cn(
+          "absolute top-0 left-0 right-0 h-1",
+          isDraft && "bg-muted-foreground/30",
+          entry.docstatus === 1 && "bg-success",
+          entry.docstatus === 2 && "bg-destructive",
+        )}
+      />
+
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
@@ -122,68 +87,54 @@ function JournalEntryCard({
               <h3 className="font-bold text-lg text-foreground tracking-tight">
                 {entry.name}
               </h3>
-              <Badge
-                className={cn(
-                  "text-[10px] font-black uppercase tracking-widest",
-                  typeConfig.bgColor,
-                  typeConfig.color,
-                )}
-              >
-                {typeConfig.label}
-              </Badge>
+              <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 line-clamp-1">
-              <History className="h-3 w-3" />
-              {entry.user_remark || "No remarks"}
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 font-medium">
+              <BookOpen className="h-3.5 w-3.5 text-primary" />
+              {entry.voucher_type || "Journal Entry"}
             </p>
           </div>
 
-          <div
-            className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center border",
-              status === "Submitted"
-                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                : "bg-slate-500/10 text-slate-600 border-slate-500/20",
-            )}
-          >
-            {status === "Submitted" ? (
-              <CheckCircle2 className="h-4 w-4" />
-            ) : (
-              <Clock className="h-4 w-4" />
-            )}
-          </div>
+          <StatusBadge status={status} size="sm" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">
+            <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
               Debit
             </p>
-            <p className="text-sm font-black text-emerald-600">
-              {formatCurrency(entry.total_debit)}
+            <p className="text-sm font-bold text-foreground tabular-nums">
+              {ETB.format(entry.total_debit ?? 0)}
             </p>
           </div>
           <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">
+            <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
               Credit
             </p>
-            <p className="text-sm font-black text-rose-600">
-              {formatCurrency(entry.total_credit)}
+            <p className="text-sm font-bold text-foreground tabular-nums">
+              {ETB.format(entry.total_credit ?? 0)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-border/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             <CalendarDays className="h-3 w-3" />
-            {formatDate(entry.posting_date)}
+            {entry.posting_date
+              ? new Date(entry.posting_date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "—"}
           </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                className="h-9 w-9 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -202,17 +153,20 @@ function JournalEntryCard({
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </DropdownMenuItem>
-              {isEditable && (
-                <DropdownMenuItem
-                  className="rounded-lg cursor-pointer text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
+              {isDraft && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -258,20 +212,41 @@ export default function JournalEntryListPage() {
     return entries.filter((e) => e.voucher_type === typeFilter);
   }, [entries, typeFilter]);
 
+  const kpis = useMemo(() => {
+    if (!entries)
+      return { total: 0, thisMonth: 0, draft: 0, submitted: 0 };
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split("T")[0];
+    return {
+      total: entries.length,
+      thisMonth: entries.filter((e) => e.posting_date >= monthStart).length,
+      draft: entries.filter((e) => e.docstatus === 0).length,
+      submitted: entries.filter((e) => e.docstatus === 1).length,
+    };
+  }, [entries]);
+
   if (isLoading) return <LoadingState type="cards" count={6} />;
+  if (error)
+    return (
+      <div className="p-8 text-center text-destructive">
+        Failed to load journal entries
+      </div>
+    );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <PageHeader
         title="Journal Entries"
-        subtitle="Manual GL adjustments and inter-account transfers"
+        subtitle={`${filteredEntries.length} entr${filteredEntries.length !== 1 ? "ies" : "y"}`}
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Entry # or remarks..."
         actions={
           <Button
-            className="rounded-full shadow-lg shadow-primary/20 h-10 px-6 font-bold"
+            className="rounded-full shadow-lg shadow-primary/20"
             onClick={() => router.push("/accounting/journal-entry/new")}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -280,45 +255,111 @@ export default function JournalEntryListPage() {
         }
       />
 
+      {/* KPI Bar */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KPICard
+          title="Total Entries"
+          value={kpis.total}
+          icon={BookOpen}
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="This Month"
+          value={kpis.thisMonth}
+          icon={CalendarDays}
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Draft"
+          value={kpis.draft}
+          icon={BookOpen}
+          variant="warning"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Submitted"
+          value={kpis.submitted}
+          icon={BookOpen}
+          variant="success"
+          isLoading={isLoading}
+        />
+      </div>
+
+      {/* Type Filter Pills */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all", label: "All Entries" },
-          { key: "Journal Entry", label: "Journal" },
-          { key: "Bank Entry", label: "Bank" },
-          { key: "Cash Entry", label: "Cash" },
-          { key: "Opening Entry", label: "Opening" },
+          { key: "all", label: "All", count: entries?.length || 0 },
+          {
+            key: "Journal Entry",
+            label: "Journal",
+            count: entries?.filter((e) => e.voucher_type === "Journal Entry")
+              .length || 0,
+          },
+          {
+            key: "Opening Entry",
+            label: "Opening",
+            count: entries?.filter((e) => e.voucher_type === "Opening Entry")
+              .length || 0,
+          },
+          {
+            key: "Depreciation Entry",
+            label: "Depreciation",
+            count: entries?.filter(
+              (e) => e.voucher_type === "Depreciation Entry",
+            ).length || 0,
+          },
         ].map((type) => (
           <Button
             key={type.key}
             variant={typeFilter === type.key ? "default" : "outline"}
             size="sm"
             className={cn(
-              "rounded-full transition-all font-bold px-5 h-9",
+              "rounded-full gap-2 transition-all",
               typeFilter === type.key
                 ? "shadow-lg shadow-primary/20"
-                : "hover:bg-secondary/80 bg-card",
+                : "hover:bg-secondary/80",
             )}
             onClick={() => setTypeFilter(type.key)}
           >
             {type.label}
+            <Badge
+              variant="secondary"
+              className={cn(
+                "h-5 min-w-[20px] px-1.5 text-[10px] font-bold",
+                typeFilter === type.key
+                  ? "bg-primary-foreground/20 text-primary-foreground"
+                  : "bg-secondary",
+              )}
+            >
+              {type.count}
+            </Badge>
           </Button>
         ))}
       </div>
 
+      {/* Card Grid */}
       {!entries || entries.length === 0 ? (
         <EmptyState
           title="No journal entries"
           description="Record manual adjustments or opening balances"
+          action={
+            <Button
+              className="rounded-full"
+              onClick={() => router.push("/accounting/journal-entry/new")}
+            >
+              <Plus className="h-4 w-4 mr-2" /> New Journal Entry
+            </Button>
+          }
         />
       ) : filteredEntries.length === 0 ? (
-        <div className="text-center py-24 border-2 border-dashed border-border rounded-[2.5rem]">
-          <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-10" />
-          <p className="text-muted-foreground font-black uppercase tracking-widest text-sm">
-            No entries match this type
+        <div className="text-center py-20 border-2 border-dashed border-border rounded-[2.5rem]">
+          <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-muted-foreground font-medium">
+            No entries match this filter
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEntries.map((entry, i) => (
             <JournalEntryCard
               key={entry.name}
@@ -327,11 +368,6 @@ export default function JournalEntryListPage() {
               onView={() =>
                 router.push(
                   `/accounting/journal-entry/${encodeURIComponent(entry.name)}`,
-                )
-              }
-              onEdit={() =>
-                router.push(
-                  `/accounting/journal-entry/${encodeURIComponent(entry.name)}/edit`,
                 )
               }
               onDelete={() => setDeleteTarget(entry)}
@@ -344,7 +380,7 @@ export default function JournalEntryListPage() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete Journal Entry"
-        description={`Are you sure you want to delete entry "${deleteTarget?.name}"?`}
+        description={`Are you sure you want to delete entry "${deleteTarget?.name}"? This action cannot be undone.`}
         onConfirm={() => deleteMutation.mutate(deleteTarget!.name)}
         loading={deleteMutation.isPending}
       />

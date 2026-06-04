@@ -1,5 +1,5 @@
 // components/ui/info-card.tsx
-// Pana ERP v1.3 - Reusable Info Card Component
+// Obsidian ERP v4.0 - Reusable Info Card Component
 
 import { cn } from "@/lib/utils";
 import React from "react";
@@ -29,13 +29,13 @@ export function InfoCard({
   className,
   delay = 0,
   variant = "default",
-  gradientFrom = "from-indigo-50/50",
-  gradientTo = "to-purple-50/50",
+  gradientFrom = "from-primary/5",
+  gradientTo = "to-primary/10",
 }: InfoCardProps) {
   const variantClasses = {
-    default: "bg-card shadow-sm hover:shadow-xl hover:shadow-primary/5",
-    gradient: `bg-gradient-to-br from-primary/5 to-primary/10 border border-border/50`,
-    transparent: "bg-transparent border-none shadow-none hover:shadow-none p-0",
+    default: "bg-card shadow-sm",
+    gradient: `bg-gradient-to-br from-primary/5 to-primary/10`,
+    transparent: "bg-transparent shadow-none p-0",
   };
 
   // Helper to render icon
@@ -53,7 +53,7 @@ export function InfoCard({
   return (
     <div
       className={cn(
-        "rounded-[2rem] p-8 transition-all duration-500 animate-slide-up",
+        "rounded-2xl p-6 transition-all duration-500 animate-slide-up",
         variantClasses[variant],
         className
       )}

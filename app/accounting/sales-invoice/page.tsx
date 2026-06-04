@@ -10,17 +10,12 @@ import {
   Pencil,
   Trash2,
   Eye,
-  CalendarDays,
-  Clock,
-  User,
-  Building2,
   DollarSign,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
   FileText,
   ArrowRight,
-  HandCoins,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -35,51 +30,16 @@ import {
   EmptyState,
   LoadingState,
   ConfirmDialog,
+  StatusBadge,
 } from "@/components/smart";
+import { KPICard } from "@/components/dashboard/KPICard";
 import type { SalesInvoice } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<
-  string,
-  { color: string; bgColor: string; icon: React.ElementType; label: string }
-> = {
-  Draft: {
-    color: "text-slate-700 dark:text-slate-300",
-    bgColor: "bg-slate-100 dark:bg-slate-800",
-    icon: FileText,
-    label: "Draft",
-  },
-  Unpaid: {
-    color: "text-amber-700 dark:text-amber-300",
-    bgColor: "bg-amber-100 dark:bg-amber-900/50",
-    icon: Clock,
-    label: "Unpaid",
-  },
-  Paid: {
-    color: "text-emerald-700 dark:text-emerald-300",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
-    icon: CheckCircle2,
-    label: "Paid",
-  },
-  Overdue: {
-    color: "text-rose-700 dark:text-rose-300",
-    bgColor: "bg-rose-100 dark:bg-rose-900/50",
-    icon: AlertTriangle,
-    label: "Overdue",
-  },
-  "Part Paid": {
-    color: "text-indigo-700 dark:text-indigo-300",
-    bgColor: "bg-indigo-100 dark:bg-indigo-900/50",
-    icon: HandCoins,
-    label: "Part Paid",
-  },
-  Cancelled: {
-    color: "text-gray-600 dark:text-gray-400",
-    bgColor: "bg-gray-100 dark:bg-gray-800",
-    icon: XCircle,
-    label: "Cancelled",
-  },
-};
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+});
 
 function InvoiceCard({
   invoice,
@@ -94,27 +54,6 @@ function InvoiceCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const statusConfig =
-    STATUS_CONFIG[invoice.status || "Draft"] || STATUS_CONFIG.Draft;
-  const StatusIcon = statusConfig.icon;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ET", {
-      style: "currency",
-      currency: invoice.currency || "ETB",
-      minimumFractionDigits: 2,
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
   const isEditable = invoice.docstatus === 0;
   const isDeletable = invoice.docstatus === 0;
 
@@ -129,17 +68,6 @@ function InvoiceCard({
       style={{ animationDelay: `${index * 40}ms` }}
       onClick={onView}
     >
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          invoice.status === "Draft" && "bg-slate-400",
-          invoice.status === "Unpaid" && "bg-amber-500",
-          invoice.status === "Paid" && "bg-emerald-500",
-          invoice.status === "Overdue" && "bg-rose-500",
-          invoice.status === "Cancelled" && "bg-gray-400",
-        )}
-      />
-
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
@@ -149,22 +77,11 @@ function InvoiceCard({
               </h3>
               <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-              <User className="h-3 w-3" />
+            <p className="text-sm text-muted-foreground">
               {invoice.customer_name || invoice.customer || "No customer"}
             </p>
           </div>
-
-          <div
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-              statusConfig.bgColor,
-              statusConfig.color,
-            )}
-          >
-            <StatusIcon className="h-3.5 w-3.5" />
-            {statusConfig.label}
-          </div>
+          <StatusBadge status={invoice.status || "Draft"} size="sm" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -172,18 +89,28 @@ function InvoiceCard({
             <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
               Posting Date
             </p>
-            <p className="text-sm font-medium text-foreground flex items-center gap-1">
-              <CalendarDays className="h-3 w-3 text-muted-foreground" />
-              {formatDate(invoice.posting_date)}
+            <p className="text-sm font-medium text-foreground">
+              {invoice.posting_date
+                ? new Date(invoice.posting_date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "\u2014"}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
               Due Date
             </p>
-            <p className="text-sm font-medium text-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3 text-muted-foreground" />
-              {formatDate(invoice.due_date)}
+            <p className="text-sm font-medium text-foreground">
+              {invoice.due_date
+                ? new Date(invoice.due_date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "\u2014"}
             </p>
           </div>
         </div>
@@ -198,7 +125,7 @@ function InvoiceCard({
                 Outstanding
               </p>
               <p className="text-lg font-black text-foreground tracking-tight">
-                {formatCurrency(invoice.outstanding_amount)}
+                {ETB.format(invoice.outstanding_amount ?? 0)}
               </p>
             </div>
           </div>
@@ -271,7 +198,6 @@ export default function SalesInvoiceListPage() {
   const {
     data: invoices,
     isLoading,
-    error,
   } = useFrappeList<SalesInvoice>("Sales Invoice", {
     fields: [
       "name",
@@ -302,14 +228,25 @@ export default function SalesInvoiceListPage() {
   }, [invoices, statusFilter]);
 
   const statusCounts = useMemo(() => {
-    if (!invoices) return {};
+    if (!invoices) return { total: 0, unpaid: 0, overdue: 0, paid: 0 };
     return invoices.reduce(
       (acc, inv) => {
+        acc.total += 1;
         const status = inv.status || "Draft";
-        acc[status] = (acc[status] || 0) + 1;
+        if (status === "Unpaid") acc.unpaid += 1;
+        else if (status === "Overdue") acc.overdue += 1;
+        else if (status === "Paid") acc.paid += 1;
         return acc;
       },
-      {} as Record<string, number>,
+      { total: 0, unpaid: 0, overdue: 0, paid: 0 },
+    );
+  }, [invoices]);
+
+  const totalOutstanding = useMemo(() => {
+    if (!invoices) return 0;
+    return invoices.reduce(
+      (sum, inv) => sum + (Number(inv.outstanding_amount) || 0),
+      0,
     );
   }, [invoices]);
 
@@ -335,17 +272,39 @@ export default function SalesInvoiceListPage() {
         }
       />
 
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KPICard
+          title="Total"
+          value={String(statusCounts.total)}
+          icon={FileText}
+        />
+        <KPICard
+          title="Unpaid"
+          value={ETB.format(totalOutstanding)}
+          icon={Clock}
+          variant="warning"
+        />
+        <KPICard
+          title="Overdue"
+          value={String(statusCounts.overdue)}
+          icon={AlertTriangle}
+          variant="danger"
+        />
+        <KPICard
+          title="Paid"
+          value={String(statusCounts.paid)}
+          icon={CheckCircle2}
+          variant="success"
+        />
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         {[
           { key: "all", label: "All", count: invoices?.length || 0 },
-          { key: "Unpaid", label: "Unpaid", count: statusCounts.Unpaid || 0 },
-          { key: "Paid", label: "Paid", count: statusCounts.Paid || 0 },
-          {
-            key: "Overdue",
-            label: "Overdue",
-            count: statusCounts.Overdue || 0,
-          },
-          { key: "Draft", label: "Draft", count: statusCounts.Draft || 0 },
+          { key: "Draft", label: "Draft", count: invoices?.filter((i) => i.status === "Draft").length || 0 },
+          { key: "Unpaid", label: "Unpaid", count: statusCounts.unpaid },
+          { key: "Paid", label: "Paid", count: statusCounts.paid },
+          { key: "Overdue", label: "Overdue", count: statusCounts.overdue },
         ].map((status) => (
           <Button
             key={status.key}

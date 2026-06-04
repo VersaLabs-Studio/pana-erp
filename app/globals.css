@@ -1,4 +1,4 @@
-/* Pana ERP v3.0 - Premium Fluid Theme with Dark Mode Support */
+/* Obsidian ERP v4.0 - Premium Fluid Theme with Dark Mode Support */
 /* Font: Plus Jakarta Sans - Modern, Clean, Premium (used by Vercel, Linear) */
 @import "tailwindcss";
 
@@ -23,6 +23,12 @@
   --color-border: var(--color-border);
   --color-input: var(--color-input);
   --color-ring: var(--color-ring);
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+  --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+  --color-info: var(--color-info);
+  --color-info-foreground: var(--color-info-foreground);
 }
 
 /* ============================================================================
@@ -68,6 +74,14 @@
   --color-border: oklch(0.92 0.01 240);
   --color-input: oklch(0.92 0.01 240);
   --color-ring: oklch(0.15 0.02 240);
+
+  /* Semantic Status Tokens (OKLCH — no raw Tailwind colors) */
+  --color-warning: oklch(0.75 0.15 75);
+  --color-warning-foreground: oklch(0.25 0.08 75);
+  --color-success: oklch(0.7 0.15 155);
+  --color-success-foreground: oklch(0.2 0.08 155);
+  --color-info: oklch(0.6 0.12 250);
+  --color-info-foreground: oklch(0.2 0.06 250);
 
   /* Sidebar */
   --color-sidebar: oklch(0.98 0.01 240);
@@ -135,6 +149,14 @@
   --color-input: oklch(0.3 0.02 240);
   --color-ring: oklch(0.65 0.02 240);
 
+  /* Semantic Status Tokens (OKLCH — dark mode) */
+  --color-warning: oklch(0.78 0.14 75);
+  --color-warning-foreground: oklch(0.95 0.02 75);
+  --color-success: oklch(0.72 0.14 155);
+  --color-success-foreground: oklch(0.95 0.02 155);
+  --color-info: oklch(0.65 0.12 250);
+  --color-info-foreground: oklch(0.95 0.02 250);
+
   /* Sidebar - Consistent with card elevation */
   --color-sidebar: oklch(0.16 0.015 240);
   --color-sidebar-foreground: oklch(0.78 0.015 240);
@@ -174,6 +196,23 @@
     transition: background-color 0.2s ease, border-color 0.2s ease,
       color 0.2s ease !important;
   }
+}
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-muted) 25%,
+    var(--color-muted-foreground) / 0.05 37%,
+    var(--color-muted) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
 
 /* Animations & Utilities */
