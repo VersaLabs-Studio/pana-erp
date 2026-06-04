@@ -218,7 +218,7 @@ export default function CreateJournalEntryPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[2.5rem] border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
+                  <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-secondary/20 border-b border-border">

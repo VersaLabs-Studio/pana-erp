@@ -96,8 +96,8 @@ export default function AccountingSetupPage() {
               key={module.href}
               onClick={() => router.push(module.href)}
               className={cn(
-                "group relative bg-card rounded-[2.5rem] border p-8 cursor-pointer overflow-hidden",
-                "hover:shadow-2xl hover:border-primary/20 transition-all duration-500",
+                "group relative bg-card rounded-2xl border p-8 cursor-pointer overflow-hidden",
+                "hover:shadow-xl hover:border-primary/20 transition-all duration-500",
                 "animate-in fade-in slide-in-from-bottom-4 shadow-sm",
                 module.borderColor,
               )}

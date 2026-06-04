@@ -80,7 +80,9 @@ export default function StockEntryDetailPage() {
       stageStatuses["Work Order"] = {
         status: "completed",
         documentName: se.work_order,
-        documentUrl: `/manufacturing/work-order/${encodeURIComponent(se.work_order)}`,
+        documentUrl: isModuleBuilt("Work Order")
+          ? `/manufacturing/work-order/${encodeURIComponent(se.work_order)}`
+          : undefined,
       };
     }
 
@@ -232,12 +234,18 @@ export default function StockEntryDetailPage() {
                 label="Work Order"
                 value={
                   se.work_order ? (
-                    <Link
-                      href={`/manufacturing/work-order/${encodeURIComponent(se.work_order)}`}
-                      className="text-primary underline underline-offset-2 hover:text-primary/80"
-                    >
-                      {se.work_order}
-                    </Link>
+                    isModuleBuilt("Work Order") ? (
+                      <Link
+                        href={`/manufacturing/work-order/${encodeURIComponent(se.work_order)}`}
+                        className="text-primary underline underline-offset-2 hover:text-primary/80"
+                      >
+                        {se.work_order}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground text-sm" title="Work Order module not yet built">
+                        {se.work_order}
+                      </span>
+                    )
                   ) : (
                     "—"
                   )

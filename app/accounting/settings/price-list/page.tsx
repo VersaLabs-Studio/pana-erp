@@ -53,7 +53,7 @@ export default function PriceListsPage() {
 
   if (error)
     return (
-      <div className="flex items-center justify-center p-20 bg-destructive/5 rounded-[2rem] border border-destructive/10">
+      <div className="flex items-center justify-center p-20 bg-destructive/5 rounded-2xl border border-destructive/10">
         <p className="text-destructive font-bold text-lg">
           Failed to load price lists
         </p>
@@ -97,7 +97,7 @@ export default function PriceListsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="group relative bg-card p-8 rounded-[2.5rem] border border-transparent hover:border-primary/10 transition-all duration-300 shadow-sm hover:shadow-xl"
+              className="group relative bg-card p-8 rounded-2xl border border-transparent hover:border-primary/10 transition-all duration-300 shadow-sm hover:shadow-xl"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
