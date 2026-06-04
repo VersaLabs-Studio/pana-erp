@@ -10,6 +10,8 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import {
   Edit3,
   Send,
@@ -51,6 +53,7 @@ export default function SalesOrderDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const { data: order, isLoading, error } = useFrappeDoc<SalesOrder>(
     "Sales Order",
@@ -108,8 +111,8 @@ export default function SalesOrderDetailPage() {
       { name, data: { docstatus: 1, status: "To Deliver and Bill" } },
       {
         onSuccess: () => toast.success(`Sales Order ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Sales Order" })),
       },
     );
   };
@@ -120,8 +123,8 @@ export default function SalesOrderDetailPage() {
       { name, data: { docstatus: 2, status: "Cancelled" } },
       {
         onSuccess: () => toast.success(`Sales Order ${name} cancelled`),
-        onError: (e) =>
-          toast.error("Cancel failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Sales Order" })),
       },
     );
   };

@@ -348,6 +348,64 @@ export const supplierQuotationStepSchemas = {
 };
 
 /**
+ * BOM step schemas
+ */
+export const bomStepSchemas = {
+  step1: z.object({
+    item: z.string().min(1, "Item is required"),
+    quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
+    is_active: z.coerce.number().optional(),
+    is_default: z.coerce.number().optional(),
+  }),
+  step2: z.object({
+    items: z
+      .array(
+        z.object({
+          item_code: z.string().min(1, "Item code is required"),
+          qty: z.coerce.number().min(0.01, "Quantity must be greater than 0"),
+          rate: z.coerce.number().min(0, "Rate must be non-negative"),
+          uom: z.string().optional(),
+          amount: z.coerce.number().optional(),
+          source_warehouse: z.string().optional(),
+        })
+      )
+      .min(1, "At least one material is required"),
+    operations: z
+      .array(
+        z.object({
+          operation: z.string().min(1, "Operation is required"),
+          workstation: z.string().optional(),
+          time_in_mins: z.coerce.number().min(0).default(0),
+          operating_cost: z.coerce.number().optional(),
+        })
+      )
+      .optional(),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+/**
+ * Work Order step schemas
+ */
+export const workOrderStepSchemas = {
+  step1: z.object({
+    production_item: z.string().min(1, "Production item is required"),
+    bom_no: z.string().min(1, "BOM is required"),
+    qty: z.coerce.number().min(1, "Quantity must be at least 1"),
+    sales_order: z.string().optional(),
+    expected_delivery_date: z.string().optional(),
+  }),
+  step2: z.object({
+    fg_warehouse: z.string().min(1, "Target warehouse is required"),
+    wip_warehouse: z.string().optional(),
+    source_warehouse: z.string().optional(),
+    planned_start_date: z.string().min(1, "Planned start date is required"),
+  }),
+};
+
+/**
  * All step schemas indexed by doctype
  */
 export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
@@ -363,6 +421,8 @@ export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
   "Purchase Order": purchaseOrderStepSchemas,
   "Request for Quotation": rfqStepSchemas,
   "Supplier Quotation": supplierQuotationStepSchemas,
+  "BOM": bomStepSchemas,
+  "Work Order": workOrderStepSchemas,
 };
 
 /**

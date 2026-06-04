@@ -7,6 +7,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { Send, Loader2, FileSearch, Users, Package } from "lucide-react";
 
 import {
@@ -45,6 +47,7 @@ export default function RequestForQuotationDetailPage() {
   const name = decodeURIComponent(String(params.name));
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: rfq,
@@ -88,8 +91,8 @@ export default function RequestForQuotationDetailPage() {
       { name, data: { docstatus: 1, status: "Submitted" } },
       {
         onSuccess: () => toast.success(`RFQ ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Request for Quotation" })),
       },
     );
   };
@@ -288,6 +291,7 @@ export default function RequestForQuotationDetailPage() {
         confirmText="Submit"
         onConfirm={handleSubmit}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

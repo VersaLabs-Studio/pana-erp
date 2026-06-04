@@ -9,6 +9,8 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { Plus, Trash2 } from "lucide-react";
 
 import { PageHeader, LoadingState } from "@/components/smart";
@@ -61,6 +63,7 @@ export default function EditSalesOrderPage() {
   const name = decodeURIComponent(String(params.name));
 
   const [, setStep] = useState(0);
+  const { resolution, showError, dismiss } = useGuidedError();
   const { data: order, isLoading, error } = useFrappeDoc<SalesOrder>("Sales Order", name);
 
   const form = useForm<SOForm>({
@@ -121,8 +124,10 @@ export default function EditSalesOrderPage() {
   }, [watchedAll]);
 
   const updateMutation = useFrappeUpdate<SalesOrder>("Sales Order", {
+    showToast: false,
     successMessage: "Sales Order updated",
     onSuccess: () => router.push(`/sales/sales-order/${encodeURIComponent(name)}`),
+    onError: (err) => showError(resolveFrappeError(err, { doctype: "Sales Order" })),
   });
 
   const handleSubmit = useCallback(() => {
@@ -308,6 +313,7 @@ export default function EditSalesOrderPage() {
           />
         </InfoCard>
       </Form>
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

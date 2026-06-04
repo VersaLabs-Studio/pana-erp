@@ -296,7 +296,7 @@ export default function NewDeliveryNotePage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-3xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -529,81 +529,106 @@ export default function NewDeliveryNotePage() {
               // ---- STEP 3 — Logistics & Review -----------------------------
               const v = getValues();
               return (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   <StepHeading
                     icon={<Truck className="h-5 w-5 text-primary" />}
                     title="Logistics & Review"
-                    description="Set transporter details and confirm the delivery."
+                    description="Review everything below, then create — you can still go back to edit."
                   />
 
                   {/* Logistics fields */}
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <FormFrappeSelect
-                      control={control}
-                      name="transporter"
-                      label="Transporter"
-                      doctype="Supplier"
-                      placeholder="e.g., In-House, DHL..."
-                      filters={[["is_transporter", "=", 1]]}
-                    />
-                    <FormFrappeSelect
-                      control={control}
-                      name="driver"
-                      label="Driver"
-                      doctype="Driver"
-                      placeholder="Select driver..."
-                    />
-                    <FormInput
-                      control={control}
-                      name="vehicle_no"
-                      label="Vehicle Number"
-                      placeholder="License plate"
-                    />
-                    <FormInput
-                      control={control}
-                      name="lr_no"
-                      label="Gate Pass / LR No"
-                      placeholder="Receipt number"
-                    />
-                    <FormDatePicker
-                      control={control}
-                      name="lr_date"
-                      label="LR Date"
-                    />
-                    <FormFrappeSelect
-                      control={control}
-                      name="set_warehouse"
-                      label="Default Warehouse"
-                      doctype="Warehouse"
-                      placeholder="Source warehouse..."
-                      filters={[["is_group", "=", 0]]}
-                    />
+                  <div className="bg-card/40 rounded-2xl p-6 space-y-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Logistics</p>
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <FormFrappeSelect
+                        control={control}
+                        name="transporter"
+                        label="Transporter"
+                        doctype="Supplier"
+                        placeholder="e.g., In-House, DHL..."
+                        filters={[["is_transporter", "=", 1]]}
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="driver"
+                        label="Driver"
+                        doctype="Driver"
+                        placeholder="Select driver..."
+                      />
+                      <FormInput
+                        control={control}
+                        name="vehicle_no"
+                        label="Vehicle Number"
+                        placeholder="License plate"
+                      />
+                      <FormInput
+                        control={control}
+                        name="lr_no"
+                        label="Gate Pass / LR No"
+                        placeholder="Receipt number"
+                      />
+                      <FormDatePicker
+                        control={control}
+                        name="lr_date"
+                        label="LR Date"
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="set_warehouse"
+                        label="Default Warehouse"
+                        doctype="Warehouse"
+                        placeholder="Source warehouse..."
+                        filters={[["is_group", "=", 0]]}
+                      />
+                    </div>
                   </div>
 
-                  {/* Review summary */}
-                  <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                  {/* Header summary */}
+                  <div className="bg-card/40 rounded-2xl p-6 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <Summary label="Customer" value={v.customer_name || v.customer} />
                       <Summary label="Company" value={v.company} />
                       <Summary label="Posting Date" value={v.posting_date} />
                       <Summary label="Shipping Address" value={v.shipping_address_name} />
+                      <Summary label="Customer PO No" value={v.po_no} />
                     </div>
-                    <div className="mt-4 border-t border-border/60 pt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {(watchedItems ?? []).filter((i) => i?.item_code).length}{" "}
-                          item(s)
-                        </span>
-                        <div className="text-right">
-                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                            Grand Total
-                          </span>
-                          <p className="text-2xl font-bold tabular-nums text-primary">
-                            {ETB.format(subtotal)}
-                          </p>
-                        </div>
-                      </div>
+                  </div>
+
+                  {/* Items table */}
+                  <div className="bg-card/40 rounded-2xl overflow-hidden">
+                    <div className="px-6 py-3 bg-muted/30">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Items ({(watchedItems ?? []).filter(i => i?.item_code).length})
+                      </p>
                     </div>
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-border/40">
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <th className="px-6 py-2.5 text-left font-semibold">Item</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Qty</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Rate</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Amount</th>
+                          <th className="px-6 py-2.5 text-left font-semibold">Warehouse</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {(watchedItems ?? []).filter(i => i?.item_code).map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="px-6 py-3 font-medium">{item.item_name || item.item_code}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{item.qty} {item.uom}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{ETB.format(item.rate ?? 0)}</td>
+                            <td className="px-6 py-3 text-right font-medium tabular-nums">{ETB.format((item.qty || 0) * (item.rate || 0))}</td>
+                            <td className="px-6 py-3 text-muted-foreground">{item.warehouse || v.set_warehouse || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/20">
+                          <td colSpan={4} className="px-6 py-3 text-right font-bold uppercase text-xs">Grand Total</td>
+                          <td className="px-6 py-3 text-right font-bold text-lg text-primary tabular-nums">{ETB.format(subtotal)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
               );

@@ -177,9 +177,15 @@ describe("Module Availability — A2 fix", () => {
     expect(isModuleBuilt("Delivery Note")).toBe(true);
   });
 
-  it("isModuleBuilt returns false for unbuilt modules", () => {
-    expect(isModuleBuilt("Work Order")).toBe(false);
-    expect(isModuleBuilt("BOM")).toBe(false);
+  it("isModuleBuilt returns true for manufacturing modules", () => {
+    expect(isModuleBuilt("Work Order")).toBe(true);
+    expect(isModuleBuilt("BOM")).toBe(true);
+  });
+
+  it("isModuleBuilt returns false for modules not yet built", () => {
+    // Add entries here as new modules are planned but not yet implemented
+    // Currently all planned modules are built
+    expect(isModuleBuilt("Nonexistent Module")).toBe(false);
   });
 });
 

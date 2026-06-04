@@ -8,6 +8,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import {
   Send,
   Ban,
@@ -51,6 +53,7 @@ export default function PaymentEntryDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const { data: entry, isLoading, error } = useFrappeDoc<PaymentEntry>(
     "Payment Entry",
@@ -118,8 +121,8 @@ export default function PaymentEntryDetailPage() {
       { name, data: { docstatus: 1, status: "Submitted" } },
       {
         onSuccess: () => toast.success(`Payment Entry ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Payment Entry" })),
       },
     );
   };
@@ -130,8 +133,8 @@ export default function PaymentEntryDetailPage() {
       { name, data: { docstatus: 2, status: "Cancelled" } },
       {
         onSuccess: () => toast.success(`Payment Entry ${name} cancelled`),
-        onError: (e) =>
-          toast.error("Cancel failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Payment Entry" })),
       },
     );
   };
@@ -404,6 +407,7 @@ export default function PaymentEntryDetailPage() {
         variant="destructive"
         onConfirm={handleCancel}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

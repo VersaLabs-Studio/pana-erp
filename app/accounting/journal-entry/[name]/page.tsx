@@ -41,6 +41,8 @@ import type { FlowChainResult } from "@/types/flow-types";
 import type { JournalEntry } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 
 interface JournalEntryAccount {
   account: string;
@@ -60,6 +62,7 @@ export default function JournalEntryDetailPage() {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: entry,
@@ -385,11 +388,15 @@ export default function JournalEntryDetailPage() {
         title="Submit Journal Entry"
         description="This will finalize the accounting impact. Proceed?"
         onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: entry.name,
-            data: { docstatus: 1 },
-          });
-          toast.success("Entry Submitted");
+          try {
+            await updateMutation.mutateAsync({
+              name: entry.name,
+              data: { docstatus: 1 },
+            });
+            toast.success("Entry Submitted");
+          } catch (err) {
+            showError(resolveFrappeError(err, { doctype: "Journal Entry" }));
+          }
         }}
         loading={updateMutation.isPending}
       />
@@ -401,11 +408,15 @@ export default function JournalEntryDetailPage() {
         description="Reverse the accounting impact of this journal entry?"
         confirmText="Cancel Entry"
         onConfirm={async () => {
-          await updateMutation.mutateAsync({
-            name: entry.name,
-            data: { docstatus: 2 },
-          });
-          toast.success("Entry Cancelled");
+          try {
+            await updateMutation.mutateAsync({
+              name: entry.name,
+              data: { docstatus: 2 },
+            });
+            toast.success("Entry Cancelled");
+          } catch (err) {
+            showError(resolveFrappeError(err, { doctype: "Journal Entry" }));
+          }
         }}
         loading={updateMutation.isPending}
       />
@@ -416,11 +427,16 @@ export default function JournalEntryDetailPage() {
         title="Delete Journal Entry"
         description="Delete this draft entry permanently?"
         onConfirm={async () => {
-          await deleteMutation.mutateAsync(entry.name);
-          toast.success("Entry Deleted");
+          try {
+            await deleteMutation.mutateAsync(entry.name);
+            toast.success("Entry Deleted");
+          } catch (err) {
+            showError(resolveFrappeError(err, { doctype: "Journal Entry" }));
+          }
         }}
         loading={deleteMutation.isPending}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

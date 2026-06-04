@@ -379,7 +379,7 @@ export default function CreateJournalEntryPage() {
 
                   <div
                     className={cn(
-                      "mt-6 p-6 rounded-[1.5rem] border-2 flex items-center justify-between transition-all",
+                      "mt-6 p-6 rounded-2xl border border-border/40 flex items-center justify-between transition-all",
                       isBalanced
                         ? "bg-success/10 border-success/20 text-success"
                         : "bg-destructive/10 border-destructive/20 text-destructive",

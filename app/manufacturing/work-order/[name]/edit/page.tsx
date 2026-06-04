@@ -212,7 +212,7 @@ function EditWorkOrderForm() {
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
             {/* Product & BOM */}
-            <div className="bg-card rounded-[2rem] border border-border/50 p-8 shadow-sm space-y-6">
+            <div className="bg-card rounded-2xl border border-border/50 p-8 shadow-sm space-y-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Package className="h-5 w-5 text-primary" />
@@ -276,7 +276,7 @@ function EditWorkOrderForm() {
             </div>
 
             {/* Source & Scheduling */}
-            <div className="bg-card rounded-[2rem] border border-border/50 p-8 shadow-sm space-y-6">
+            <div className="bg-card rounded-2xl border border-border/50 p-8 shadow-sm space-y-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <FileText className="h-5 w-5 text-blue-500" />
@@ -331,7 +331,7 @@ function EditWorkOrderForm() {
             </div>
 
             {/* Warehouses */}
-            <div className="bg-card rounded-[2rem] border border-border/50 p-8 shadow-sm space-y-6">
+            <div className="bg-card rounded-2xl border border-border/50 p-8 shadow-sm space-y-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                   <Factory className="h-5 w-5 text-amber-500" />
@@ -393,7 +393,7 @@ function EditWorkOrderForm() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-card rounded-[2rem] border border-border/50 p-8 shadow-xl shadow-primary/5 sticky top-6">
+            <div className="bg-card rounded-2xl border border-border/50 p-8 shadow-xl shadow-primary/5 sticky top-6">
               <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-primary" />
                 Updated Metrics

@@ -9,6 +9,8 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import {
   Send,
   Trash2,
@@ -52,6 +54,7 @@ export default function StockEntryDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const { data: se, isLoading, error } = useFrappeDoc<StockEntry>(
     "Stock Entry",
@@ -96,8 +99,8 @@ export default function StockEntryDetailPage() {
       { name, data: { docstatus: 1 } },
       {
         onSuccess: () => toast.success(`Stock Entry ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Stock Entry" })),
       },
     );
   };
@@ -109,8 +112,8 @@ export default function StockEntryDetailPage() {
         toast.success(`Stock Entry ${name} deleted`);
         router.push("/stock/stock-entry");
       },
-      onError: (e) =>
-        toast.error("Delete failed", { description: e.message }),
+      onError: (err) =>
+        showError(resolveFrappeError(err, { doctype: "Stock Entry" })),
     });
   };
 
@@ -370,6 +373,7 @@ export default function StockEntryDetailPage() {
         variant="destructive"
         onConfirm={handleDelete}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

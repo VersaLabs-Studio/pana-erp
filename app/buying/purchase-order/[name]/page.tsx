@@ -9,6 +9,8 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import {
   Send,
   Ban,
@@ -56,6 +58,7 @@ export default function PurchaseOrderDetailPage() {
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: order,
@@ -139,8 +142,8 @@ export default function PurchaseOrderDetailPage() {
           toast.success(`Purchase Order ${name} submitted`);
           refetch();
         },
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Purchase Order" })),
       },
     );
   };
@@ -154,8 +157,8 @@ export default function PurchaseOrderDetailPage() {
           toast.success(`Purchase Order ${name} approved`);
           refetch();
         },
-        onError: (e) =>
-          toast.error("Approve failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Purchase Order" })),
       },
     );
   };
@@ -169,8 +172,8 @@ export default function PurchaseOrderDetailPage() {
           toast.success(`Purchase Order ${name} rejected`);
           refetch();
         },
-        onError: (e) =>
-          toast.error("Reject failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Purchase Order" })),
       },
     );
   };
@@ -320,10 +323,8 @@ export default function PurchaseOrderDetailPage() {
                         toast.success(`Purchase Order ${name} cancelled`);
                         refetch();
                       },
-                      onError: (e) =>
-                        toast.error("Cancel failed", {
-                          description: e.message,
-                        }),
+                      onError: (err) =>
+                        showError(resolveFrappeError(err, { doctype: "Purchase Order" })),
                     },
                   );
                 }}
@@ -488,6 +489,7 @@ export default function PurchaseOrderDetailPage() {
         variant="destructive"
         onConfirm={handleReject}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

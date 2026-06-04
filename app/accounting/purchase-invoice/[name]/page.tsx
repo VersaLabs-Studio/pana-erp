@@ -10,6 +10,8 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import {
   Edit3,
   Send,
@@ -55,6 +57,7 @@ export default function PurchaseInvoiceDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: invoice,
@@ -139,8 +142,8 @@ export default function PurchaseInvoiceDetailPage() {
       { name, data: { docstatus: 1 } },
       {
         onSuccess: () => toast.success(`Purchase Invoice ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Purchase Invoice" })),
       },
     );
   };
@@ -152,8 +155,8 @@ export default function PurchaseInvoiceDetailPage() {
       {
         onSuccess: () =>
           toast.success(`Purchase Invoice ${name} cancelled`),
-        onError: (e) =>
-          toast.error("Cancel failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Purchase Invoice" })),
       },
     );
   };
@@ -385,6 +388,7 @@ export default function PurchaseInvoiceDetailPage() {
         variant="destructive"
         onConfirm={handleCancel}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

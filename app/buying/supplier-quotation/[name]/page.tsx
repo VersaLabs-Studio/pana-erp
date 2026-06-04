@@ -7,6 +7,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { Send, Loader2, FileText, Package } from "lucide-react";
 
 import {
@@ -47,6 +49,7 @@ export default function SupplierQuotationDetailPage() {
   const name = decodeURIComponent(String(params.name));
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: sq,
@@ -94,8 +97,8 @@ export default function SupplierQuotationDetailPage() {
       { name, data: { docstatus: 1, status: "Submitted" } },
       {
         onSuccess: () => toast.success(`Supplier Quotation ${name} submitted`),
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Supplier Quotation" })),
       },
     );
   };
@@ -282,6 +285,7 @@ export default function SupplierQuotationDetailPage() {
         confirmText="Submit"
         onConfirm={handleSubmit}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

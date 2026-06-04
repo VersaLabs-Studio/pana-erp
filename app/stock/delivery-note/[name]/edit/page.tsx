@@ -8,6 +8,8 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { Plus, Trash2 } from "lucide-react";
 
 import { PageHeader, LoadingState } from "@/components/smart";
@@ -67,6 +69,7 @@ export default function EditDeliveryNotePage() {
   const name = decodeURIComponent(String(params.name));
 
   const [, setStep] = useState(0);
+  const { resolution, showError, dismiss } = useGuidedError();
   const { data: order, isLoading, error } = useFrappeDoc<DeliveryNote>("Delivery Note", name);
 
   const form = useForm<DNForm>({
@@ -141,8 +144,10 @@ export default function EditDeliveryNotePage() {
   }, [watchedAll]);
 
   const updateMutation = useFrappeUpdate<DeliveryNote>("Delivery Note", {
+    showToast: false,
     successMessage: "Delivery Note updated",
     onSuccess: () => router.push(`/stock/delivery-note/${encodeURIComponent(name)}`),
+    onError: (err) => showError(resolveFrappeError(err, { doctype: "Delivery Note" })),
   });
 
   const handleSubmit = useCallback(() => {
@@ -358,6 +363,7 @@ export default function EditDeliveryNotePage() {
           />
         </InfoCard>
       </Form>
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

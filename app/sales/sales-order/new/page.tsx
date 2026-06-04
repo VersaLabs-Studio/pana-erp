@@ -287,7 +287,7 @@ export default function NewSalesOrderPage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-5xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -502,38 +502,64 @@ export default function NewSalesOrderPage() {
                 );
               }
 
-              // ---- STEP 3 — Review --------------------------------------
+              // ---- STEP 3 — Review & Confirm --------------------------------
               const v = getValues();
               return (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   <StepHeading
                     icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
                     title="Review & Confirm"
-                    description="Confirm the details below to create the order."
+                    description="Review everything below, then create — you can still go back to edit."
                   />
-                  <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+
+                  {/* Header fields */}
+                  <div className="bg-card/40 rounded-2xl p-6 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <Summary label="Customer" value={v.customer_name || v.customer} />
                       <Summary label="Company" value={v.company} />
                       <Summary label="Order Date" value={v.transaction_date} />
                       <Summary label="Delivery Date" value={v.delivery_date} />
+                      <Summary label="Order Type" value={v.order_type} />
+                      <Summary label="Currency" value={v.currency} />
+                      <Summary label="Price List" value={v.selling_price_list} />
+                      <Summary label="Customer Address" value={v.customer_address} />
+                      <Summary label="Customer PO No" value={v.po_no} />
                     </div>
-                    <div className="mt-4 border-t border-border/60 pt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {(watchedItems ?? []).filter((i) => i?.item_code).length}{" "}
-                          item(s)
-                        </span>
-                        <div className="text-right">
-                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                            Grand Total
-                          </span>
-                          <p className="text-2xl font-bold tabular-nums text-primary">
-                            {ETB.format(subtotal)}
-                          </p>
-                        </div>
-                      </div>
+                  </div>
+
+                  {/* Items table */}
+                  <div className="bg-card/40 rounded-2xl overflow-hidden">
+                    <div className="px-6 py-3 bg-muted/30">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Items ({(watchedItems ?? []).filter(i => i?.item_code).length})
+                      </p>
                     </div>
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-border/40">
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <th className="px-6 py-2.5 text-left font-semibold">Item</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Qty</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Rate</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {(watchedItems ?? []).filter(i => i?.item_code).map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="px-6 py-3 font-medium">{item.item_name || item.item_code}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{item.qty} {item.uom}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{ETB.format(item.rate ?? 0)}</td>
+                            <td className="px-6 py-3 text-right font-medium tabular-nums">{ETB.format((item.qty || 0) * (item.rate || 0))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/20">
+                          <td colSpan={3} className="px-6 py-3 text-right font-bold uppercase text-xs">Grand Total</td>
+                          <td className="px-6 py-3 text-right font-bold text-lg text-primary tabular-nums">{ETB.format(subtotal)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
               );

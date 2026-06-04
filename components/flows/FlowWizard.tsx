@@ -232,9 +232,9 @@ export function FlowWizard({
         </Button>
 
         <div className="flex items-center gap-3">
-          {/* A1: Calm inline hint instead of raw error dump */}
+          {/* A2: Clear destructive hint — not a whisper */}
           {showInlineHint && (
-            <span className="text-xs text-muted-foreground hidden sm:block">
+            <span className="text-sm font-medium text-destructive">
               Complete the required fields to continue
             </span>
           )}

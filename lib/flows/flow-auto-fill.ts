@@ -340,6 +340,51 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
   },
 
   // =========================================================================
+  // BOM → WORK ORDER
+  // =========================================================================
+  "BOM->Work Order": {
+    sourceDoctype: "BOM",
+    targetDoctype: "Work Order",
+    headerMappings: [
+      { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
+      { sourceField: "name", targetField: "bom_no", isReadOnly: true, sourceLabel: "BOM No" },
+      { sourceField: "item", targetField: "production_item", isReadOnly: true, sourceLabel: "Production Item" },
+    ],
+    itemMappings: [
+      { sourceField: "item_code", targetField: "item_code", isReadOnly: true, sourceLabel: "Item Code" },
+      { sourceField: "item_name", targetField: "item_name", isReadOnly: true, sourceLabel: "Item Name" },
+      { sourceField: "qty", targetField: "required_qty", isReadOnly: false, sourceLabel: "Required Qty" },
+      { sourceField: "source_warehouse", targetField: "source_warehouse", isReadOnly: false, sourceLabel: "Source Warehouse" },
+    ],
+    userMustFill: ["fg_warehouse", "planned_start_date"],
+    defaults: {
+      naming_series: "MFG-WO-.YYYY.-",
+      status: "Draft",
+      docstatus: 0,
+    },
+  },
+
+  // =========================================================================
+  // WORK ORDER → STOCK ENTRY (Manufacture)
+  // =========================================================================
+  "Work Order->Stock Entry": {
+    sourceDoctype: "Work Order",
+    targetDoctype: "Stock Entry",
+    headerMappings: [
+      { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
+      { sourceField: "name", targetField: "work_order", isReadOnly: true, sourceLabel: "Work Order" },
+      { sourceField: "fg_warehouse", targetField: "to_warehouse", isReadOnly: true, sourceLabel: "Target Warehouse" },
+      { sourceField: "source_warehouse", targetField: "from_warehouse", isReadOnly: true, sourceLabel: "Source Warehouse" },
+    ],
+    itemMappings: [],
+    userMustFill: [],
+    defaults: {
+      purpose: "Manufacture",
+      docstatus: 0,
+    },
+  },
+
+  // =========================================================================
   // SUPPLIER QUOTATION → PURCHASE ORDER
   // =========================================================================
   "Supplier Quotation->Purchase Order": {

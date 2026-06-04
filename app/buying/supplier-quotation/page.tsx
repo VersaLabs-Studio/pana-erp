@@ -137,7 +137,7 @@ function SQCard({
 
         <div className="pt-4 border-t border-border/50 flex justify-between items-center">
           <StatusBadge status={sq.status} />
-          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-secondary/50 text-muted-foreground group-hover:bg-primary group-hover:text-white transition-all">
+          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-secondary/50 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all">
             <Eye className="h-4 w-4" />
           </div>
         </div>
