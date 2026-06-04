@@ -107,6 +107,7 @@ const ETB = new Intl.NumberFormat("en-ET", {
 export default function NewPurchaseInvoicePage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<PIForm>({
     defaultValues: {
@@ -207,7 +208,7 @@ export default function NewPurchaseInvoicePage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-3xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -215,6 +216,7 @@ export default function NewPurchaseInvoicePage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Purchase Invoice"

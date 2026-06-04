@@ -111,6 +111,7 @@ const ETB = new Intl.NumberFormat("en-ET", {
 export default function NewBOMPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<BOMForm>({
     defaultValues: {
@@ -240,6 +241,7 @@ export default function NewBOMPage() {
           isSubmitting={createMutation.isPending}
           onFormDataChange={() => {}}
           onStepChange={setStep}
+          onTriedNextChange={setTriedNextSteps}
           onSubmit={handleSubmit}
           onCancel={() => router.back()}
           submitLabel="Create BOM"

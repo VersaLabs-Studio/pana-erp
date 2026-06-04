@@ -113,6 +113,7 @@ export default function NewSalesInvoicePage() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set(),
   );
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<SIForm>({
     defaultValues: {
@@ -256,6 +257,7 @@ export default function NewSalesInvoicePage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Sales Invoice"
@@ -273,6 +275,7 @@ export default function NewSalesInvoicePage() {
                       <FieldWrap
                         auto={isAuto("customer")}
                         loading={loadingDN}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.customer : undefined}
                       >
                         <FormFrappeSelect
                           control={control}
@@ -285,7 +288,10 @@ export default function NewSalesInvoicePage() {
                           disabled={isAuto("customer")}
                         />
                       </FieldWrap>
-                      <FieldWrap auto={isAuto("company")}>
+                      <FieldWrap
+                        auto={isAuto("company")}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.company : undefined}
+                      >
                         <FormFrappeSelect
                           control={control}
                           name="company"
@@ -548,19 +554,26 @@ function StepHeading({
 function FieldWrap({
   auto,
   loading,
+  error,
   children,
 }: {
   auto?: boolean;
   loading?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("relative", loading && "animate-pulse")}>
-      {children}
+      <div className={cn(error && "[&_*]:border-destructive [&_*]:ring-destructive/20")}>
+        {children}
+      </div>
       {auto && (
         <span className="pointer-events-none absolute right-2 top-0 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           <Lock className="h-3 w-3" />
         </span>
+      )}
+      {error && (
+        <p className="mt-1.5 text-xs text-destructive font-medium">{error}</p>
       )}
     </div>
   );

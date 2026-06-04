@@ -31,6 +31,8 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
 import type { Bom } from "@/types/doctype-types";
 import type { FlowStageStatus } from "@/types/flow-types";
@@ -48,6 +50,7 @@ export default function BOMDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: bom,
@@ -105,8 +108,8 @@ export default function BOMDetailPage() {
           toast.success(`BOM ${name} submitted`);
           refetch();
         },
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "BOM" })),
       },
     );
   };
@@ -121,10 +124,11 @@ export default function BOMDetailPage() {
         toast.success("BOM deleted");
         router.push("/manufacturing/bom");
       } else {
-        toast.error("Delete failed");
+        const body = await res.json().catch(() => ({}));
+        showError(resolveFrappeError(body, { doctype: "BOM" }));
       }
-    } catch {
-      toast.error("Delete failed");
+    } catch (err) {
+      showError(resolveFrappeError(err, { doctype: "BOM" }));
     }
   };
 
@@ -465,6 +469,7 @@ export default function BOMDetailPage() {
         variant="destructive"
         onConfirm={handleDelete}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

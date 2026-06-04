@@ -6,7 +6,7 @@
 // Real flow-chain resolution (no stub): upstream Quotation via prevdoc_docname,
 // downstream Work Orders via the sales_order header link. OKLCH tokens only.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -30,7 +30,9 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
-import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
+import { buildIdempotencyKey } from "@/lib/flows/idempotency";
+import { getAutoFillMapping, applyAutoFill } from "@/lib/flows/flow-auto-fill";
+import { useFrappeDoc, useFrappeList, useFrappeUpdate, useFrappeCreate } from "@/hooks/generic";
 import type { SalesOrder } from "@/types/doctype-types";
 import type { FlowStageStatus } from "@/types/flow-types";
 
@@ -53,6 +55,8 @@ export default function SalesOrderDetailPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmCreateWO, setConfirmCreateWO] = useState(false);
+  const [woToCreate, setWoToCreate] = useState<Array<{ item_code: string; item_name?: string; qty: number; warehouse?: string }>>([]);
   const { resolution, showError, dismiss } = useGuidedError();
 
   const { data: order, isLoading, error } = useFrappeDoc<SalesOrder>(
@@ -129,6 +133,68 @@ export default function SalesOrderDetailPage() {
     );
   };
 
+  // -- Work Order multi-create (B3 idempotency) --------------------------------
+  const createWOMutation = useFrappeCreate("Work Order", {
+    showToast: false,
+    onSuccess: () => {
+      toast.success(`${woToCreate.length} Work Order(s) created`);
+      setConfirmCreateWO(false);
+    },
+    onError: (err) => showError(resolveFrappeError(err, { doctype: "Work Order" })),
+  });
+
+  const handleCreateWorkOrders = useCallback(() => {
+    if (workOrders && workOrders.length > 0) {
+      toast.info("Work Orders already created", {
+        description: `${workOrders.length} Work Order(s) linked to this Sales Order.`,
+      });
+      return;
+    }
+
+    const soItems = (order?.items ?? []) as Array<{ item_code: string; item_name?: string; qty: number; warehouse?: string }>;
+    if (soItems.length === 0) {
+      toast.error("No items on this Sales Order to create Work Orders for.");
+      return;
+    }
+
+    const woItems = soItems.map((item) => ({
+      item_code: item.item_code,
+      item_name: item.item_name,
+      qty: item.qty,
+      warehouse: item.warehouse,
+    }));
+
+    setWoToCreate(woItems);
+    setConfirmCreateWO(true);
+  }, [order, workOrders]);
+
+  const executeCreateWorkOrders = useCallback(() => {
+    const mapping = getAutoFillMapping("Sales Order", "Work Order");
+    if (!mapping) return;
+
+    const soData = order as unknown as Record<string, unknown>;
+
+    for (const item of woToCreate) {
+      const idempotencyKey = buildIdempotencyKey("Sales Order", name, "create_work_orders", item.item_code);
+
+      const header = applyAutoFill(soData, mapping);
+      const woPayload = {
+        ...header,
+        production_item: item.item_code,
+        item_name: item.item_name,
+        qty: item.qty,
+        fg_warehouse: item.warehouse || "",
+        sales_order: name,
+        naming_series: "MFG-WO-.YYYY.-",
+        status: "Draft",
+        docstatus: 0,
+        idempotency_key: idempotencyKey,
+      };
+
+      createWOMutation.mutate(woPayload);
+    }
+  }, [order, name, woToCreate, createWOMutation]);
+
   if (isLoading) return <LoadingState />;
   if (error || !order) {
     return (
@@ -156,18 +222,26 @@ export default function SalesOrderDetailPage() {
       isLoading: updateMutation.isPending,
     },
     isSubmitted && {
-      label: "Create Work Order(s)",
-      description: "Phase 2 — production automation",
-      onClick: () => {},
-      disabled: !isModuleBuilt("Work Order"),
-      disabledReason: "Coming in Phase 2",
+      label: workOrders && workOrders.length > 0 ? "View Work Orders" : "Create Work Order(s)",
+      description: workOrders && workOrders.length > 0
+        ? `${workOrders.length} Work Order(s) linked`
+        : "Generate production orders for each line item",
+      onClick: () => {
+        if (workOrders && workOrders.length > 0) {
+          router.push(`/manufacturing/work-order/${encodeURIComponent(workOrders[0].name)}`);
+        } else {
+          handleCreateWorkOrders();
+        }
+      },
+      isPrimary: !(workOrders && workOrders.length > 0),
+      isLoading: createWOMutation.isPending,
     },
     isSubmitted && {
       label: "Create Delivery Note",
       description: "Create fulfillment from this order",
       onClick: () => router.push(`/stock/delivery-note/new?sales_order=${encodeURIComponent(name)}`),
       disabled: !isModuleBuilt("Delivery Note"),
-      disabledReason: "Coming in Phase 2",
+      disabledReason: "Delivery Note module not available",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
@@ -327,6 +401,15 @@ export default function SalesOrderDetailPage() {
         confirmText="Cancel Order"
         variant="destructive"
         onConfirm={handleCancel}
+      />
+      <ConfirmDialog
+        open={confirmCreateWO}
+        onOpenChange={setConfirmCreateWO}
+        title="Create Work Orders"
+        description={`${woToCreate.length} Work Order(s) will be created for Sales Order ${name}. Each line item becomes a separate Work Order.`}
+        confirmText="Create Work Orders"
+        onConfirm={executeCreateWorkOrders}
+        loading={createWOMutation.isPending}
       />
     </div>
   );

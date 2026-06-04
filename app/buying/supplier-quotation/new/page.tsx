@@ -117,6 +117,7 @@ export default function NewSupplierQuotationPage() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set(),
   );
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<SQForm>({
     defaultValues: {
@@ -276,7 +277,7 @@ export default function NewSupplierQuotationPage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-5xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -284,6 +285,7 @@ export default function NewSupplierQuotationPage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Supplier Quotation"
@@ -299,7 +301,11 @@ export default function NewSupplierQuotationPage() {
                       description="Select the supplier providing this quotation."
                     />
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                      <FieldWrap auto={isAuto("supplier")} loading={loadingRFQ}>
+                      <FieldWrap
+                        auto={isAuto("supplier")}
+                        loading={loadingRFQ}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.supplier : undefined}
+                      >
                         <FormFrappeSelect
                           control={control}
                           name="supplier"
@@ -311,7 +317,10 @@ export default function NewSupplierQuotationPage() {
                           disabled={isAuto("supplier")}
                         />
                       </FieldWrap>
-                      <FieldWrap auto={isAuto("company")}>
+                      <FieldWrap
+                        auto={isAuto("company")}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.company : undefined}
+                      >
                         <FormFrappeSelect
                           control={control}
                           name="company"
@@ -573,19 +582,26 @@ function StepHeading({
 function FieldWrap({
   auto,
   loading,
+  error,
   children,
 }: {
   auto?: boolean;
   loading?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("relative", loading && "animate-pulse")}>
-      {children}
+      <div className={cn(error && "[&_*]:border-destructive [&_*]:ring-destructive/20")}>
+        {children}
+      </div>
       {auto && (
         <span className="pointer-events-none absolute right-2 top-0 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           <Lock className="h-3 w-3" />
         </span>
+      )}
+      {error && (
+        <p className="mt-1.5 text-xs text-destructive font-medium">{error}</p>
       )}
     </div>
   );

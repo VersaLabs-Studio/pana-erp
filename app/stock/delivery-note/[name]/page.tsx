@@ -166,7 +166,7 @@ export default function DeliveryNoteDetailPage() {
       description: "Create invoice from this delivery",
       onClick: () => router.push(`/accounting/sales-invoice/new?delivery_note=${encodeURIComponent(name)}`),
       disabled: !isModuleBuilt("Sales Invoice"),
-      disabledReason: "Coming in Phase 2",
+      disabledReason: "Module not available",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
@@ -212,7 +212,7 @@ export default function DeliveryNoteDetailPage() {
                 variant="outline"
                 size="sm"
                 disabled={!isModuleBuilt("Sales Invoice")}
-                title={!isModuleBuilt("Sales Invoice") ? "Coming in Phase 2" : undefined}
+                title={!isModuleBuilt("Sales Invoice") ? "Module not available" : undefined}
                 asChild={isModuleBuilt("Sales Invoice")}
               >
                 {isModuleBuilt("Sales Invoice") ? (

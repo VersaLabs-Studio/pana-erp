@@ -36,6 +36,8 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
 import type { WorkOrder, SalesOrder, Bom } from "@/types/doctype-types";
 import type { FlowStageStatus } from "@/types/flow-types";
@@ -55,6 +57,7 @@ export default function WorkOrderDetailPage() {
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const { resolution, showError, dismiss } = useGuidedError();
 
   const {
     data: wo,
@@ -152,8 +155,8 @@ export default function WorkOrderDetailPage() {
           toast.success(`Work Order ${name} submitted`);
           refetch();
         },
-        onError: (e) =>
-          toast.error("Submit failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Work Order" })),
       },
     );
   };
@@ -179,8 +182,8 @@ export default function WorkOrderDetailPage() {
           toast.success("Work Order stopped");
           refetch();
         },
-        onError: (e) =>
-          toast.error("Stop failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Work Order" })),
       },
     );
   };
@@ -218,8 +221,8 @@ export default function WorkOrderDetailPage() {
           toast.success("Work Order cancelled");
           refetch();
         },
-        onError: (e) =>
-          toast.error("Cancel failed", { description: e.message }),
+        onError: (err) =>
+          showError(resolveFrappeError(err, { doctype: "Work Order" })),
       },
     );
   };
@@ -234,10 +237,11 @@ export default function WorkOrderDetailPage() {
         toast.success("Work Order deleted");
         router.push("/manufacturing/work-order");
       } else {
-        toast.error("Delete failed");
+        const body = await res.json().catch(() => ({}));
+        showError(resolveFrappeError(body, { doctype: "Work Order" }));
       }
-    } catch {
-      toast.error("Delete failed");
+    } catch (err) {
+      showError(resolveFrappeError(err, { doctype: "Work Order" }));
     }
   };
 
@@ -654,6 +658,7 @@ export default function WorkOrderDetailPage() {
         variant="destructive"
         onConfirm={handleDelete}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

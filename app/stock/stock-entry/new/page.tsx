@@ -112,6 +112,7 @@ export default function NewStockEntryPage() {
   const router = useRouter();
 
   const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<SEForm>({
     defaultValues: {
@@ -212,6 +213,7 @@ export default function NewStockEntryPage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Stock Entry"

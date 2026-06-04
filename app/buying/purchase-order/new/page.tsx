@@ -134,6 +134,7 @@ export default function NewPurchaseOrderPage() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set(),
   );
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<POForm>({
     defaultValues: {
@@ -300,7 +301,7 @@ export default function NewPurchaseOrderPage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-5xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -308,6 +309,7 @@ export default function NewPurchaseOrderPage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Purchase Order"
@@ -326,6 +328,7 @@ export default function NewPurchaseOrderPage() {
                       <FieldWrap
                         auto={isAuto("supplier")}
                         loading={isLoadingSource}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.supplier : undefined}
                       >
                         <FormFrappeSelect
                           control={control}
@@ -338,7 +341,10 @@ export default function NewPurchaseOrderPage() {
                           disabled={isAuto("supplier")}
                         />
                       </FieldWrap>
-                      <FieldWrap auto={isAuto("company")}>
+                      <FieldWrap
+                        auto={isAuto("company")}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.company : undefined}
+                      >
                         <FormFrappeSelect
                           control={control}
                           name="company"
@@ -362,7 +368,10 @@ export default function NewPurchaseOrderPage() {
                         label="Required By"
                         required
                       />
-                      <FieldWrap auto={isAuto("set_warehouse")}>
+                      <FieldWrap
+                        auto={isAuto("set_warehouse")}
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.set_warehouse : undefined}
+                      >
                         <FormFrappeSelect
                           control={control}
                           name="set_warehouse"
@@ -579,19 +588,26 @@ function StepHeading({
 function FieldWrap({
   auto,
   loading,
+  error,
   children,
 }: {
   auto?: boolean;
   loading?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("relative", loading && "animate-pulse")}>
-      {children}
+      <div className={cn(error && "[&_*]:border-destructive [&_*]:ring-destructive/20")}>
+        {children}
+      </div>
       {auto && (
         <span className="pointer-events-none absolute right-2 top-0 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           <Lock className="h-3 w-3" />
         </span>
+      )}
+      {error && (
+        <p className="mt-1.5 text-xs text-destructive font-medium">{error}</p>
       )}
     </div>
   );

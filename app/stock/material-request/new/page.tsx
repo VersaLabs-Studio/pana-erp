@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -92,6 +92,7 @@ const REQUEST_TYPE_OPTIONS = [
 export default function NewMaterialRequestPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<MRForm>({
     defaultValues: {
@@ -108,6 +109,23 @@ export default function NewMaterialRequestPage() {
 
   const { control, getValues, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+
+  const searchParams = useSearchParams();
+  const prefillItemCode = searchParams.get("item_code");
+  const prefillItemName = searchParams.get("item_name");
+  const prefillQty = searchParams.get("qty");
+  const prefillWarehouse = searchParams.get("warehouse");
+
+  useEffect(() => {
+    if (!prefillItemCode) return;
+    setValue("items.0.item_code", prefillItemCode);
+    if (prefillItemName) setValue("items.0.item_name", prefillItemName);
+    if (prefillQty) setValue("items.0.qty", Number(prefillQty));
+    if (prefillWarehouse) {
+      setValue("items.0.warehouse", prefillWarehouse);
+      setValue("set_warehouse", prefillWarehouse);
+    }
+  }, [prefillItemCode, prefillItemName, prefillQty, prefillWarehouse, setValue]);
 
   const watchedAll = useWatch({ control });
   const watchedItems = watchedAll?.items ?? [];
@@ -174,6 +192,7 @@ export default function NewMaterialRequestPage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Material Request"

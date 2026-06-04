@@ -125,7 +125,7 @@ export default function MaterialRequestDetailPage() {
       description: "Create PO from this request",
       onClick: () => router.push(`/buying/purchase-order/new?material_request=${encodeURIComponent(name)}`),
       disabled: !isModuleBuilt("Purchase Order"),
-      disabledReason: "Coming in Phase 2",
+      disabledReason: "Module not available",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 

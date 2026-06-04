@@ -70,6 +70,7 @@ const WIZARD_STEPS: WizardStep[] = [
 export default function CreateJournalEntryPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<JournalEntryFormData>({
     resolver: zodResolver(JournalEntryCreateSchema),
@@ -149,7 +150,7 @@ export default function CreateJournalEntryPage() {
       />
 
       <Form {...form}>
-        <InfoCard className="max-w-4xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}
@@ -157,6 +158,7 @@ export default function CreateJournalEntryPage() {
             isSubmitting={createMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={onSubmit}
             onCancel={() => router.back()}
             submitLabel="Create Entry"

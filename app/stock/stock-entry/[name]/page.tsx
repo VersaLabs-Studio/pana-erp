@@ -147,7 +147,7 @@ export default function StockEntryDetailPage() {
       description: "Create fulfillment from this entry",
       onClick: () => router.push(`/stock/delivery-note/new?stock_entry=${encodeURIComponent(name)}`),
       disabled: !isModuleBuilt("Delivery Note"),
-      disabledReason: "Coming in Phase 2",
+      disabledReason: "Module not available",
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 

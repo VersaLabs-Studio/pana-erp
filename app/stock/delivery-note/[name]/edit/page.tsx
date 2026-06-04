@@ -211,7 +211,7 @@ export default function EditDeliveryNotePage() {
         backHref={`/stock/delivery-note/${encodeURIComponent(name)}`}
       />
       <Form {...form}>
-        <InfoCard className="max-w-3xl">
+        <InfoCard>
           <FlowWizard
             steps={WIZARD_STEPS}
             formData={watchedAll as unknown as Record<string, unknown>}

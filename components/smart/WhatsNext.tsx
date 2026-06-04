@@ -56,11 +56,11 @@ export function WhatsNext({ actions, className }: WhatsNextProps) {
       animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "rounded-xl border bg-card p-4",
+        "bg-card rounded-2xl shadow-sm shadow-black/5 p-6 border border-border/40",
         className
       )}
     >
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-4">
         <Sparkles className="h-4 w-4 text-primary" />
         <h4 className="text-sm font-semibold text-foreground">What&apos;s Next?</h4>
       </div>
@@ -73,7 +73,7 @@ export function WhatsNext({ actions, className }: WhatsNextProps) {
               key={action.label}
               variant={action.isPrimary ? "default" : "ghost"}
               size="sm"
-              className="w-full justify-between"
+              className="w-full justify-between h-auto py-3"
               onClick={action.onClick}
               disabled={isDisabled}
             >

@@ -50,15 +50,19 @@ const strategies: ErrorStrategy[] = [
       const qtyMatch = msg.match(/([\d.]+)\s+units?/i);
       const whMatch = msg.match(/Warehouse\s+(.+?)(?:\s+to\s+complete|$)/i);
 
-      const item = itemMatch?.[1]?.trim() ?? "Unknown item";
+      const rawItem = itemMatch?.[1]?.trim() ?? "Unknown item";
       const qty = qtyMatch?.[1] ?? "?";
       const warehouse = whMatch?.[1]?.trim() ?? "unknown warehouse";
 
+      const [itemCode, itemName] = rawItem.includes(": ")
+        ? rawItem.split(": ", 2)
+        : [rawItem, rawItem];
+
       return {
         title: "Not enough stock to deliver",
-        explanation: `You need ${qty} more units of ${item} in ${warehouse} to complete this transaction.`,
+        explanation: `You need ${qty} more units of ${itemCode} in ${warehouse} to complete this transaction.`,
         details: [
-          `Item: ${item}`,
+          `Item: ${itemCode}`,
           `Short by: ${qty} units`,
           `Warehouse: ${warehouse}`,
         ],
@@ -69,9 +73,9 @@ const strategies: ErrorStrategy[] = [
             kind: "prefill",
             variant: "default",
             run: () => {
-              // Caller wires this — deep-link to MR wizard prefilled
               const params = new URLSearchParams({
-                item: item,
+                item_code: itemCode,
+                item_name: itemName || itemCode,
                 qty: qty,
                 warehouse: warehouse,
               });

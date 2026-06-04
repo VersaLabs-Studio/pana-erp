@@ -93,6 +93,7 @@ function CreateWorkOrderForm() {
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<WOForm>({
     defaultValues: {
@@ -251,6 +252,7 @@ function CreateWorkOrderForm() {
           isSubmitting={createMutation.isPending}
           onFormDataChange={() => {}}
           onStepChange={setStep}
+          onTriedNextChange={setTriedNextSteps}
           onSubmit={handleSubmit}
           onCancel={() => router.back()}
           submitLabel="Create Work Order"

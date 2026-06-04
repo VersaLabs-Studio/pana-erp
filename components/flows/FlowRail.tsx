@@ -1,8 +1,7 @@
 // components/flows/FlowRail.tsx
-// Obsidian ERP v4.0 — "Journey Rail" premium flow visualization
-// Part C: Progress header, continuous spine, status eyebrows,
-// current-row emphasis, one real action per row.
-// Replaces the old flat list of disconnected glyph stubs.
+// Obsidian ERP v4.0 — Horizontal stepper flow visualization
+// Compact journey rail with connected nodes, animated connectors,
+// and one surfaced action per flow.
 
 "use client";
 
@@ -16,8 +15,6 @@ import {
   Clock,
   SkipForward,
   Ban,
-  ChevronRight,
-  ExternalLink,
   ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,34 +38,9 @@ interface FlowRailProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-type StageEyebrow = "Completed" | "In progress" | "Up next" | "Pending" | "Blocked" | "Skipped";
-
-function getEyebrow(status: FlowStageStatus, isNextBuildable: boolean): StageEyebrow {
-  if (status === "completed") return "Completed";
-  if (status === "current") return "In progress";
-  if (isNextBuildable) return "Up next";
-  if (status === "pending") return "Pending";
-  if (status === "blocked") return "Blocked";
-  if (status === "skipped") return "Skipped";
-  return "Pending";
-}
-
-function formatRelativeTime(dateStr?: string): string {
-  if (!dateStr) return "";
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
-}
 
 // ---------------------------------------------------------------------------
-// Node glyph (32px)
+// Node glyph (28–32px)
 // ---------------------------------------------------------------------------
 function StageNode({ status }: { status: FlowStageStatus }) {
   const prefersReducedMotion = useReducedMotion();
@@ -122,122 +94,140 @@ function StageNode({ status }: { status: FlowStageStatus }) {
 }
 
 // ---------------------------------------------------------------------------
-// Single row
+// Connector segment between nodes
 // ---------------------------------------------------------------------------
-function RailRow({
+function Connector({
+  filled,
+  index,
+  prefersReducedMotion,
+}: {
+  filled: boolean;
+  index: number;
+  prefersReducedMotion: boolean;
+}) {
+  return (
+    <div className="flex-1 flex items-center min-w-[20px] h-8" aria-hidden>
+      <motion.div
+        className={cn(
+          "h-0.5 w-full rounded-full",
+          filled ? "bg-primary" : "bg-border/40"
+        )}
+        initial={prefersReducedMotion ? {} : { scaleX: 0 }}
+        animate={prefersReducedMotion ? {} : { scaleX: 1 }}
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { duration: 0.4, delay: index * 0.05, ease: "easeOut" }
+        }
+        style={{ originX: 0 }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single stepper node
+// ---------------------------------------------------------------------------
+function StepperNode({
   stage,
   isCurrent,
-  isNextBuildable,
-  eyebrow,
+  isCompleted,
+  isSkipped,
   index,
-  total,
-  upstreamDocId,
+  prefersReducedMotion,
 }: {
   stage: FlowStage;
   isCurrent: boolean;
-  isNextBuildable: boolean;
-  eyebrow: StageEyebrow;
+  isCompleted: boolean;
+  isSkipped: boolean;
   index: number;
-  total: number;
-  upstreamDocId?: string;
+  prefersReducedMotion: boolean;
 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const isSkipped = stage.status === "skipped";
-  const isCompleted = stage.status === "completed";
-  const isPending = stage.status === "pending";
-
-  // Action slot
-  const hasViewLink = isCompleted && stage.documentUrl;
-  const hasCreateLink =
-    isNextBuildable &&
-    stage.createAction &&
-    isModuleBuilt(stage.doctype);
-
-  const metaLine = isCurrent
-    ? "you are here"
+  const hasDocLink = isCompleted && stage.documentUrl;
+  const tooltipText = isCurrent
+    ? `${stage.label} — you are here`
     : isCompleted && stage.documentName
       ? stage.documentName
-      : isPending
-        ? "Not created yet"
-        : undefined;
+      : stage.label;
 
-  const timeLine = isCompleted ? "" : undefined;
-
-  return (
+  const node = (
     <motion.div
-      initial={prefersReducedMotion ? {} : { opacity: 0, y: 8 }}
+      initial={prefersReducedMotion ? {} : { opacity: 0, y: 6 }}
       animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
       transition={
         prefersReducedMotion
           ? { duration: 0 }
           : { duration: 0.25, delay: index * 0.05 }
       }
-      className={cn(
-        "relative flex items-start gap-3 py-3",
-        isSkipped && "opacity-50",
-        isCurrent && "-mx-2 rounded-xl bg-primary/[0.04] px-2",
-      )}
+      className="group relative flex flex-col items-center gap-1.5 min-w-0"
     >
-      {/* Node */}
       <StageNode status={stage.status} />
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 pt-0.5">
-        {/* Eyebrow */}
-        <span
-          className={cn(
-            "text-[10px] uppercase tracking-wider font-medium",
-            eyebrow === "Completed" && "text-muted-foreground",
-            eyebrow === "In progress" && "text-primary",
-            eyebrow === "Up next" && "text-muted-foreground",
-            eyebrow === "Pending" && "text-muted-foreground/50",
-            eyebrow === "Blocked" && "text-destructive",
-            eyebrow === "Skipped" && "text-muted-foreground/40",
-          )}
-        >
-          {eyebrow}
+      <span
+        className={cn(
+          "text-[11px] font-medium truncate max-w-[72px] text-center",
+          isCurrent && "font-semibold text-foreground",
+          isSkipped && "line-through text-muted-foreground/50",
+          !isCurrent && !isSkipped && "text-muted-foreground"
+        )}
+      >
+        {stage.label}
+      </span>
+
+      {isCurrent && (
+        <span className="text-[10px] text-primary font-medium">
+          you are here
         </span>
+      )}
 
-        {/* Label */}
-        <p
-          className={cn(
-            "text-sm",
-            isCurrent ? "font-semibold text-foreground" : "font-medium text-foreground",
-            isSkipped && "line-through text-muted-foreground",
-          )}
-        >
-          {stage.label}
-        </p>
-
-        {/* Meta line */}
-        {metaLine && (
-          <p className="text-[11px] text-muted-foreground font-mono mt-0.5 truncate">
-            {metaLine}
-            {timeLine && ` · ${timeLine}`}
-          </p>
-        )}
-      </div>
-
-      {/* Action slot — exactly one, right-aligned */}
-      <div className="shrink-0 pt-5">
-        {hasViewLink && (
-          <Link
-            href={stage.documentUrl!}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            View <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
-        {hasCreateLink && stage.createAction && (
-          <Link
-            href={stage.createAction}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors"
-          >
-            Create <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
+      {/* Hover tooltip */}
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {tooltipText}
       </div>
     </motion.div>
+  );
+
+  if (hasDocLink) {
+    return (
+      <Link
+        href={stage.documentUrl!}
+        className="outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-lg"
+        aria-label={`View ${stage.documentName ?? stage.label}`}
+      >
+        {node}
+      </Link>
+    );
+  }
+
+  return (
+    <div aria-current={isCurrent ? "step" : undefined}>
+      {node}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+function FlowRailSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("bg-card rounded-2xl shadow-sm p-5", className)}>
+      <div className="flex items-center justify-between mb-4">
+        <SkeletonLine className="h-4 w-28" />
+        <SkeletonLine className="h-3 w-20" />
+      </div>
+      <div className="flex items-center gap-0">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="contents">
+            <div className="flex flex-col items-center gap-1.5">
+              <SkeletonLine className="h-8 w-8 rounded-full" />
+              <SkeletonLine className="h-2.5 w-12" />
+            </div>
+            {i < 5 && <SkeletonLine className="flex-1 h-0.5 min-w-[20px] mx-1" />}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -254,36 +244,13 @@ export function FlowRail({
 
   // Loading
   if (isLoading) {
-    return (
-      <div className={cn("bg-card shadow-sm rounded-2xl p-6 space-y-4", className)}>
-        <div className="flex items-center justify-between">
-          <SkeletonLine className="h-4 w-28" />
-          <SkeletonLine className="h-3 w-20" />
-        </div>
-        <SkeletonLine className="h-1.5 w-full rounded-full" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 py-2">
-            <SkeletonLine className="h-8 w-8 rounded-full" />
-            <div className="space-y-1.5 flex-1">
-              <SkeletonLine className="h-3 w-16" />
-              <SkeletonLine className="h-4 w-32" />
-              <SkeletonLine className="h-2.5 w-24" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <FlowRailSkeleton className={className} />;
   }
 
   // Error
   if (error) {
     return (
-      <div
-        className={cn(
-          "bg-card shadow-sm rounded-2xl p-6",
-          className,
-        )}
-      >
+      <div className={cn("bg-card rounded-2xl shadow-sm p-5", className)}>
         <div className="flex items-center gap-2 text-destructive">
           <Ban className="h-4 w-4" />
           <span className="text-sm">Failed to load flow: {error.message}</span>
@@ -292,10 +259,10 @@ export function FlowRail({
     );
   }
 
-  // Empty / standalone
+  // Empty
   if (!result || result.stages.length === 0) {
     return (
-      <div className={cn("bg-card shadow-sm rounded-2xl p-6", className)}>
+      <div className={cn("bg-card rounded-2xl shadow-sm p-5", className)}>
         <p className="text-sm text-muted-foreground text-center">
           No flow data available
         </p>
@@ -306,80 +273,101 @@ export function FlowRail({
   const { stages, completedCount } = result;
   const total = stages.length;
 
-  // Find the next buildable stage (first pending whose upstream is completed + module built)
+  // Find the next buildable stage
   const nextBuildableIndex = stages.findIndex((s, i) => {
     if (s.status !== "pending") return false;
     if (!isModuleBuilt(s.doctype)) return false;
-    // Upstream must be completed or current
     if (i === 0) return true;
     const upstream = stages[i - 1];
     return upstream.status === "completed" || upstream.status === "current";
   });
 
-  // Progress percentage
-  const progressPct = total > 0 ? (completedCount / total) * 100 : 0;
+  const nextBuildable =
+    nextBuildableIndex >= 0 ? stages[nextBuildableIndex] : null;
+  const nextBuildableAction =
+    nextBuildable?.createAction && isModuleBuilt(nextBuildable.doctype)
+      ? nextBuildable.createAction
+      : null;
 
   return (
     <motion.div
       initial={prefersReducedMotion ? {} : { opacity: 0 }}
       animate={prefersReducedMotion ? {} : { opacity: 1 }}
       transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.3 }}
-      className={cn("bg-card shadow-sm rounded-2xl p-6", className)}
+      className={cn("bg-card rounded-2xl shadow-sm p-5", className)}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-foreground">Order Journey</h3>
         <span className="text-xs text-muted-foreground">
           {completedCount} of {total} complete
         </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <motion.div
-          className="h-full rounded-full bg-primary"
-          initial={{ width: 0 }}
-          animate={{ width: `${progressPct}%` }}
-          transition={
-            prefersReducedMotion
-              ? { duration: 0 }
-              : { duration: 0.6, ease: "easeOut" }
-          }
-        />
-      </div>
-
-      {/* Spine + rows */}
-      <div className="relative">
-        {/* Continuous spine — absolute positioned */}
-        <div
-          className="absolute left-4 top-4 bottom-4 w-px"
-          style={{
-            background: `linear-gradient(to bottom, var(--color-primary) ${progressPct}%, var(--color-border) ${progressPct}%)`,
-            opacity: 0.4,
-          }}
-        />
-
-        {/* Rows */}
-        <div className="space-y-0">
+      {/* Horizontal stepper band */}
+      <div className="overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2">
+        <div className="flex items-center min-w-max">
           {stages.map((stage, index) => {
             const isCurrent = stage.status === "current";
-            const isNextBuildable = index === nextBuildableIndex;
-            const eyebrow = getEyebrow(stage.status, isNextBuildable);
+            const isCompleted = stage.status === "completed";
+            const isSkipped = stage.status === "skipped";
 
             return (
-              <RailRow
-                key={stage.id}
-                stage={stage}
-                isCurrent={isCurrent}
-                isNextBuildable={isNextBuildable}
-                eyebrow={eyebrow}
-                index={index}
-                total={total}
-              />
+              <div key={stage.id} className="contents">
+                <StepperNode
+                  stage={stage}
+                  isCurrent={isCurrent}
+                  isCompleted={isCompleted}
+                  isSkipped={isSkipped}
+                  index={index}
+                  prefersReducedMotion={!!prefersReducedMotion}
+                />
+                {index < stages.length - 1 && (
+                  <Connector
+                    filled={isCompleted}
+                    index={index}
+                    prefersReducedMotion={!!prefersReducedMotion}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
       </div>
+
+      {/* Surfaced action */}
+      {nextBuildable && nextBuildableAction && (
+        <motion.div
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 4 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { duration: 0.3, delay: 0.3 }
+          }
+          className="mt-4 flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3"
+        >
+          <span className="text-sm text-muted-foreground">
+            Up next:{" "}
+            <span className="font-semibold text-foreground">
+              {nextBuildable.label}
+            </span>
+          </span>
+          <Link href={nextBuildableAction}>
+            <Button size="sm" className="gap-1.5">
+              Create <ArrowRight className="h-3 w-3" />
+            </Button>
+          </Link>
+        </motion.div>
+      )}
+
+      {result.isComplete && (
+        <div className="mt-4 flex items-center justify-center rounded-lg bg-primary/5 px-4 py-3">
+          <span className="text-sm font-medium text-primary">
+            All complete
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 }

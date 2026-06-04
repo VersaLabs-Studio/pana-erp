@@ -33,6 +33,7 @@ interface FlowWizardProps {
   isSubmitting?: boolean;
   onFormDataChange: (data: Record<string, unknown>) => void;
   onStepChange: (step: number) => void;
+  onTriedNextChange?: (triedNext: Set<number>) => void;
   onSubmit: () => void;
   onCancel: () => void;
   renderStep: (step: WizardStep, stepIndex: number) => React.ReactNode;
@@ -121,6 +122,7 @@ export function FlowWizard({
   validationResults,
   isSubmitting,
   onStepChange,
+  onTriedNextChange,
   onSubmit,
   onCancel,
   renderStep,
@@ -137,6 +139,11 @@ export function FlowWizard({
   const currentStepData = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
   const isFirstStep = currentStep === 0;
+
+  // Expose triedNextSteps to the parent for per-field error lighting
+  useEffect(() => {
+    onTriedNextChange?.(triedNextSteps);
+  }, [triedNextSteps, onTriedNextChange]);
 
   const currentValidation = validationResults?.[currentStepData?.id];
   const isCurrentStepValid = currentValidation
