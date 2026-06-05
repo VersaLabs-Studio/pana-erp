@@ -83,12 +83,6 @@ const strategies: ErrorStrategy[] = [
             },
           },
           {
-            label: "Reduce quantity",
-            kind: "dismiss",
-            variant: "secondary",
-            run: () => {},
-          },
-          {
             label: "Dismiss",
             kind: "dismiss",
             variant: "ghost",
@@ -118,14 +112,6 @@ const strategies: ErrorStrategy[] = [
         severity: "warning",
         actions: [
           {
-            label: "Go to field",
-            kind: "prefill",
-            variant: "default",
-            run: () => {
-              // The page-level handler focuses the specific field
-            },
-          },
-          {
             label: "Dismiss",
             kind: "dismiss",
             variant: "ghost",
@@ -154,12 +140,6 @@ const strategies: ErrorStrategy[] = [
         severity: "error",
         actions: [
           {
-            label: "Pick another",
-            kind: "dismiss",
-            variant: "default",
-            run: () => {},
-          },
-          {
             label: "Dismiss",
             kind: "dismiss",
             variant: "ghost",
@@ -186,21 +166,67 @@ const strategies: ErrorStrategy[] = [
         severity: "warning",
         actions: [
           {
-            label: "Open existing",
-            kind: "navigate",
-            variant: "default",
-            run: () => {},
-          },
-          {
-            label: "Change entry",
-            kind: "dismiss",
-            variant: "secondary",
-            run: () => {},
-          },
-          {
             label: "Dismiss",
             kind: "dismiss",
             variant: "ghost",
+            run: () => {},
+          },
+        ],
+      };
+    },
+  },
+
+  // LINKED_DOC_EXISTS
+  {
+    code: "LINKED_DOC_EXISTS",
+    match: (m) =>
+      /cannot cancel because.*exists/i.test(m) ||
+      /linked with submitted/i.test(m) ||
+      /is linked with/i.test(m),
+    resolve: (msg) => {
+      const linkedNameMatch = msg.match(/([A-Z]{2,}-[\w-]+-\d+(?:-\d+)?)/i);
+      const linkedName = linkedNameMatch?.[1]?.trim() ?? "the linked record";
+
+      const idIndex = linkedNameMatch?.index ?? 0;
+      const beforeId = msg.slice(0, idIndex);
+      const noise = /^(?:submitted|existing|draft)\s+/i;
+      const cleaned = beforeId.replace(noise, "").trim();
+      const linkedDoctype = cleaned.split(/\s+/).slice(-2).join(" ") || "Linked document";
+
+      const routeMap: Record<string, string> = {
+        "Stock Entry": "stock/stock-entry",
+        "Sales Order": "sales/sales-order",
+        "Delivery Note": "stock/delivery-note",
+        "Sales Invoice": "accounting/sales-invoice",
+        "Purchase Order": "buying/purchase-order",
+        "Purchase Invoice": "accounting/purchase-invoice",
+        "Work Order": "manufacturing/work-order",
+        "Material Request": "stock/material-request",
+        "Payment Entry": "accounting/payment-entry",
+        "Journal Entry": "accounting/journal-entry",
+        "BOM": "manufacturing/bom",
+        "Quotation": "sales/quotation",
+      };
+      const route = routeMap[linkedDoctype] ?? linkedDoctype.toLowerCase().replace(/\s+/g, "-");
+
+      return {
+        title: "Cancel the linked document first",
+        explanation: `This can't be cancelled while ${linkedDoctype} ${linkedName} is still submitted. Cancel ${linkedName} first, then return here.`,
+        details: [`Linked: ${linkedDoctype} ${linkedName}`],
+        severity: "warning" as const,
+        actions: [
+          {
+            label: `Open ${linkedDoctype} ${linkedName}`,
+            kind: "navigate" as const,
+            variant: "default" as const,
+            run: () => {
+              window.location.href = `/${route}/${encodeURIComponent(linkedName)}`;
+            },
+          },
+          {
+            label: "Dismiss",
+            kind: "dismiss" as const,
+            variant: "ghost" as const,
             run: () => {},
           },
         ],

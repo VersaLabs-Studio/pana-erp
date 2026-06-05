@@ -21,6 +21,7 @@ export const LEAD_TO_CASH_FLOW: FlowDefinition = {
       doctype: "Lead",
       status: "pending",
       icon: "UserPlus",
+      canCreateDownstream: false,
     },
     {
       id: "opportunity",
@@ -28,6 +29,7 @@ export const LEAD_TO_CASH_FLOW: FlowDefinition = {
       doctype: "Opportunity",
       status: "pending",
       icon: "Target",
+      canCreateDownstream: false,
     },
     {
       id: "quotation",

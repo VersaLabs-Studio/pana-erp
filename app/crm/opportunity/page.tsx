@@ -1,5 +1,5 @@
-// app/crm/lead/page.tsx
-// Obsidian ERP v4.0 — Leads List Page (Golden Template)
+// app/crm/opportunity/page.tsx
+// Obsidian ERP v4.0 — Opportunity List Page (Golden Template)
 // KPI cards, StatusBadge, search, filter pills, card grid.
 // Premium UI: OKLCH semantic tokens only, Framer Motion, elevation-first surfaces.
 
@@ -15,14 +15,13 @@ import {
   Pencil,
   Trash2,
   Eye,
-  UserPlus,
-  Mail,
-  Phone,
+  Target,
+  CalendarDays,
   Building2,
-  MapPin,
-  Users,
-  UserCheck,
+  Percent,
   TrendingUp,
+  Trophy,
+  XCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,17 +39,26 @@ import {
 } from "@/components/smart";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { StatusBadge } from "@/components/smart/status-badge";
-import type { Lead } from "@/types/doctype-types";
+import type { Opportunity } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 
-function LeadCard({
-  lead,
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "\u2014";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function OpportunityCard({
+  opp,
   index,
   onView,
   onEdit,
   onDelete,
 }: {
-  lead: Lead;
+  opp: Opportunity;
   index: number;
   onView: () => void;
   onEdit: () => void;
@@ -70,57 +78,53 @@ function LeadCard({
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-lg text-foreground tracking-tight truncate">
-                {lead.lead_name || lead.first_name || "Unnamed Lead"}
-              </h3>
-            </div>
-            {lead.company_name && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <Building2 className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{lead.company_name}</span>
-              </p>
-            )}
+            <h3 className="font-bold text-lg text-foreground tracking-tight truncate">
+              {opp.title || opp.party_name || opp.name}
+            </h3>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <Building2 className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{opp.party_name}</span>
+            </p>
           </div>
-          <StatusBadge status={lead.status} size="sm" />
+          <StatusBadge status={opp.status} size="sm" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {lead.source && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
-                Source
-              </p>
-              <p className="text-sm font-medium text-foreground">{lead.source}</p>
-            </div>
-          )}
-          {lead.territory && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
-                Territory
-              </p>
-              <p className="text-sm font-medium text-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3 text-muted-foreground" />
-                {lead.territory}
-              </p>
-            </div>
-          )}
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
+              Type
+            </p>
+            <p className="text-sm font-medium text-foreground">
+              {opp.opportunity_type || "\u2014"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
+              Stage
+            </p>
+            <p className="text-sm font-medium text-foreground">
+              {opp.sales_stage || "\u2014"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground/70 tracking-wider">
+              Probability
+            </p>
+            <p className="text-sm font-medium text-foreground flex items-center gap-1">
+              <Percent className="h-3 w-3 text-muted-foreground" />
+              {opp.probability ?? "\u2014"}
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {lead.email_id && (
-              <span className="flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                <span className="truncate max-w-[120px]">{lead.email_id}</span>
-              </span>
-            )}
-            {lead.mobile_no && (
-              <span className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {lead.mobile_no}
-              </span>
-            )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CalendarDays className="h-3 w-3" />
+            <span>
+              {opp.expected_closing
+                ? `Close: ${formatDate(opp.expected_closing)}`
+                : `Created: ${formatDate(opp.transaction_date)}`}
+            </span>
           </div>
 
           <DropdownMenu>
@@ -147,16 +151,18 @@ function LeadCard({
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="rounded-lg cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
+              {opp.status === "Open" && (
+                <DropdownMenuItem
+                  className="rounded-lg cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
@@ -176,69 +182,67 @@ function LeadCard({
   );
 }
 
-export default function LeadListPage() {
+export default function OpportunityListPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Opportunity | null>(null);
 
   const {
-    data: leads,
+    data: opportunities,
     isLoading,
     error,
-  } = useFrappeList<Lead>("Lead", {
+  } = useFrappeList<Opportunity>("Opportunity", {
     fields: [
       "name",
-      "lead_name",
-      "company_name",
-      "email_id",
-      "mobile_no",
-      "phone",
-      "source",
-      "territory",
+      "title",
+      "party_name",
+      "opportunity_from",
+      "opportunity_type",
+      "sales_stage",
+      "probability",
+      "expected_closing",
+      "transaction_date",
       "status",
-      "industry",
-      "creation",
+      "company",
     ],
     orderBy: { field: "creation", order: "desc" },
     search,
     limit: 100,
   });
 
-  const deleteMutation = useFrappeDelete("Lead", {
+  const deleteMutation = useFrappeDelete("Opportunity", {
     onSuccess: () => setDeleteTarget(null),
   });
 
-  const filteredLeads = useMemo(() => {
-    if (!leads) return [];
-    if (statusFilter === "all") return leads;
-    return leads.filter((l) => l.status === statusFilter);
-  }, [leads, statusFilter]);
+  const filteredOpps = useMemo(() => {
+    if (!opportunities) return [];
+    if (statusFilter === "all") return opportunities;
+    return opportunities.filter((o) => o.status === statusFilter);
+  }, [opportunities, statusFilter]);
 
   const statusCounts = useMemo(() => {
-    if (!leads) return {};
-    return leads.reduce(
-      (acc, l) => {
-        acc[l.status] = (acc[l.status] || 0) + 1;
+    if (!opportunities) return {};
+    return opportunities.reduce(
+      (acc, o) => {
+        acc[o.status] = (acc[o.status] || 0) + 1;
         return acc;
       },
       {} as Record<string, number>,
     );
-  }, [leads]);
+  }, [opportunities]);
 
   const kpis = useMemo(() => {
-    if (!leads) return { total: 0, open: 0, qualified: 0, converted: 0 };
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    return {
-      total: leads.length,
-      open: leads.filter((l) => ["Lead", "Open", "Replied"].includes(l.status)).length,
-      qualified: leads.filter((l) => l.status === "Interested" || l.status === "Opportunity").length,
-      converted: leads.filter(
-        (l) => l.status === "Converted" && l.creation && l.creation >= monthStart,
-      ).length,
-    };
-  }, [leads]);
+    if (!opportunities)
+      return { total: 0, open: 0, won: 0, lost: 0, winRate: 0 };
+    const total = opportunities.length;
+    const open = opportunities.filter((o) => o.status === "Open").length;
+    const won = opportunities.filter((o) => o.status === "Converted").length;
+    const lost = opportunities.filter((o) => o.status === "Lost").length;
+    const closed = won + lost;
+    const winRate = closed > 0 ? Math.round((won / closed) * 100) : 0;
+    return { total, open, won, lost, winRate };
+  }, [opportunities]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -249,57 +253,64 @@ export default function LeadListPage() {
   if (error)
     return (
       <div className="p-8 text-center text-destructive">
-        Failed to load leads
+        Failed to load opportunities
       </div>
     );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Leads"
-        subtitle={`${filteredLeads.length} lead${filteredLeads.length !== 1 ? "s" : ""}`}
+        title="Opportunities"
+        subtitle={`${filteredOpps.length} opportunit${filteredOpps.length !== 1 ? "ies" : "y"}`}
         showSearch
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search by name, company, email..."
+        searchPlaceholder="Search by title, party, type..."
         actions={
           <Button
             className="rounded-full shadow-lg shadow-primary/20"
-            onClick={() => router.push("/crm/lead/new")}
+            onClick={() => router.push("/crm/opportunity/new")}
           >
             <Plus className="h-4 w-4 mr-2" />
-            New Lead
+            New Opportunity
           </Button>
         }
       />
 
       {/* KPI Bar */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <KPICard
-          title="Total Leads"
+          title="Total"
           value={kpis.total}
-          icon={Users}
+          icon={Target}
           isLoading={isLoading}
         />
         <KPICard
           title="Open"
           value={kpis.open}
-          icon={UserPlus}
-          variant="warning"
-          isLoading={isLoading}
-        />
-        <KPICard
-          title="Qualified"
-          value={kpis.qualified}
           icon={TrendingUp}
           variant="default"
           isLoading={isLoading}
         />
         <KPICard
-          title="Converted (Month)"
-          value={kpis.converted}
-          icon={UserCheck}
+          title="Won"
+          value={kpis.won}
+          icon={Trophy}
           variant="success"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Lost"
+          value={kpis.lost}
+          icon={XCircle}
+          variant="danger"
+          isLoading={isLoading}
+        />
+        <KPICard
+          title="Win Rate"
+          value={`${kpis.winRate}%`}
+          icon={Percent}
+          variant={kpis.winRate >= 50 ? "success" : "warning"}
           isLoading={isLoading}
         />
       </div>
@@ -307,14 +318,13 @@ export default function LeadListPage() {
       {/* Status Filter Pills */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all", label: "All", count: leads?.length || 0 },
-          { key: "Lead", label: "Lead", count: statusCounts.Lead || 0 },
+          { key: "all", label: "All", count: opportunities?.length || 0 },
           { key: "Open", label: "Open", count: statusCounts.Open || 0 },
-          { key: "Replied", label: "Replied", count: statusCounts.Replied || 0 },
-          { key: "Interested", label: "Interested", count: statusCounts.Interested || 0 },
-          { key: "Opportunity", label: "Opportunity", count: statusCounts.Opportunity || 0 },
+          { key: "Quotation", label: "Quotation", count: statusCounts.Quotation || 0 },
           { key: "Converted", label: "Converted", count: statusCounts.Converted || 0 },
-          { key: "Do Not Contact", label: "Do Not Contact", count: statusCounts["Do Not Contact"] || 0 },
+          { key: "Lost", label: "Lost", count: statusCounts.Lost || 0 },
+          { key: "Replied", label: "Replied", count: statusCounts.Replied || 0 },
+          { key: "Closed", label: "Closed", count: statusCounts.Closed || 0 },
         ].map((status) => (
           <Button
             key={status.key}
@@ -344,41 +354,45 @@ export default function LeadListPage() {
         ))}
       </div>
 
-      {/* Leads Grid */}
-      {!leads || leads.length === 0 ? (
+      {/* Opportunities Grid */}
+      {!opportunities || opportunities.length === 0 ? (
         <EmptyState
-          title="No leads found"
-          description="Create your first lead to start tracking prospects"
+          title="No opportunities found"
+          description="Create your first opportunity to start tracking deals"
           action={
             <Button
-              onClick={() => router.push("/crm/lead/new")}
+              onClick={() => router.push("/crm/opportunity/new")}
               className="rounded-full"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create Lead
+              Create Opportunity
             </Button>
           }
         />
-      ) : filteredLeads.length === 0 ? (
+      ) : filteredOpps.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          <Users className="h-12 w-12 mx-auto mb-4 opacity-30" />
-          <p className="font-medium">No leads match this filter</p>
+          <Target className="h-12 w-12 mx-auto mb-4 opacity-30" />
+          <p className="font-medium">No opportunities match this filter</p>
           <p className="text-sm mt-1">Try selecting a different status</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredLeads.map((lead, index) => (
-            <LeadCard
-              key={lead.name}
-              lead={lead}
+          {filteredOpps.map((opp, index) => (
+            <OpportunityCard
+              key={opp.name}
+              opp={opp}
               index={index}
               onView={() =>
-                router.push(`/crm/lead/${encodeURIComponent(lead.name)}`)
+                router.push(
+                  `/crm/opportunity/${encodeURIComponent(opp.name)}`,
+                )
               }
               onEdit={() =>
-                router.push(`/crm/lead/${encodeURIComponent(lead.name)}/edit`)
+                router.push(
+                  `/crm/opportunity/${encodeURIComponent(opp.name)}/edit`,
+                )
               }
-              onDelete={() => setDeleteTarget(lead)}
+              onDelete={() => setDeleteTarget(opp)}
             />
           ))}
         </div>
@@ -388,8 +402,8 @@ export default function LeadListPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Lead"
-        description={`Are you sure you want to delete "${deleteTarget?.lead_name || deleteTarget?.name}"? This action cannot be undone.`}
+        title="Delete Opportunity"
+        description={`Are you sure you want to delete "${deleteTarget?.title || deleteTarget?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         variant="destructive"
         onConfirm={handleDeleteConfirm}
