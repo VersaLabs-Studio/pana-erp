@@ -234,29 +234,28 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
   },
 
   // =========================================================================
-  // LEAD → OPPORTUNITY
+  // LEAD → CUSTOMER (B8: CRM head = Lead → Customer)
   // =========================================================================
-  "Lead->Opportunity": {
+  "Lead->Customer": {
     sourceDoctype: "Lead",
-    targetDoctype: "Opportunity",
+    targetDoctype: "Customer",
     headerMappings: [
-      { sourceField: "lead_name", targetField: "party_name", isReadOnly: true, sourceLabel: "Lead Name" },
-      { sourceField: "company_name", targetField: "company_name", isReadOnly: true, sourceLabel: "Company Name" },
+      { sourceField: "lead_name", targetField: "customer_name", isReadOnly: true, sourceLabel: "Name" },
+      { sourceField: "company_name", targetField: "customer_name", isReadOnly: true, sourceLabel: "Company Name" },
       { sourceField: "email_id", targetField: "email_id", isReadOnly: true, sourceLabel: "Email" },
-      { sourceField: "mobile_no", targetField: "contact_no", isReadOnly: true, sourceLabel: "Mobile" },
+      { sourceField: "mobile_no", targetField: "mobile_no", isReadOnly: true, sourceLabel: "Mobile" },
       { sourceField: "territory", targetField: "territory", isReadOnly: true, sourceLabel: "Territory" },
-      { sourceField: "source", targetField: "source", isReadOnly: true, sourceLabel: "Source" },
     ],
     itemMappings: [],
-    userMustFill: ["opportunity_type"],
+    userMustFill: [],
     defaults: {
-      naming_series: "CRM-OPP-.YYYY.-",
-      status: "Open",
+      customer_group: "All Customer Groups",
+      customer_type: "Company",
     },
   },
 
   // =========================================================================
-  // OPPORTUNITY → QUOTATION
+  // OPPORTUNITY → QUOTATION (demoted — secondary flow, not primary rail)
   // =========================================================================
   "Opportunity->Quotation": {
     sourceDoctype: "Opportunity",
