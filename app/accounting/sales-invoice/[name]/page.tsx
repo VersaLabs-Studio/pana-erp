@@ -180,13 +180,6 @@ export default function SalesInvoiceDetailPage() {
       disabled: !isModuleBuilt("Payment Entry"),
       disabledReason: "Payment Entry module not yet available",
     },
-    isSubmitted && {
-      label: "Print Invoice",
-      description: "Generate a printable PDF",
-      onClick: () => {},
-      disabled: true,
-      disabledReason: "Coming soon",
-    },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
   return (
