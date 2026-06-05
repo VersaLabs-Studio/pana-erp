@@ -33,6 +33,7 @@ import { validateWizardStep } from "@/lib/flows/flow-validation";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import { useFieldArray } from "react-hook-form";
+import { getActiveCompany } from "@/lib/settings/company";
 
 interface OppItem {
   item_code: string;
@@ -143,6 +144,7 @@ export default function NewOpportunityPage() {
     );
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         qty: Number(it.qty) || 1,

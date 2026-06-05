@@ -37,6 +37,7 @@ import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate } from "@/hooks/generic";
 import { validateWizardStep } from "@/lib/flows/flow-validation";
+import { getActiveCompany } from "@/lib/settings/company";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import type { BOMFormData, BOMItemData, BOMOperationData } from "@/lib/schemas/doctype-schemas";
@@ -215,6 +216,7 @@ export default function NewBOMPage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),

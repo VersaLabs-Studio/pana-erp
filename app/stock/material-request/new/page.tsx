@@ -173,6 +173,7 @@ export default function NewMaterialRequestPage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         schedule_date: it.schedule_date || values.schedule_date,

@@ -190,6 +190,7 @@ export default function NewStockEntryPage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       stock_entry_type: values.stock_entry_type || values.purpose,
       items: items.map((it) => ({
         ...it,

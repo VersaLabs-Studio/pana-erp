@@ -37,6 +37,7 @@ import {
 } from "@/lib/flows/flow-auto-fill";
 import { validateWizardStep } from "@/lib/flows/flow-validation";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
+import { getActiveCompany } from "@/lib/settings/company";
 import type { WizardStep } from "@/types/flow-types";
 import type { SalesOrder } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
@@ -227,6 +228,7 @@ function CreateWorkOrderForm() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       docstatus: 0,
       status: "Draft",
     });

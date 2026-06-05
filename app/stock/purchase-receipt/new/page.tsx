@@ -1,17 +1,17 @@
 "use client";
 
-// app/buying/purchase-order/new/page.tsx
-// Obsidian ERP v4.0 — Purchase Order Create (V4 FlowWizard)
-// 3-step wizard: Supplier & Dates → Items → Review & Submit.
-// Auto-fill from Material Request or Supplier Quotation via AUTO_FILL_REGISTRY.
-// Error resolver wired. OKLCH tokens only. No @ts-nocheck, no any.
+// app/stock/purchase-receipt/new/page.tsx
+// Obsidian ERP v4.0 — Purchase Receipt Create (V4 SmartForm Wizard)
+// Inbound goods from suppliers. Mirrors Delivery Note golden template.
+// Flow engine: FlowWizard (Zod step gating) + AUTO_FILL_REGISTRY (PO→PR).
+// B7: company injected via getActiveCompany(), never user-entered.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
-  UserRound,
+  Truck,
   Package,
   ClipboardCheck,
   Plus,
@@ -21,11 +21,6 @@ import {
 
 import { PageHeader } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
-import {
-  GuidedErrorDialog,
-  useGuidedError,
-} from "@/components/errors/GuidedErrorDialog";
-import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,9 +28,13 @@ import {
   FormFrappeSelect,
   FormDatePicker,
 } from "@/components/form";
+import { FieldWrap } from "@/components/form/field-wrap";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
+import { getActiveCompany } from "@/lib/settings/company";
 import {
   getAutoFillMapping,
   applyAutoFill,
@@ -46,13 +45,11 @@ import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import type { PurchaseOrder } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
-import { getActiveCompany } from "@/lib/settings/company";
-import { FieldWrap } from "@/components/form/field-wrap";
 
 // ---------------------------------------------------------------------------
 // Form model
 // ---------------------------------------------------------------------------
-interface POItem {
+interface PRItem {
   item_code: string;
   item_name?: string;
   description?: string;
@@ -61,29 +58,27 @@ interface POItem {
   amount?: number;
   uom?: string;
   warehouse?: string;
-  schedule_date?: string;
+  purchase_order?: string;
+  purchase_order_item?: string;
 }
 
-interface POForm {
+interface PRForm {
   naming_series: string;
   supplier: string;
   supplier_name?: string;
   company: string;
-  transaction_date: string;
-  schedule_date: string;
+  posting_date: string;
+  posting_time?: string;
+  set_warehouse?: string;
+  supplier_address?: string;
+  shipping_address?: string;
+  purchase_order?: string;
   currency: string;
   conversion_rate: number;
-  buying_price_list: string;
-  price_list_currency: string;
-  plc_conversion_rate: number;
-  set_warehouse?: string;
-  material_request?: string;
-  terms?: string;
-  status: string;
-  items: POItem[];
+  items: PRItem[];
 }
 
-const EMPTY_ITEM: POItem = {
+const EMPTY_ITEM: PRItem = {
   item_code: "",
   item_name: "",
   description: "",
@@ -97,24 +92,24 @@ const EMPTY_ITEM: POItem = {
 const WIZARD_STEPS: WizardStep[] = [
   {
     id: "step1",
-    label: "Supplier & Dates",
-    description: "Confirm the supplier and set the delivery timeline",
+    label: "Supplier & Date",
+    description: "Confirm the supplier and set posting details",
     schema: null,
-    fields: ["supplier", "company", "transaction_date", "schedule_date"],
-    icon: "UserRound",
+    fields: ["supplier", "posting_date"],
+    icon: "Truck",
   },
   {
     id: "step2",
-    label: "Order Items",
-    description: "Add items, quantities, and rates",
+    label: "Receive Items",
+    description: "Review and adjust the items being received",
     schema: null,
     fields: ["items"],
     icon: "Package",
   },
   {
     id: "step3",
-    label: "Review & Submit",
-    description: "Review the order before creating it",
+    label: "Review & Create",
+    description: "Review everything below, then create the receipt",
     schema: null,
     fields: [],
     icon: "ClipboardCheck",
@@ -126,11 +121,10 @@ const ETB = new Intl.NumberFormat("en-ET", {
   currency: "ETB",
 });
 
-export default function NewPurchaseOrderPage() {
+export default function NewPurchaseReceiptPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const materialRequestId = searchParams.get("material_request");
-  const supplierQuotationId = searchParams.get("supplier_quotation");
+  const purchaseOrderId = searchParams.get("purchase_order");
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -138,19 +132,15 @@ export default function NewPurchaseOrderPage() {
   );
   const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
-  const form = useForm<POForm>({
+  const form = useForm<PRForm>({
     defaultValues: {
-      naming_series: "PUR-ORD-.YYYY.-",
+      naming_series: "MAT-PRE-.YYYY.-",
       supplier: "",
       company: "",
-      transaction_date: new Date().toISOString().split("T")[0],
-      schedule_date: "",
+      posting_date: new Date().toISOString().split("T")[0],
+      posting_time: new Date().toTimeString().slice(0, 5),
       currency: "ETB",
       conversion_rate: 1,
-      buying_price_list: "Standard Buying",
-      price_list_currency: "ETB",
-      plc_conversion_rate: 1,
-      status: "Draft",
       items: [{ ...EMPTY_ITEM }],
     },
   });
@@ -160,45 +150,35 @@ export default function NewPurchaseOrderPage() {
 
   const watchedAll = useWatch({ control });
   const watchedItems = watchedAll?.items ?? [];
+  const watchedSupplier = watchedAll?.supplier ?? "";
 
-  // -- Auto-fill from Material Request ---------------------------------------
-  const { data: materialRequest, isLoading: loadingMR } =
-    useFrappeDoc<PurchaseOrder>("Material Request", materialRequestId ?? "", {
-      enabled: !!materialRequestId,
-    });
-
-  // -- Auto-fill from Supplier Quotation -------------------------------------
-  const { data: supplierQuotation, isLoading: loadingSQ } =
-    useFrappeDoc<PurchaseOrder>("Supplier Quotation", supplierQuotationId ?? "", {
-      enabled: !!supplierQuotationId,
+  // -- Auto-fill from upstream Purchase Order via the registry ----------------
+  const { data: purchaseOrder, isLoading: loadingPO } =
+    useFrappeDoc<PurchaseOrder>("Purchase Order", purchaseOrderId ?? "", {
+      enabled: !!purchaseOrderId,
     });
 
   useEffect(() => {
-    const source = materialRequest ?? supplierQuotation;
-    const sourceType = materialRequest
-      ? "Material Request"
-      : supplierQuotation
-        ? "Supplier Quotation"
-        : null;
-    if (!source || !sourceType) return;
-
-    const mapping = getAutoFillMapping(sourceType, "Purchase Order");
+    if (!purchaseOrder) return;
+    const mapping = getAutoFillMapping("Purchase Order", "Purchase Receipt");
     if (!mapping) return;
 
     const header = applyAutoFill(
-      source as unknown as Record<string, unknown>,
+      purchaseOrder as unknown as Record<string, unknown>,
       mapping,
     );
-    const items = applyItemAutoFill(
-      (source as { items?: Record<string, unknown>[] }).items ?? [],
-      mapping,
-    ) as unknown as POItem[];
+
+    const poItems = (purchaseOrder as { items?: Record<string, unknown>[] }).items ?? [];
+    const items = applyItemAutoFill(poItems, mapping).map((item, idx) => ({
+      ...item,
+      purchase_order: purchaseOrderId ?? "",
+      purchase_order_item: (poItems[idx] as { name?: string })?.name ?? "",
+    })) as unknown as PRItem[];
 
     reset({
       ...getValues(),
-      ...(header as Partial<POForm>),
+      ...(header as Partial<PRForm>),
       items: items.length ? items : [{ ...EMPTY_ITEM }],
-      schedule_date: "",
     });
 
     const filled = new Set<string>([
@@ -209,16 +189,17 @@ export default function NewPurchaseOrderPage() {
     ]);
     setAutoFilledFields(filled);
 
-    toast.success(`Loaded from ${sourceType} ${materialRequestId ?? supplierQuotationId}`, {
-      description: "Set the schedule date to continue.",
+    toast.success(`Loaded from Purchase Order ${purchaseOrderId}`, {
+      description: "Review items and set warehouse to continue.",
     });
-  }, [materialRequest, supplierQuotation, materialRequestId, supplierQuotationId, reset, getValues]);
+  }, [purchaseOrder, purchaseOrderId, reset, getValues]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),
     [autoFilledFields],
   );
 
+  // -- Live subtotal ----------------------------------------------------------
   const subtotal = useMemo(
     () =>
       (watchedItems ?? []).reduce(
@@ -228,40 +209,31 @@ export default function NewPurchaseOrderPage() {
     [watchedItems],
   );
 
+  // -- Per-step validation (gates the wizard's Next button) ------------------
   const validationResults = useMemo<Record<string, StepValidationResult>>(() => {
-    const values = {
-      ...getValues(),
-      ...watchedAll,
-      items: watchedAll?.items ?? [],
-    };
+    const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
-      step1: validateWizardStep("Purchase Order", "step1", values),
-      step2: validateWizardStep("Purchase Order", "step2", values),
+      step1: validateWizardStep("Purchase Receipt", "step1", values),
+      step2: validateWizardStep("Purchase Receipt", "step2", values),
       step3: { valid: true, errors: {} },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedAll]);
 
+  // -- Persistence ------------------------------------------------------------
   const { resolution, showError, dismiss } = useGuidedError();
-
   const createMutation = useFrappeCreate<
     { data: { name: string } },
     Record<string, unknown>
-  >("Purchase Order", {
-    successMessage: "Purchase Order created",
+  >("Purchase Receipt", {
+    successMessage: "Purchase Receipt created",
     onSuccess: (res) => {
       const name = res?.data?.name;
       if (name) {
-        router.push(`/buying/purchase-order/${encodeURIComponent(name)}`);
+        router.push(`/stock/purchase-receipt/${encodeURIComponent(name)}`);
       }
     },
-    onError: (err) => {
-      const r = resolveFrappeError(err, {
-        doctype: "Purchase Order",
-        values: getValues(),
-      });
-      showError(r);
-    },
+    onError: (err) => showError(resolveFrappeError(err, { doctype: "Purchase Receipt" })),
   });
 
   const handleSubmit = useCallback(() => {
@@ -270,37 +242,35 @@ export default function NewPurchaseOrderPage() {
       (it) => it.item_code && Number(it.qty) > 0,
     );
     if (items.length === 0) {
-      toast.error("Add at least one valid item before creating the order.");
+      toast.error("Add at least one valid item before creating the receipt.");
       setStep(1);
       return;
     }
     createMutation.mutate({
       ...values,
       company: getActiveCompany(),
-      items: items.map((it) => ({
+      items: items.map((it, idx) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
+        idx: idx + 1,
+        warehouse: it.warehouse || values.set_warehouse,
+        doctype: "Purchase Receipt Item",
       })),
-      conversion_rate: 1,
-      plc_conversion_rate: 1,
-      currency: "ETB",
-      price_list_currency: "ETB",
+      docstatus: 0,
+      status: "Draft",
     });
   }, [createMutation, getValues]);
-
-  const isLoadingSource = loadingMR || loadingSQ;
-  const sourceId = materialRequestId ?? supplierQuotationId;
 
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
-        title="New Purchase Order"
+        title="New Purchase Receipt"
         subtitle={
-          sourceId
-            ? `From ${materialRequestId ? "Material Request" : "Supplier Quotation"} ${sourceId}`
-            : "Create a purchase order in three steps"
+          purchaseOrderId
+            ? `From Purchase Order ${purchaseOrderId}`
+            : "Record incoming goods in three steps"
         }
-        backHref="/buying/purchase-order"
+        backHref="/stock/purchase-receipt"
       />
 
       <Form {...form}>
@@ -315,22 +285,22 @@ export default function NewPurchaseOrderPage() {
             onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
-            submitLabel="Create Purchase Order"
+            submitLabel="Create Purchase Receipt"
             submittingLabel="Creating..."
             renderStep={(s) => {
-              // ---- STEP 1 — Supplier & Dates ----------------------------
+              // ---- STEP 1 — Supplier & Date --------------------------------
               if (s.id === "step1") {
                 return (
                   <div className="space-y-6">
                     <StepHeading
-                      icon={<UserRound className="h-5 w-5 text-primary" />}
-                      title="Supplier & Dates"
-                      description="Confirm the supplier and set the delivery timeline."
+                      icon={<Truck className="h-5 w-5 text-primary" />}
+                      title="Supplier & Date"
+                      description="Confirm who is delivering goods and when they arrived."
                     />
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                       <FieldWrap
                         auto={isAuto("supplier")}
-                        loading={isLoadingSource}
+                        loading={loadingPO}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.supplier : undefined}
                       >
                         <FormFrappeSelect
@@ -344,67 +314,45 @@ export default function NewPurchaseOrderPage() {
                           disabled={isAuto("supplier")}
                         />
                       </FieldWrap>
-                      <FieldWrap
-                        auto={isAuto("company")}
-                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.company : undefined}
-                      >
-                        <FormFrappeSelect
-                          control={control}
-                          name="company"
-                          label="Company"
-                          required
-                          doctype="Company"
-                          labelField="company_name"
-                          placeholder="Select company..."
-                          disabled={isAuto("company")}
-                        />
-                      </FieldWrap>
                       <FormDatePicker
                         control={control}
-                        name="transaction_date"
-                        label="Order Date"
+                        name="posting_date"
+                        label="Posting Date"
                         required
                       />
-                      <FormDatePicker
-                        control={control}
-                        name="schedule_date"
-                        label="Required By"
-                        required
-                      />
-                      <FieldWrap
-                        auto={isAuto("set_warehouse")}
-                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.set_warehouse : undefined}
-                      >
-                        <FormFrappeSelect
-                          control={control}
-                          name="set_warehouse"
-                          label="Receipt Warehouse"
-                          doctype="Warehouse"
-                          placeholder="Default target..."
-                          filters={[["is_group", "=", 0]] as unknown as [string, string, unknown][]}
-                          disabled={isAuto("set_warehouse")}
-                        />
-                      </FieldWrap>
                       <FormInput
                         control={control}
-                        name="terms"
-                        label="Terms & Conditions"
-                        placeholder="Optional delivery terms..."
+                        name="posting_time"
+                        label="Posting Time"
+                        placeholder="HH:MM"
                       />
+                      <FieldWrap
+                        auto={isAuto("purchase_order")}
+                      >
+                        <FormFrappeSelect
+                          control={control}
+                          name="purchase_order"
+                          label="Purchase Order"
+                          doctype="Purchase Order"
+                          labelField="name"
+                          disabled={isAuto("purchase_order")}
+                          placeholder="Link to PO..."
+                        />
+                      </FieldWrap>
                     </div>
                   </div>
                 );
               }
 
-              // ---- STEP 2 — Items ---------------------------------------
+              // ---- STEP 2 — Items ------------------------------------------
               if (s.id === "step2") {
                 return (
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <StepHeading
                         icon={<Package className="h-5 w-5 text-primary" />}
-                        title="Order Items"
-                        description="Add items, quantities, and rates."
+                        title="Receive Items"
+                        description="Set quantities and target warehouses for incoming goods."
                       />
                       {isAuto("items") && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -422,6 +370,7 @@ export default function NewPurchaseOrderPage() {
                             <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
                             <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
                             <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                            <th className="px-3 py-2.5 text-left font-semibold">Warehouse</th>
                             <th className="w-10" />
                           </tr>
                         </thead>
@@ -477,6 +426,16 @@ export default function NewPurchaseOrderPage() {
                                 <td className="px-3 py-3 text-right align-middle font-semibold tabular-nums text-foreground">
                                   {ETB.format(qty * rate)}
                                 </td>
+                                <td className="px-3 py-2 align-top">
+                                  <FormFrappeSelect
+                                    control={control}
+                                    name={`items.${index}.warehouse`}
+                                    doctype="Warehouse"
+                                    hideLabel
+                                    placeholder="WH..."
+                                    filters={[["is_group", "=", 0]]}
+                                  />
+                                </td>
                                 <td className="px-2 py-2 text-center align-middle">
                                   <Button
                                     type="button"
@@ -518,38 +477,61 @@ export default function NewPurchaseOrderPage() {
                 );
               }
 
-              // ---- STEP 3 — Review --------------------------------------
+              // ---- STEP 3 — Review & Create --------------------------------
               const v = getValues();
               return (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   <StepHeading
                     icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
-                    title="Review & Confirm"
-                    description="Confirm the details below to create the order."
+                    title="Review & Create"
+                    description="Review everything below — you can still go back to edit."
                   />
-                  <div className="rounded-xl border border-border/60 bg-card/40 p-5 backdrop-blur-sm">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+
+                  {/* Header summary */}
+                  <div className="bg-card/40 rounded-2xl p-6 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <Summary label="Supplier" value={v.supplier_name || v.supplier} />
-                      <Summary label="Company" value={v.company} />
-                      <Summary label="Order Date" value={v.transaction_date} />
-                      <Summary label="Required By" value={v.schedule_date} />
+                      <Summary label="Company" value={v.company || getActiveCompany()} />
+                      <Summary label="Posting Date" value={v.posting_date} />
+                      <Summary label="Purchase Order" value={v.purchase_order} />
                     </div>
-                    <div className="mt-4 border-t border-border/60 pt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {(watchedItems ?? []).filter((i) => i?.item_code).length}{" "}
-                          item(s)
-                        </span>
-                        <div className="text-right">
-                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                            Grand Total
-                          </span>
-                          <p className="text-2xl font-bold tabular-nums text-primary">
-                            {ETB.format(subtotal)}
-                          </p>
-                        </div>
-                      </div>
+                  </div>
+
+                  {/* Items table */}
+                  <div className="bg-card/40 rounded-2xl overflow-hidden">
+                    <div className="px-6 py-3 bg-muted/30">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Items ({(watchedItems ?? []).filter(i => i?.item_code).length})
+                      </p>
                     </div>
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-border/40">
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <th className="px-6 py-2.5 text-left font-semibold">Item</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Qty</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Rate</th>
+                          <th className="px-6 py-2.5 text-right font-semibold">Amount</th>
+                          <th className="px-6 py-2.5 text-left font-semibold">Warehouse</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {(watchedItems ?? []).filter(i => i?.item_code).map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="px-6 py-3 font-medium">{item.item_name || item.item_code}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{item.qty} {item.uom}</td>
+                            <td className="px-6 py-3 text-right tabular-nums">{ETB.format(item.rate ?? 0)}</td>
+                            <td className="px-6 py-3 text-right font-medium tabular-nums">{ETB.format((item.qty || 0) * (item.rate || 0))}</td>
+                            <td className="px-6 py-3 text-muted-foreground">{item.warehouse || v.set_warehouse || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/20">
+                          <td colSpan={4} className="px-6 py-3 text-right font-bold uppercase text-xs">Grand Total</td>
+                          <td className="px-6 py-3 text-right font-bold text-lg text-primary tabular-nums">{ETB.format(subtotal)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
               );
@@ -557,7 +539,6 @@ export default function NewPurchaseOrderPage() {
           />
         </InfoCard>
       </Form>
-
       <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
@@ -603,7 +584,7 @@ function NumberCell({
   control,
   name,
 }: {
-  control: ReturnType<typeof useForm<POForm>>["control"];
+  control: ReturnType<typeof useForm<PRForm>>["control"];
   name: `items.${number}.qty` | `items.${number}.rate`;
 }) {
   return (
