@@ -46,6 +46,7 @@ import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import type { PurchaseOrder } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
+import { getActiveCompany } from "@/lib/settings/company";
 
 // ---------------------------------------------------------------------------
 // Form model
@@ -274,6 +275,7 @@ export default function NewPurchaseOrderPage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),

@@ -41,6 +41,7 @@ import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import type { MaterialRequest } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
+import { getActiveCompany } from "@/lib/settings/company";
 
 // ---------------------------------------------------------------------------
 // Form model
@@ -257,6 +258,7 @@ export default function NewRequestForQuotationPage() {
 
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         doctype: "Request for Quotation Item",

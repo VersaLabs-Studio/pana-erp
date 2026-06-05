@@ -32,6 +32,7 @@ import {
 import { useFrappeCreate, useFrappeList, useFrappeDoc } from "@/hooks/generic";
 import { PageHeader } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
+import { getActiveCompany } from "@/lib/settings/company";
 import {
   FormInput,
   FormSelect,
@@ -185,6 +186,7 @@ export default function CreateQuotationPage() {
 
     const payload = {
       ...values,
+      company: getActiveCompany(),
       items: validItems,
       currency: "ETB",
       price_list_currency: "ETB",

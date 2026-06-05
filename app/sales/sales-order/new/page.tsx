@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/smart";
 import { InfoCard } from "@/components/ui/info-card";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
+import { getActiveCompany } from "@/lib/settings/company";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -264,6 +265,7 @@ export default function NewSalesOrderPage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),

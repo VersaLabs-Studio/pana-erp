@@ -277,6 +277,7 @@ export default function NewDeliveryNotePage() {
     }
     createMutation.mutate({
       ...values,
+      company: getActiveCompany(),
       items: items.map((it, idx) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
