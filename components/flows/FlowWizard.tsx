@@ -148,7 +148,13 @@ export function FlowWizard({
   const currentValidation = validationResults?.[currentStepData?.id];
   const isCurrentStepValid = currentValidation
     ? currentValidation.valid
-    : true;
+    : validationResults
+      ? false
+      : true;
+
+  if (validationResults && !currentValidation && process.env.NODE_ENV === "development") {
+    console.warn(`[FlowWizard] Step "${currentStepData?.id}" not found in validationResults. Treating as invalid. Keys: ${Object.keys(validationResults).join(", ")}`);
+  }
 
   // A1: When triedNext and invalid, focus the first invalid field
   useEffect(() => {

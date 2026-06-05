@@ -30,7 +30,6 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
-import { buildIdempotencyKey } from "@/lib/flows/idempotency";
 import { getAutoFillMapping, applyAutoFill } from "@/lib/flows/flow-auto-fill";
 import { useFrappeDoc, useFrappeList, useFrappeUpdate, useFrappeCreate } from "@/hooks/generic";
 import type { SalesOrder } from "@/types/doctype-types";
@@ -69,6 +68,25 @@ export default function SalesOrderDetailPage() {
     "Work Order",
     { filters: [["sales_order", "=", name]], fields: ["name"], limit: 5 },
     { enabled: !isLoading && !!order },
+  );
+
+  // -- BOM lookup for WO creation (default BOM per production item) ----------
+  const soItemCodes = useMemo(() => {
+    const items = (order?.items ?? []) as Array<{ item_code: string }>;
+    return [...new Set(items.map((i) => i.item_code))];
+  }, [order]);
+
+  const { data: defaultBOMs } = useFrappeList<{ item: string; name: string }>(
+    "BOM",
+    {
+      filters: [
+        ["item", "in", soItemCodes.length > 0 ? soItemCodes : ["__none__"]],
+        ["is_default", "=", 1],
+      ],
+      fields: ["item", "name"],
+      limit: soItemCodes.length || 1,
+    },
+    { enabled: soItemCodes.length > 0 },
   );
 
   // -- Build the flow chain from real linked documents -----------------------
@@ -173,9 +191,28 @@ export default function SalesOrderDetailPage() {
     if (!mapping) return;
 
     const soData = order as unknown as Record<string, unknown>;
+    const bomMap = new Map((defaultBOMs ?? []).map((b) => [b.item, b.name]));
 
     for (const item of woToCreate) {
-      const idempotencyKey = buildIdempotencyKey("Sales Order", name, "create_work_orders", item.item_code);
+      const bomNo = bomMap.get(item.item_code);
+      if (!bomNo) {
+        showError({
+          code: "LINK_VALIDATION",
+          title: "No default BOM found",
+          explanation: `Item ${item.item_code} has no default Bill of Materials. Create a default BOM for this item before creating Work Orders.`,
+          details: [`Item: ${item.item_code}`],
+          severity: "error",
+          actions: [
+            {
+              label: "Dismiss",
+              kind: "dismiss",
+              variant: "ghost",
+              run: () => {},
+            },
+          ],
+        });
+        continue;
+      }
 
       const header = applyAutoFill(soData, mapping);
       const woPayload = {
@@ -185,15 +222,15 @@ export default function SalesOrderDetailPage() {
         qty: item.qty,
         fg_warehouse: item.warehouse || "",
         sales_order: name,
+        bom_no: bomNo,
         naming_series: "MFG-WO-.YYYY.-",
         status: "Draft",
         docstatus: 0,
-        idempotency_key: idempotencyKey,
       };
 
       createWOMutation.mutate(woPayload);
     }
-  }, [order, name, woToCreate, createWOMutation]);
+  }, [order, name, woToCreate, defaultBOMs, createWOMutation, showError]);
 
   if (isLoading) return <LoadingState />;
   if (error || !order) {
@@ -411,6 +448,7 @@ export default function SalesOrderDetailPage() {
         onConfirm={executeCreateWorkOrders}
         loading={createWOMutation.isPending}
       />
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

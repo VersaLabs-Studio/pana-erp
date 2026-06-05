@@ -154,7 +154,7 @@ export default function NewStockEntryPage() {
     const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Stock Entry", "step1", values),
-      step2: { valid: true, errors: {} },
+      step2: validateWizardStep("Stock Entry", "step2", { items: watchedAll?.items ?? [] }),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedAll]);

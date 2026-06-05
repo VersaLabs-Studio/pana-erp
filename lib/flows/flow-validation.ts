@@ -387,6 +387,47 @@ export const bomStepSchemas = {
 };
 
 /**
+ * Lead step schemas
+ */
+export const leadStepSchemas = {
+  step1: z.object({
+    lead_name: z.string().min(1, "Lead name is required"),
+    company_name: z.string().optional(),
+    mobile_no: z.string().optional(),
+    email_id: z.string().optional(),
+  }),
+  step2: z.object({
+    source: z.string().optional(),
+    territory: z.string().optional(),
+    industry: z.string().optional(),
+    notes: z.string().optional(),
+  }),
+};
+
+/**
+ * Opportunity step schemas
+ */
+export const opportunityStepSchemas = {
+  step1: z.object({
+    opportunity_from: z.string().min(1, "Source type is required"),
+    party_name: z.string().min(1, "Lead/Customer is required"),
+    company: z.string().min(1, "Company is required"),
+    transaction_date: z.string().min(1, "Date is required"),
+  }),
+  step2: z.object({
+    opportunity_type: z.string().min(1, "Opportunity type is required"),
+    sales_stage: z.string().optional(),
+    probability: z.number().optional(),
+    expected_closing: z.string().optional(),
+    items: z.array(z.object({
+      item_code: z.string().min(1, "Item is required"),
+      qty: z.number().min(0.01).optional(),
+      rate: z.number().min(0).optional(),
+    })).optional(),
+  }),
+};
+
+/**
  * Work Order step schemas
  */
 export const workOrderStepSchemas = {
@@ -423,6 +464,8 @@ export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
   "Supplier Quotation": supplierQuotationStepSchemas,
   "BOM": bomStepSchemas,
   "Work Order": workOrderStepSchemas,
+  "Lead": leadStepSchemas,
+  "Opportunity": opportunityStepSchemas,
 };
 
 /**

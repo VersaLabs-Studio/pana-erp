@@ -137,7 +137,7 @@ export default function NewMaterialRequestPage() {
     const values = { ...getValues(), ...watchedAll, items: watchedAll?.items ?? [] };
     return {
       step1: validateWizardStep("Material Request", "step1", values),
-      step2: { valid: true, errors: {} },
+      step2: validateWizardStep("Material Request", "step2", { items: watchedAll?.items ?? [] }),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedAll]);

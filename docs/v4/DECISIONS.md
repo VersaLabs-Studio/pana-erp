@@ -370,18 +370,56 @@ components/errors/GuidedErrorDialog.tsx
 | Code | Signature | Resolution |
 |------|-----------|------------|
 | `INSUFFICIENT_STOCK` | "units of … needed in Warehouse … to complete" | Explain shortfall; action: Create Material Request (prefilled) |
-| `MANDATORY_MISSING` | "is mandatory" / "Mandatory fields required" | Name field in plain language; action: Go to field (focus) |
-| `LINK_VALIDATION` | "Could not find" / "not found" | Explain missing link; action: Pick another |
-| `DUPLICATE` | "Duplicate" / "already exists" | Offer Open existing vs Change entry |
+| `MANDATORY_MISSING` | "is mandatory" / "Mandatory fields required" | Name field in plain language; action: Dismiss |
+| `LINK_VALIDATION` | "Could not find" / "not found" | Explain missing link; action: Dismiss |
+| `LINKED_DOC_EXISTS` | "cannot cancel because … exists" / "linked with submitted" / "is linked with" | Parse linked doctype + name; action: Open {Doctype} {name} (real navigate) |
+| `DUPLICATE` | "Duplicate" / "already exists" | Explain conflict; action: Dismiss |
 | `GENERIC_FALLBACK` | anything else | Clean error card with collapsed technical details |
 
 ### Rule
 
 Every `useFrappe{Create,Update,Delete}` `onError` callback calls `resolveFrappeError` and surfaces the result via `GuidedErrorDialog`. Each future phase adds strategies as it encounters new Frappe error classes.
 
+### Action Rule (B5 extension — Phase 2F)
+
+Every `ResolutionAction` is either:
+1. A **functional** action (`navigate` / `prefill` / `mutate`) with a real `run` that performs an observable side effect, OR
+2. A **dismiss** action.
+
+**No decorative buttons.** No `run: () => {}` no-ops outside dismiss actions. Every offered resolution must conform to the documented business workflow — never offer an action the workflow forbids (e.g. "Reduce quantity" when the workflow requires procurement to resolve shortfalls).
+
+### Render Rule (Phase 2F)
+
+Every page that calls `showError` must also **render** `<GuidedErrorDialog>` in its JSX. Calling `showError()` without a rendered dialog produces a silent failure (state updates but nothing displays).
+
 ### Tests
 
 Unit tests per strategy in `tests/smoke.test.ts` — each test asserts the expected `code`, `title`, and action labels for a representative error message.
+
+---
+
+## B6 — Wizard Gate Hardening
+
+**Decided in:** Phase 2F (2026-06-05)
+
+### Problem
+
+`FlowWizard` defaulted `isCurrentStepValid` to `true` when the current step's `id` was missing from `validationResults` (fail-open). This meant that if a page's step IDs didn't match the validationResults keys, the wizard would silently allow progression without validation. Additionally, several wizards (MR, SE) hardcoded `step2: { valid: true }`, bypassing items validation entirely.
+
+### Decision
+
+1. **FlowWizard fails closed.** When `validationResults` is provided but the current step's `id` is missing, the step is treated as **invalid** (not valid). A `console.warn` fires in dev to surface the mismatch.
+
+2. **Step IDs must match validationResults keys.** This is a structural invariant. All wizard step schemas use `step1`/`step2`/`step3` naming (enforced by test). All page-level `validationResults` objects use the same keys.
+
+3. **Items validation runs at wizard gate time.** MR and SE step2 now call `validateWizardStep()` instead of hardcoding `{ valid: true }`. The wizard blocks Next when items array is empty.
+
+### Tests
+
+- `validateWizardStep("Material Request", "step2", { items: [] })` → `valid === false`
+- `validateWizardStep("Stock Entry", "step2", { items: [] })` → `valid === false`
+- Unknown step id lookup in validationResults → `valid === false` (fail-closed)
+- All `WIZARD_STEP_SCHEMAS` keys match `/^step\d+$/` pattern
 
 ---
 
