@@ -423,6 +423,46 @@ Unit tests per strategy in `tests/smoke.test.ts` — each test asserts the expec
 
 ---
 
+## B5 Extension — Error Parsing (Phase 2G)
+
+**Decided in:** Phase 2G (2026-06-05)
+
+All Frappe errors pass through `extractFrappeMessage` before display. The UI never shows `[object Object]` or a raw `_server_messages` blob. Every create/edit/detail mutation renders a `GuidedErrorDialog`; raw `toast.error(rawError)` is prohibited.
+
+`extractFrappeMessage` handles: `_server_messages` (JSON array, nested JSON, HTML stripping), `exception` (take after last `:`), `message` (string/object/array), `httpStatus` (status code fallback). Guard: never returns `[object Object]`.
+
+---
+
+## B7 — Implicit Company (Phase 2G)
+
+**Decided in:** Phase 2G (2026-06-05)
+
+`company` is a tenant-implicit field sourced from `getActiveCompany()` (default "Pana"), injected at submit, never user-entered, changeable only in Settings. Rationale: DB-per-tenant ⇒ one company per tenant. Making the user pick `company` on every document is wrong UX.
+
+Implementation: `lib/settings/company.ts` with `getActiveCompany()` / `setActiveCompany()`. Company removed from all Zod step schemas. Injected in mutation payloads.
+
+---
+
+## B8 — CRM Head = Lead → Customer (Phase 2G)
+
+**Decided in:** Phase 2G (2026-06-05)
+
+The Lead-to-Cash entry is Lead → Convert to Customer → Quotation/Sales Order (per WORKFLOW_PART1 §3). Opportunity is demoted to a secondary/settings area, not a surfaced stage in the FlowRail or Lead's WhatsNext.
+
+The conversion is idempotent: if the Lead is already converted (`converted_to` set, `status = "Converted"`), the action becomes "View Customer" — never creates a duplicate.
+
+---
+
+## B9 — Notifications Center (Phase 2G)
+
+**Decided in:** Phase 2G (2026-06-05)
+
+A global notification store captures every toast + guided resolution. The Layout Bell is its surface. The unread dot reflects real unread count (disappears at zero). In-memory session storage; persistence deferred.
+
+Architecture: `lib/stores/notification-store.ts` (subscribe/getSnapshot pattern for `useSyncExternalStore`), `lib/stores/toast-wrapper.ts` (drop-in Sonner replacement), `components/notifications/notifications-panel.tsx` (B1 surface panel).
+
+---
+
 ## Summary — Gate Status
 
 | Gate | Status | Resolution |

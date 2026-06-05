@@ -32,7 +32,8 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
-import { useFrappeDoc, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
+import { useFrappeDoc, useFrappeList, useFrappeUpdate, useFrappeCreate } from "@/hooks/generic";
+import { getActiveCompany } from "@/lib/settings/company";
 import type { Lead } from "@/types/doctype-types";
 import type { FlowStageStatus } from "@/types/flow-types";
 
@@ -99,6 +100,60 @@ export default function LeadDetailPage() {
   // Status update mutation
   const updateMutation = useFrappeUpdate<Lead>("Lead", { showToast: false });
 
+  // Customer create mutation (for Lead → Customer conversion)
+  const createCustomerMutation = useFrappeCreate("Customer", {
+    showToast: false,
+  });
+
+  // Check if already converted (Lead.customer is the linked Customer field)
+  const isConverted = lead?.status === "Converted" && lead?.customer;
+
+  const handleConvertToCustomer = useCallback(() => {
+    if (isConverted && lead?.customer) {
+      router.push(`/crm/customer/${encodeURIComponent(lead.customer)}`);
+      return;
+    }
+
+    const customerData = {
+      customer_name: lead?.company_name || lead?.lead_name || name,
+      customer_type: "Company",
+      customer_group: "All Customer Groups",
+      territory: lead?.territory || "",
+      email_id: lead?.email_id || "",
+      mobile_no: lead?.mobile_no || "",
+      company: getActiveCompany(),
+      lead_name: name,
+    };
+
+    createCustomerMutation.mutate(customerData, {
+      onSuccess: (res) => {
+        const customerName = (res as { data?: { name?: string } })?.data?.name;
+        if (customerName) {
+          // Update Lead with customer link + status
+          updateMutation.mutate(
+            {
+              name,
+              data: {
+                customer: customerName,
+                status: "Converted",
+              },
+            },
+            {
+              onSuccess: () => {
+                toast.success(`Converted to Customer ${customerName}`);
+                router.push(`/crm/customer/${encodeURIComponent(customerName)}`);
+              },
+              onError: (err) =>
+                showError(resolveFrappeError(err, { doctype: "Lead" })),
+            },
+          );
+        }
+      },
+      onError: (err) =>
+        showError(resolveFrappeError(err, { doctype: "Customer" })),
+    });
+  }, [isConverted, lead, name, createCustomerMutation, updateMutation, router, showError]);
+
   const handleStatusChange = useCallback(
     (newStatus: string) => {
       setConfirmStatusChange({ open: false, newStatus: "" });
@@ -136,19 +191,17 @@ export default function LeadDetailPage() {
   }
 
   const allowedTransitions = STATUS_TRANSITIONS[lead.status] ?? [];
-  const isConverted = lead.status === "Converted";
 
   // WhatsNext actions
   const whatsNext = [
-    !isConverted &&
-    isModuleBuilt("Opportunity") && {
-      label: "Create Opportunity",
-      description: "Convert this lead into a sales opportunity",
-      onClick: () =>
-        router.push(
-          `/crm/opportunity/new?lead=${encodeURIComponent(name)}&party_name=${encodeURIComponent(name)}&opportunity_from=Lead`,
-        ),
-      isPrimary: true,
+    isModuleBuilt("Customer") && {
+      label: isConverted ? "View Customer" : "Convert to Customer",
+      description: isConverted
+        ? `Converted to ${lead?.customer}`
+        : "Create a Customer record from this lead",
+      onClick: handleConvertToCustomer,
+      isPrimary: !isConverted,
+      isLoading: createCustomerMutation.isPending || updateMutation.isPending,
     },
     !isConverted &&
     isModuleBuilt("Quotation") && {
