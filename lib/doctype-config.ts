@@ -365,6 +365,13 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     searchFields: ["name", "supplier_name", "supplier_group"],
     defaultSortField: "supplier_name",
   },
+  "Supplier Group": {
+    apiPath: "buying/supplier-group",
+    module: "Buying",
+    labelField: "supplier_group_name",
+    searchFields: ["supplier_group_name"],
+    isSettings: true,
+  },
   "Purchase Order": {
     apiPath: "buying/purchase-order",
     module: "Buying",
@@ -480,7 +487,7 @@ export const DOCTYPE_CONFIG: Record<string, DocTypeConfig> = {
     isSettings: true,
   },
   Currency: {
-    apiPath: "accounting/currency",
+    apiPath: "accounting/settings/currency",
     module: "Accounting",
     labelField: "currency_name",
     searchFields: ["currency_name", "name"],

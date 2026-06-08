@@ -70,3 +70,8 @@ export function subscribe(listener: () => void): () => void {
 export function getSnapshot(): Notification[] {
   return _notifications;
 }
+
+const EMPTY: Notification[] = [];
+export function getServerSnapshot(): Notification[] {
+  return EMPTY;
+}

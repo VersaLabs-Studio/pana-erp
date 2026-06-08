@@ -205,6 +205,12 @@ export default function SalesOrderDetailPage() {
           severity: "error",
           actions: [
             {
+              label: "Create default BOM",
+              kind: "navigate",
+              variant: "default",
+              run: () => router.push(`/manufacturing/bom/new?item=${encodeURIComponent(item.item_code)}`),
+            },
+            {
               label: "Dismiss",
               kind: "dismiss",
               variant: "ghost",

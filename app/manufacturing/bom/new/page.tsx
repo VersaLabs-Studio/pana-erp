@@ -6,8 +6,8 @@
 // Step 2: Materials & Operations (items table, operations table)
 // Step 3: Review (costing rollup)
 
-import { useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -35,7 +35,7 @@ import {
 } from "@/components/form";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
-import { useFrappeCreate } from "@/hooks/generic";
+import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
 import { validateWizardStep } from "@/lib/flows/flow-validation";
 import { getActiveCompany } from "@/lib/settings/company";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
@@ -111,12 +111,15 @@ const ETB = new Intl.NumberFormat("en-ET", {
 
 export default function NewBOMPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillItem = searchParams.get("item");
+
   const [step, setStep] = useState(0);
   const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
   const form = useForm<BOMForm>({
     defaultValues: {
-      item: "",
+      item: prefillItem || "",
       company: "",
       quantity: 1,
       uom: "Nos",
@@ -131,6 +134,21 @@ export default function NewBOMPage() {
   });
 
   const { control, getValues, setValue } = form;
+
+  const { data: itemDoc } = useFrappeDoc<{ stock_uom?: string }>(
+    "Item",
+    prefillItem || "",
+    { enabled: !!prefillItem }
+  );
+
+  useEffect(() => {
+    if (prefillItem) {
+      setValue("item", prefillItem);
+      if (itemDoc?.stock_uom) {
+        setValue("uom", itemDoc.stock_uom);
+      }
+    }
+  }, [prefillItem, itemDoc, setValue]);
   const {
     fields: itemFields,
     append: appendItem,

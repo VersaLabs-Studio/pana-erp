@@ -282,12 +282,14 @@ export function FlowRail({
   const flowName = deriveFlowName(flowId);
 
   // Find next actionable pending stage whose module is built
+  const currentIndex = stages.findIndex((s) => s.status === "current");
   const nextBuildableIndex = stages.findIndex((s, i) => {
-    if (s.status !== "pending") return false;
-    if (!isModuleBuilt(s.doctype)) return false;
-    if (i === 0) return true;
-    const upstream = stages[i - 1];
-    return upstream.status === "completed" || upstream.status === "current";
+    return (
+      i > currentIndex &&
+      s.status === "pending" &&
+      isModuleBuilt(s.doctype) &&
+      (stages[i - 1].status === "completed" || stages[i - 1].status === "current")
+    );
   });
   const nextBuildable =
     nextBuildableIndex >= 0 ? stages[nextBuildableIndex] : null;
