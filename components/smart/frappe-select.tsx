@@ -24,7 +24,7 @@ interface FrappeSelectProps {
   /** Field to use as display label (default: "name") */
   labelField?: string;
   /** Additional Frappe filters */
-  filters?: [string, string, unknown][];
+  filters?: ([string, string, unknown] | [string, string, string, unknown])[];
   /** Order by field and direction (use table prefix for joins) */
   orderBy?: { field: string; order?: "asc" | "desc" };
   /** Whether the select is disabled */

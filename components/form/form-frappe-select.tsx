@@ -29,7 +29,7 @@ interface FormFrappeSelectProps<T extends FieldValues> {
   /** Field to use as option label */
   labelField?: string;
   /** Additional Frappe filters for querying */
-  filters?: [string, string, unknown][];
+  filters?: ([string, string, unknown] | [string, string, string, unknown])[];
   /** Order by field and direction (use table prefix for Dynamic Link joins, e.g. "`tabAddress`.name") */
   orderBy?: { field: string; order?: "asc" | "desc" };
   /** Extra fields to fetch (e.g. ["standard_rate", "stock_uom"]) */

@@ -253,6 +253,22 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
       customer_type: "Company",
     },
   },
+  "Customer->Quotation": {
+    sourceDoctype: "Customer",
+    targetDoctype: "Quotation",
+    headerMappings: [
+      { sourceField: "name", targetField: "party_name", isReadOnly: true, sourceLabel: "Customer ID" },
+      { sourceField: "customer_name", targetField: "customer_name", isReadOnly: true, sourceLabel: "Customer Name" },
+      { sourceField: "territory", targetField: "territory", isReadOnly: true, sourceLabel: "Territory" },
+    ],
+    itemMappings: [],
+    userMustFill: ["valid_till", "items"],
+    defaults: {
+      naming_series: "SAL-QTN-.YYYY.-",
+      quotation_to: "Customer",
+      order_type: "Sales",
+    },
+  },
 
   // =========================================================================
   // OPPORTUNITY → QUOTATION (demoted — secondary flow, not primary rail)
