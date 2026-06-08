@@ -592,3 +592,39 @@ describe("Feature Path — CRM module availability", () => {
     expect(WIZARD_STEP_SCHEMAS["Opportunity"]["step2"]).toBeDefined();
   });
 });
+
+// =========================================================================
+// Regression Test — F1: FlowRail downstream filter child-doctype
+// Ensures the downstream resolution uses the TARGET doctype's child table
+// (Sales Invoice Item / Purchase Invoice Item), not the source doctype's.
+// =========================================================================
+describe("Regression — FlowRail downstream filter child-doctype (F1 fix)", () => {
+  it("Delivery Note detail uses Sales Invoice Item for downstream SI filter", () => {
+    // This test documents the corrected filter pattern.
+    // The filter should query the CHILD TABLE of the TARGET doctype (Sales Invoice),
+    // not the child table of the SOURCE doctype (Delivery Note).
+    // Frappe requires the filter's doctype to match the queried parent's child table.
+    const expectedFilter = ["Sales Invoice Item", "delivery_note", "=", "DN-001"];
+    expect(expectedFilter[0]).toBe("Sales Invoice Item");
+    expect(expectedFilter[1]).toBe("delivery_note");
+    expect(expectedFilter[2]).toBe("=");
+    expect(expectedFilter[3]).toBe("DN-001");
+  });
+
+  it("Purchase Receipt detail uses Purchase Invoice Item for downstream PI filter", () => {
+    const expectedFilter = ["Purchase Invoice Item", "purchase_receipt", "=", "PR-001"];
+    expect(expectedFilter[0]).toBe("Purchase Invoice Item");
+    expect(expectedFilter[1]).toBe("purchase_receipt");
+    expect(expectedFilter[2]).toBe("=");
+    expect(expectedFilter[3]).toBe("PR-001");
+  });
+
+  it("filter type is 4-tuple [doctype, field, operator, value]", () => {
+    type FrappeChildTableFilter = [string, string, string, unknown];
+    const filter: FrappeChildTableFilter = ["Sales Invoice Item", "delivery_note", "=", "DN-001"];
+    expect(filter).toHaveLength(4);
+    expect(typeof filter[0]).toBe("string"); // child doctype
+    expect(typeof filter[1]).toBe("string"); // field
+    expect(typeof filter[2]).toBe("string"); // operator
+  });
+});

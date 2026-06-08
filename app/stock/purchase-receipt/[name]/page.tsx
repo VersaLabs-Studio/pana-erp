@@ -71,7 +71,7 @@ export default function PurchaseReceiptDetailPage() {
   // -- Downstream resolution: Purchase Invoice filtered on this PR -----------
   const { data: invoices, isLoading: loadingInvoices } = useFrappeList<{ name: string }>(
     "Purchase Invoice",
-    { filters: [["Purchase Receipt Item", "purchase_receipt", "=", name]] as unknown as [string, string, unknown][], fields: ["name"], limit: 5 },
+    { filters: [["Purchase Invoice Item", "purchase_receipt", "=", name]] as [string, string, string, unknown][], fields: ["name"], limit: 5 },
     { enabled: !isLoading && !!pr },
   );
 
@@ -281,6 +281,12 @@ export default function PurchaseReceiptDetailPage() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-muted/20">
+                    <td colSpan={4} className="px-3 py-3 text-right font-bold uppercase text-xs">Grand Total</td>
+                    <td className="px-3 py-3 text-right font-bold text-lg text-primary tabular-nums">{ETB.format(grandTotal)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </InfoCard>

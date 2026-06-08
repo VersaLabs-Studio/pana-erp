@@ -134,7 +134,6 @@ export default function NewPurchaseReceiptPage() {
 
   const form = useForm<PRForm>({
     defaultValues: {
-      naming_series: "MAT-PRE-.YYYY.-",
       supplier: "",
       company: "",
       posting_date: new Date().toISOString().split("T")[0],
@@ -253,7 +252,7 @@ export default function NewPurchaseReceiptPage() {
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
         idx: idx + 1,
-        warehouse: it.warehouse || values.set_warehouse,
+        warehouse: it.warehouse,
         doctype: "Purchase Receipt Item",
       })),
       docstatus: 0,
@@ -320,6 +319,16 @@ export default function NewPurchaseReceiptPage() {
                         label="Posting Date"
                         required
                       />
+                      <FieldWrap
+                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.posting_date : undefined}
+                      >
+                        <FormDatePicker
+                          control={control}
+                          name="posting_date"
+                          label="Posting Date"
+                          required
+                        />
+                      </FieldWrap>
                       <FormInput
                         control={control}
                         name="posting_time"
@@ -427,14 +436,18 @@ export default function NewPurchaseReceiptPage() {
                                   {ETB.format(qty * rate)}
                                 </td>
                                 <td className="px-3 py-2 align-top">
-                                  <FormFrappeSelect
-                                    control={control}
-                                    name={`items.${index}.warehouse`}
-                                    doctype="Warehouse"
-                                    hideLabel
-                                    placeholder="WH..."
-                                    filters={[["is_group", "=", 0]]}
-                                  />
+                                  <FieldWrap
+                                    error={triedNextSteps.has(step) ? validationResults?.step2?.errors?.[`items.${index}.warehouse`] : undefined}
+                                  >
+                                    <FormFrappeSelect
+                                      control={control}
+                                      name={`items.${index}.warehouse`}
+                                      doctype="Warehouse"
+                                      hideLabel
+                                      placeholder="WH..."
+                                      filters={[["is_group", "=", 0]]}
+                                    />
+                                  </FieldWrap>
                                 </td>
                                 <td className="px-2 py-2 text-center align-middle">
                                   <Button

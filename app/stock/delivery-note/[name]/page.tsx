@@ -72,7 +72,7 @@ export default function DeliveryNoteDetailPage() {
   // -- Downstream resolution: Sales Invoice filtered on this DN ---------------
   const { data: invoices, isLoading: loadingInvoices } = useFrappeList<{ name: string }>(
     "Sales Invoice",
-    { filters: [["Delivery Note Item", "delivery_note", "=", name]] as unknown as [string, string, unknown][], fields: ["name"], limit: 5 },
+    { filters: [["Sales Invoice Item", "delivery_note", "=", name]] as [string, string, string, unknown][], fields: ["name"], limit: 5 },
     { enabled: !isLoading && !!dn },
   );
 

@@ -17,6 +17,7 @@ import { InfoCard } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormInput, FormFrappeSelect, FormDatePicker } from "@/components/form";
+import { FieldWrap } from "@/components/form/field-wrap";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
@@ -62,7 +63,8 @@ export default function EditPurchaseReceiptPage() {
   const params = useParams();
   const name = decodeURIComponent(String(params.name));
 
-  const [, setStep] = useState(0);
+  const [step, setStep] = useState(0);
+  const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
   const { resolution, showError, dismiss } = useGuidedError();
   const { data: order, isLoading, error } = useFrappeDoc<PurchaseReceipt>("Purchase Receipt", name);
 
@@ -191,6 +193,7 @@ export default function EditPurchaseReceiptPage() {
             isSubmitting={updateMutation.isPending}
             onFormDataChange={() => {}}
             onStepChange={setStep}
+            onTriedNextChange={setTriedNextSteps}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="Save Changes"
@@ -199,8 +202,16 @@ export default function EditPurchaseReceiptPage() {
               if (s.id === "step1") {
                 return (
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <FormFrappeSelect control={control} name="supplier" label="Supplier" required doctype="Supplier" labelField="supplier_name" />
-                    <FormDatePicker control={control} name="posting_date" label="Posting Date" required />
+                    <FieldWrap
+                      error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.supplier : undefined}
+                    >
+                      <FormFrappeSelect control={control} name="supplier" label="Supplier" required doctype="Supplier" labelField="supplier_name" />
+                    </FieldWrap>
+                    <FieldWrap
+                      error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.posting_date : undefined}
+                    >
+                      <FormDatePicker control={control} name="posting_date" label="Posting Date" required />
+                    </FieldWrap>
                     <FormInput control={control} name="posting_time" label="Posting Time" type="time" />
                     <FormFrappeSelect control={control} name="set_warehouse" label="Default Warehouse" doctype="Warehouse" filters={[["is_group", "=", 0]]} />
                   </div>
@@ -211,15 +222,16 @@ export default function EditPurchaseReceiptPage() {
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-xl border border-border/60 bg-card/40 backdrop-blur-sm">
                       <table className="w-full text-sm">
-                        <thead className="border-b border-border/60 bg-secondary/20">
-                          <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            <th className="px-3 py-2.5 text-left font-semibold">Item</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
-                            <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
-                            <th className="w-10" />
-                          </tr>
-                        </thead>
+                         <thead className="border-b border-border/60 bg-secondary/20">
+                           <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                             <th className="px-3 py-2.5 text-left font-semibold">Item</th>
+                             <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+                             <th className="px-3 py-2.5 text-right font-semibold">Rate</th>
+                             <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                             <th className="px-3 py-2.5 text-left font-semibold">Warehouse</th>
+                             <th className="w-10" />
+                           </tr>
+                         </thead>
                         <tbody className="divide-y divide-border/50">
                           {fields.map((field, index) => {
                             const qty = Number(watchedItems?.[index]?.qty) || 0;
@@ -251,6 +263,20 @@ export default function EditPurchaseReceiptPage() {
                                 </td>
                                 <td className="px-3 py-3 text-right align-middle font-semibold tabular-nums text-foreground">
                                   {ETB.format(qty * rate)}
+                                </td>
+                                <td className="px-3 py-2 align-top">
+                                  <FieldWrap
+                                    error={triedNextSteps.has(step) ? validationResults?.step2?.errors?.[`items.${index}.warehouse`] : undefined}
+                                  >
+                                    <FormFrappeSelect
+                                      control={control}
+                                      name={`items.${index}.warehouse`}
+                                      doctype="Warehouse"
+                                      hideLabel
+                                      placeholder="WH..."
+                                      filters={[["is_group", "=", 0]]}
+                                    />
+                                  </FieldWrap>
                                 </td>
                                 <td className="px-2 py-2 text-center align-middle">
                                   <Button
