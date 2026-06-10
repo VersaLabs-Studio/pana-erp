@@ -2475,6 +2475,11 @@ export const ItemPriceCreateSchema = ItemPriceSchema.pick({
   uom: true,
   price_list: true,
   price_list_rate: true,
+  currency: true,
+  valid_from: true,
+  valid_upto: true,
+  buying: true,
+  selling: true,
 }).extend({});
 
 export const ItemPriceUpdateSchema = ItemPriceSchema.partial().omit({
@@ -2485,6 +2490,41 @@ export const ItemPriceUpdateSchema = ItemPriceSchema.partial().omit({
 });
 
 export type ItemPriceSchemaType = z.infer<typeof ItemPriceSchema>;
+
+/**
+ * Price List Zod Schema
+ * @doctype Price List
+ */
+export const PriceListSchema = z.object({
+  price_list_name: z.string().min(1, "Price List Name is required"),
+  currency: z.string().min(1, "Currency is required"),
+  buying: z.union([z.literal(0), z.literal(1)]).optional(),
+  selling: z.union([z.literal(0), z.literal(1)]).optional(),
+  enabled: z.union([z.literal(0), z.literal(1)]).optional(),
+  name: z.string().min(1, "ID is required"),
+  owner: z.string().optional(),
+  creation: z.string().optional(),
+  modified: z.string().optional(),
+  modified_by: z.string().optional(),
+  docstatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+});
+
+export const PriceListCreateSchema = PriceListSchema.pick({
+  price_list_name: true,
+  currency: true,
+  buying: true,
+  selling: true,
+  enabled: true,
+}).extend({});
+
+export const PriceListUpdateSchema = PriceListSchema.partial().omit({
+  name: true,
+  creation: true,
+  owner: true,
+  docstatus: true,
+});
+
+export type PriceListSchemaType = z.infer<typeof PriceListSchema>;
 
 /**
  * Product Bundle Zod Schema
