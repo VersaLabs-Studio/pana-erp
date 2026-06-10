@@ -111,6 +111,8 @@ function CreatePaymentEntryForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const salesInvoiceId = searchParams.get("sales_invoice");
+  const partyTypeParam = searchParams.get("party_type");
+  const partyParam = searchParams.get("party");
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -121,8 +123,8 @@ function CreatePaymentEntryForm() {
   const form = useForm<PEForm>({
     defaultValues: {
       payment_type: "Receive",
-      party_type: "Customer",
-      party: "",
+      party_type: partyTypeParam || "Customer",
+      party: partyParam || "",
       party_name: "",
       paid_amount: 0,
       received_amount: 0,

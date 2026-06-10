@@ -380,7 +380,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 group cursor-pointer">
           <div className="h-10 w-10 relative overflow-hidden rounded-xl shadow-lg shadow-primary/20 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
             <img 
-              src="/Obsidian-logo.png" 
+              src="/logo.png" 
               alt="Obsidian Logo" 
               className="h-full w-full object-contain bg-white p-1"
             />

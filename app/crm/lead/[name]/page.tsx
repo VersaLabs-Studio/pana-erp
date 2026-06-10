@@ -94,8 +94,17 @@ export default function LeadDetailPage() {
       };
     }
 
+    // F6: When converted, mark Customer as completed so FlowRail doesn't show "Create Customer"
+    if (lead?.status === "Converted" && lead?.customer) {
+      stageStatuses["Customer"] = {
+        status: "completed",
+        documentName: lead.customer,
+        documentUrl: `/crm/customer/${encodeURIComponent(lead.customer)}`,
+      };
+    }
+
     return resolveFlowChain("Lead", name, stageStatuses);
-  }, [opportunities, name]);
+  }, [opportunities, name, lead?.status, lead?.customer]);
 
   // Status update mutation
   const updateMutation = useFrappeUpdate<Lead>("Lead", { showToast: false });

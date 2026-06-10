@@ -138,6 +138,7 @@ export function getDocTypeRoute(doctype: string): string {
     "Stock Entry": "stock/stock-entry",
     BOM: "manufacturing/bom",
     "Stock Reconciliation": "stock/stock-reconciliation",
+    "Stock Ledger Entry": "stock/stock-ledger",
   };
 
   return routeMap[doctype] || doctype.toLowerCase().replace(/\s+/g, "-");

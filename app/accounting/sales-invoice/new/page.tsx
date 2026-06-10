@@ -112,6 +112,7 @@ export default function NewSalesInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const deliveryNoteId = searchParams.get("delivery_note");
+  const customerId = searchParams.get("customer");
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -122,7 +123,7 @@ export default function NewSalesInvoicePage() {
   const form = useForm<SIForm>({
     defaultValues: {
       naming_series: "ACC-SINV-.YYYY.-",
-      customer: "",
+      customer: customerId || "",
       posting_date: new Date().toISOString().split("T")[0],
       due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         .toISOString()
@@ -234,6 +235,7 @@ export default function NewSalesInvoicePage() {
     createMutation.mutate({
       ...values,
       company: getActiveCompany(),
+      set_posting_time: 1,
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),

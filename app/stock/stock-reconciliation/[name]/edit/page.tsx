@@ -133,6 +133,7 @@ export default function EditStockReconciliationPage() {
         purpose: values.purpose,
         company: getActiveCompany(),
         posting_date: values.posting_date,
+        set_posting_time: 1,
         items: items.map((it, idx) => ({
           item_code: it.item_code,
           warehouse: it.warehouse,
