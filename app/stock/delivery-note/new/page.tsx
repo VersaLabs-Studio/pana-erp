@@ -29,6 +29,7 @@ import {
   FormFrappeSelect,
   FormDatePicker,
 } from "@/components/form";
+import { QuickAddField } from "@/components/quick-add/QuickAddField";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
@@ -332,7 +333,8 @@ export default function NewDeliveryNotePage() {
                         loading={loadingSO}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.customer : undefined}
                       >
-                        <FormFrappeSelect
+                        {/* 2L 1A: Quick-Add enabled Customer */}
+                        <QuickAddField
                           control={control}
                           name="customer"
                           label="Customer"
@@ -431,7 +433,8 @@ export default function NewDeliveryNotePage() {
                             return (
                               <tr key={field.id} className="group">
                                 <td className="px-3 py-2 align-top">
-                                  <FormFrappeSelect
+                                  {/* 2L 1A: Quick-Add enabled per-row Item */}
+                                  <QuickAddField
                                     control={control}
                                     name={`items.${index}.item_code`}
                                     doctype="Item"
@@ -477,7 +480,8 @@ export default function NewDeliveryNotePage() {
                                   {ETB.format(qty * rate)}
                                 </td>
                                 <td className="px-3 py-2 align-top">
-                                  <FormFrappeSelect
+                                  {/* 2L 1A: Quick-Add enabled per-row Warehouse */}
+                                  <QuickAddField
                                     control={control}
                                     name={`items.${index}.warehouse`}
                                     doctype="Warehouse"
