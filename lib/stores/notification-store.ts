@@ -116,6 +116,30 @@ export function markAllRead(): void {
   _notify();
 }
 
+/**
+ * 2L P1 — Dismiss a notification (remove it from the list). Returns the
+ * removed notification, or undefined if not found.
+ */
+export function dismiss(id: string): Notification | undefined {
+  _ensureHydrated();
+  const idx = _notifications.findIndex((n) => n.id === id);
+  if (idx < 0) return undefined;
+  const [removed] = _notifications.splice(idx, 1);
+  _persist();
+  _notify();
+  return removed;
+}
+
+/**
+ * 2L P1 — Dismiss all notifications.
+ */
+export function dismissAll(): void {
+  _ensureHydrated();
+  _notifications = [];
+  _persist();
+  _notify();
+}
+
 export function getNotificationById(id: string): Notification | undefined {
   _ensureHydrated();
   return _notifications.find((n) => n.id === id);

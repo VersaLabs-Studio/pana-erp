@@ -63,7 +63,7 @@ export function NotificationsPanel({
   open,
   onClose,
 }: NotificationsPanelProps) {
-  const { notifications, unreadCount, markRead, markAllRead } =
+  const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } =
     useNotifications();
   const panelRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -118,6 +118,25 @@ export function NotificationsPanel({
       }
     },
     [router],
+  );
+
+  // 2L P1: dismiss removes the item entirely (not just mark-read).
+  const handleDismiss = useCallback(
+    (id: string) => {
+      dismiss(id);
+      // If we were viewing the dismissed item, return to the list.
+      setDetailItem((prev) => (prev && prev.id === id ? null : prev));
+    },
+    [dismiss],
+  );
+
+  const handleOpenHref = useCallback(
+    (href: string, id: string) => {
+      // Mark read AND navigate — matches the F7 contract (click navigates).
+      markRead(id);
+      router.push(href);
+    },
+    [markRead, router],
   );
 
   return (
@@ -178,6 +197,19 @@ export function NotificationsPanel({
                   >
                     <CheckCheck className="h-3 w-3 mr-1" />
                     Mark all read
+                  </Button>
+                )}
+                {/* 2L P1: Clear-all button (removes every notification) */}
+                {!detailItem && notifications.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={dismissAll}
+                    title="Remove all notifications"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear all
                   </Button>
                 )}
                 <Button
@@ -247,13 +279,22 @@ export function NotificationsPanel({
                   {detailItem.href && (
                     <Button
                       className="w-full rounded-xl"
-                      onClick={() => {
-                        router.push(detailItem.href!);
-                      }}
+                      onClick={() => handleOpenHref(detailItem.href!, detailItem.id)}
                     >
-                      Go to document
+                      {/* 2L P1: "Open <doc>" — label reflects the deep link target */}
+                      Open document
                     </Button>
                   )}
+
+                  {/* 2L P1: working Dismiss button — removes the notification */}
+                  <Button
+                    variant="ghost"
+                    className="w-full rounded-xl text-muted-foreground"
+                    onClick={() => handleDismiss(detailItem.id)}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1.5" />
+                    Dismiss
+                  </Button>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">

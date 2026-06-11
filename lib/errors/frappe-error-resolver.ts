@@ -294,6 +294,47 @@ const strategies: ErrorStrategy[] = [
     },
   },
 
+  // LINK_EXISTS — 2L P2: deleting a Price List that's referenced by Item Prices
+  {
+    code: "LINK_EXISTS",
+    match: (m) =>
+      // ERPNext raises: "Cannot delete or cancel because Item Price <name> is
+      // linked with Price List <name>" (or similar variants)
+      /is linked with/i.test(m) ||
+      /is referenced/i.test(m) ||
+      /cannot be deleted/i.test(m) && /linked/i.test(m),
+    resolve: (msg) => {
+      // Try to extract the count or the linked doctype
+      const linkedDoctypeMatch = msg.match(/linked with\s+([A-Z][A-Za-z\s]+?)(?:\s+<|\s+\d|\.|$)/);
+      const countMatch = msg.match(/(\d+)\s+(?:Item Prices?|records?|rows?)/i);
+      const linkedDoctype = linkedDoctypeMatch?.[1]?.trim() || "Item Price";
+      const count = countMatch?.[1] || "one or more";
+
+      return {
+        title: "Price List is in use",
+        explanation: `This Price List can't be deleted while ${count} ${linkedDoctype}${count === "1" ? "" : "s"} reference${count === "1" ? "s" : ""} it. Remove or reassign the prices first, then try again.`,
+        details: [`In use by: ${count} ${linkedDoctype}`],
+        severity: "warning",
+        actions: [
+          {
+            label: "View Item Prices",
+            kind: "navigate",
+            variant: "default",
+            run: () => {
+              window.location.href = "/stock/settings/item-price";
+            },
+          },
+          {
+            label: "Dismiss",
+            kind: "dismiss",
+            variant: "ghost",
+            run: () => {},
+          },
+        ],
+      };
+    },
+  },
+
   // LINKED_DOC_EXISTS
   {
     code: "LINKED_DOC_EXISTS",

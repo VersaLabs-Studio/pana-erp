@@ -137,12 +137,16 @@ export const salesInvoiceStepSchemas = {
 
 /**
  * Material Request step schemas
+ * 2L P0-B: `schedule_date` (Required By) is NOT mandated by ERPNext on the
+ * MR header — only enforced in the UI per the spec, not by Frappe. Relaxed
+ * to optional so the wizard gate stops blocking valid submissions where the
+ * user only set the transaction_date.
  */
 export const materialRequestStepSchemas = {
   step1: z.object({
     material_request_type: z.string().min(1, "Request type is required"),
     transaction_date: z.string().min(1, "Transaction date is required"),
-    schedule_date: z.string().min(1, "Required by date is required"),
+    schedule_date: z.string().optional(),
     set_from_warehouse: z.string().optional(),
     set_warehouse: z.string().optional(),
   }),
@@ -260,12 +264,22 @@ export const journalEntryStepSchemas = {
 
 /**
  * Purchase Order step schemas
+ * 2L P0-B: `schedule_date` (Required By) is NOT mandated by ERPNext on the
+ * PO header. Relaxed to optional so the wizard gate doesn't reject valid
+ * submissions where the user only set the transaction_date. P0-A:
+ * per-item `warehouse` is also relaxed — Frappe's R1 still requires it, but
+ * the wizard injects the header `set_warehouse` into each row on submit
+ * (see purchase-order/new/page.tsx), so the gate is satisfied by the
+ * post-submit propagation. We keep the per-item check as a soft signal
+ * for the UI (the step2 still surfaces missing per-item warehouses via
+ * the `warehouse.${idx}` error path when a per-item warehouse is *also*
+ * required for mixed-warehouse orders).
  */
 export const purchaseOrderStepSchemas = {
   step1: z.object({
     supplier: z.string().min(1, "Supplier is required"),
     transaction_date: z.string().min(1, "Transaction date is required"),
-    schedule_date: z.string().min(1, "Required by date is required"),
+    schedule_date: z.string().optional(),
   }),
   step2: z.object({
     items: z
@@ -274,6 +288,11 @@ export const purchaseOrderStepSchemas = {
           item_code: z.string().min(1, "Item code is required"),
           qty: z.number().min(0.01, "Quantity must be greater than 0"),
           rate: z.number().min(0, "Rate must be non-negative"),
+          // Per-item warehouse is OPTIONAL at the gate — the header
+          // `set_warehouse` is propagated to each row on submit (P0-A).
+          // Keeping it as `.optional()` here means the wizard can advance
+          // with only the header set, and the submit handler fills the
+          // per-row warehouses.
           warehouse: z.string().optional(),
         })
       )

@@ -21,6 +21,8 @@ import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 
 interface PriceList {
   name: string;
@@ -45,6 +47,8 @@ export default function PriceListDetailPage({
   const prefersReducedMotion = useReducedMotion();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const { resolution, showError, dismiss } = useGuidedError();
+
   const {
     data: priceList,
     isLoading,
@@ -53,6 +57,11 @@ export default function PriceListDetailPage({
 
   const deleteMutation = useFrappeDelete("Price List", {
     onSuccess: () => router.push("/accounting/settings/price-list"),
+    // 2L P2: route the Frappe LinkExists error through the guided-error
+    // dialog so the user sees an actionable message + View Item Prices
+    // deep-link, not a raw toast.
+    onError: (err) =>
+      showError(resolveFrappeError(err, { doctype: "Price List" })),
   });
 
   if (isLoading) return <LoadingState type="detail" />;
@@ -220,6 +229,8 @@ export default function PriceListDetailPage({
           />
 
           <ActivityTimeline items={activityItems} />
+
+          <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
 
           <InfoCard
             title="System Info"
