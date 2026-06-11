@@ -175,11 +175,20 @@ function CreatePaymentEntryForm() {
       outstanding_amount: salesInvoice.outstanding_amount ?? 0,
     };
 
+    // 2M Part 1B: set `paid_amount = Σ allocated_amount` so Frappe doesn't
+    // reject the POST with "Difference Amount must be zero" (paid_amount(0)
+    // − allocated(X) ≠ 0). The received_amount sync effect below mirrors it
+    // for ETB. Also mark paid_from/paid_to as auto-filled so the UI shows
+    // the auto badge.
+    const allocatedTotal = ref.allocated_amount;
+
     reset({
       ...getValues(),
       ...(header as Partial<PEForm>),
       party_type: "Customer",
       payment_type: "Receive",
+      paid_amount: allocatedTotal,
+      received_amount: allocatedTotal,
       references: [ref],
     });
 
@@ -188,6 +197,7 @@ function CreatePaymentEntryForm() {
         .filter((m) => m.isReadOnly)
         .map((m) => m.targetField),
       "references",
+      "paid_amount",
     ]);
     setAutoFilledFields(filled);
 
@@ -614,6 +624,43 @@ function CreatePaymentEntryForm() {
                         </div>
                       </div>
                     </div>
+
+                    {/* 2M Part 1B: Difference indicator — paid_amount − Σ allocated.
+                        Success (zero) when paid matches the allocation; warning
+                        (non-zero) tells the user the payment won't be balanced. */}
+                    {(() => {
+                      const diff = Number(watchedPaidAmount || 0) - Number(totalAllocated || 0);
+                      const isZero = Math.abs(diff) < 0.005;
+                      return (
+                        <div
+                          className={cn(
+                            "flex items-center justify-between rounded-xl border px-4 py-3",
+                            isZero
+                              ? "border-success/30 bg-success/5"
+                              : "border-warning/30 bg-warning/5",
+                          )}
+                          aria-live="polite"
+                          data-testid="pe-difference-indicator"
+                        >
+                          <span
+                            className={cn(
+                              "text-xs font-semibold uppercase tracking-wider",
+                              isZero ? "text-success" : "text-warning",
+                            )}
+                          >
+                            {isZero ? "Balanced" : "Difference"}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-lg font-bold tabular-nums",
+                              isZero ? "text-success" : "text-warning",
+                            )}
+                          >
+                            {ETB.format(diff)}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               }

@@ -9,6 +9,9 @@
 // short-circuit — if an adjacent record already exists, the button
 // reads "View <name>" (redirect) and never "Create" (no duplicate).
 //
+// 2M Part 1C: the menu now groups backward edges (source links — "Created
+// from") ABOVE the forward edges ("Up next") so linked docs are clearly
+// stated in both directions on every doctype that has a known source edge.
 // Reuses:
 //   - `AUTO_FILL_REGISTRY` + `resolveFlowChain` (logic, not visual) via
 //     flow-adjacency.ts (derived from AUTO_FILL_REGISTRY keys)
@@ -66,6 +69,11 @@ export function CrossFlowActionsMenu({
     return null; // Standalone doctype — no rail
   }
 
+  // 2M Part 1C: split into "Created from" (backward) and "Up next" (forward)
+  // groups so linked docs are clearly stated in both directions.
+  const backward = edges.filter((e) => e.direction === "backward");
+  const forward = edges.filter((e) => e.direction === "forward");
+
   return (
     <div
       className={cn(
@@ -80,15 +88,39 @@ export function CrossFlowActionsMenu({
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
 
-      <ul className="space-y-2">
-        {edges.map((edge) => (
-          <AdjacencyRow
-            key={`${edge.direction}-${edge.targetDoctype}`}
-            edge={edge}
-            sourceDocName={name}
-          />
-        ))}
-      </ul>
+      {backward.length > 0 && (
+        <div className="mb-4" data-testid="crossflow-source-group">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Created from
+          </p>
+          <ul className="space-y-2">
+            {backward.map((edge) => (
+              <AdjacencyRow
+                key={`${edge.direction}-${edge.targetDoctype}`}
+                edge={edge}
+                sourceDocName={name}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {forward.length > 0 && (
+        <div data-testid="crossflow-forward-group">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Up next
+          </p>
+          <ul className="space-y-2">
+            {forward.map((edge) => (
+              <AdjacencyRow
+                key={`${edge.direction}-${edge.targetDoctype}`}
+                edge={edge}
+                sourceDocName={name}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
