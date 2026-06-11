@@ -185,3 +185,69 @@ export function lookupItemPriceRate(
  */
 export const ITEM_PRICE_API_PATH = "/api/stock/settings/item-price";
 
+// ---------------------------------------------------------------------------
+// 2L Part 2: Reusable auto-rate component. Mounts inside an item row, looks
+// up the matching Item Price, and writes the rate into the form on result.
+// The user's typed rate is preserved (the useEffect only writes when
+// itemPriceRate changes from undefined -> a value, and the form field is
+// a normal controlled input so the user can type over it).
+// ---------------------------------------------------------------------------
+import { useEffect } from "react";
+import { useFormContext, useWatch, type UseFormSetValue } from "react-hook-form";
+
+export interface ItemRateAutoFillProps<TFieldValues extends Record<string, any>> {
+  /** Path to the item_code field, e.g. `items.${index}.item_code` */
+  itemCodePath: string;
+  /** Path to the rate field, e.g. `items.${index}.rate` */
+  ratePath: string;
+  /** The active price list name (from the doc header) */
+  priceList: string;
+  /** The active currency (from the doc header) */
+  currency: string;
+  /** selling or buying */
+  side: ItemPriceSide;
+  /** Optional explicit setValue (the parent page's useForm().setValue) */
+  setValue?: UseFormSetValue<TFieldValues>;
+  /** When true, the rate is overwritten (default). When false, only fills if rate is 0/undefined. */
+  overwrite?: boolean;
+}
+
+export function ItemRateAutoFill<TFieldValues extends Record<string, any>>({
+  itemCodePath,
+  ratePath,
+  priceList,
+  currency,
+  side,
+  setValue: setValueProp,
+  overwrite = true,
+}: ItemRateAutoFillProps<TFieldValues>) {
+  // If the parent provided setValue use it; otherwise use the form context.
+  // (Most call sites are inside <Form>...</Form>, so the context exists.)
+  const formCtx = useFormContext<TFieldValues>();
+  const setValue = (setValueProp ?? formCtx?.setValue) as
+    | UseFormSetValue<TFieldValues>
+    | undefined;
+
+  // Watch the item_code reactively. When it changes, the lookup fires.
+  const itemCode = useWatch({ name: itemCodePath as any }) as string | undefined;
+
+  const { rate } = useItemPriceRate(
+    itemCode && priceList && currency
+      ? { itemCode, priceList, currency, side }
+      : null,
+  );
+
+  useEffect(() => {
+    if (rate === undefined || !setValue) return;
+    if (!overwrite) {
+      // Only fill if the current rate is empty/zero.
+      const current = (formCtx?.getValues?.(ratePath as any) as number | undefined) ?? 0;
+      if (current && current > 0) return;
+    }
+    setValue(ratePath as any, rate as any, { shouldDirty: true });
+  }, [rate, ratePath, setValue, overwrite, formCtx]);
+
+  // Headless component — renders nothing.
+  return null;
+}
+

@@ -30,6 +30,7 @@ import {
   FormSelect,
 } from "@/components/form";
 import { QuickAddField } from "@/components/quick-add/QuickAddField";
+import { ItemRateAutoFill } from "@/lib/flows/item-price-lookup";
 import { FieldWrap } from "@/components/form/field-wrap";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
@@ -441,11 +442,20 @@ export default function NewQuotationPage() {
                                     extraFields={["standard_rate", "stock_uom", "item_name"]}
                                     onValueChange={(_val, doc) => {
                                       if (doc) {
-                                        setValue(`items.${index}.rate`, Number(doc.standard_rate) || 0);
                                         setValue(`items.${index}.uom`, doc.stock_uom || "Nos");
                                         setValue(`items.${index}.item_name`, doc.item_name || "");
+                                        // 2L Part 2: rate is auto-filled by ItemRateAutoFill
                                       }
                                     }}
+                                  />
+                                  {/* 2L Part 2: Auto-rate via Item Price */}
+                                  <ItemRateAutoFill<QuotationForm>
+                                    itemCodePath={`items.${index}.item_code`}
+                                    ratePath={`items.${index}.rate`}
+                                    priceList={watchedAll?.selling_price_list || ""}
+                                    currency={watchedAll?.currency || "ETB"}
+                                    side="selling"
+                                    setValue={setValue as any}
                                   />
                                 </td>
                                 <td className="px-3 py-2 align-top">

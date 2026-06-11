@@ -33,6 +33,8 @@ import {
   FormDatePicker,
 } from "@/components/form";
 import { QuickAddField } from "@/components/quick-add/QuickAddField";
+import { ItemRateAutoFill } from "@/lib/flows/item-price-lookup";
+import { useItemPriceRate } from "@/lib/flows/item-price-lookup";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
@@ -444,10 +446,7 @@ export default function NewSalesOrderPage() {
                                     ]}
                                     onValueChange={(_val, doc) => {
                                       if (doc) {
-                                        setValue(
-                                          `items.${index}.rate`,
-                                          Number(doc.standard_rate) || 0,
-                                        );
+                                        // Set uom/item_name immediately (always).
                                         setValue(
                                           `items.${index}.uom`,
                                           doc.stock_uom || "Nos",
@@ -456,8 +455,26 @@ export default function NewSalesOrderPage() {
                                           `items.${index}.item_name`,
                                           doc.item_name || "",
                                         );
+                                        // 2L Part 2: rate is now set by the
+                                        // ItemRateAutoFill below via the
+                                        // Item Price lookup (more specific
+                                        // than standard_rate). Don't set
+                                        // from standard_rate here — let the
+                                        // auto-fill run; if no Item Price
+                                        // exists, the user types manually.
                                       }
                                     }}
+                                  />
+                                  {/* 2L Part 2: Auto-rate via Item Price lookup.
+                                      Headless component — watches item_code,
+                                      looks up Item Price, writes the rate. */}
+                                  <ItemRateAutoFill<SOForm>
+                                    itemCodePath={`items.${index}.item_code`}
+                                    ratePath={`items.${index}.rate`}
+                                    priceList={watchedAll?.selling_price_list || ""}
+                                    currency={watchedAll?.currency || "ETB"}
+                                    side="selling"
+                                    setValue={setValue as any}
                                   />
                                 </td>
                                 <td className="px-3 py-2 align-top">
