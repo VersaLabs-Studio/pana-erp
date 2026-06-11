@@ -266,7 +266,15 @@ describe("Part 2: Item Price auto-rate integration (§10.4)", () => {
   });
 
   it("pickBestItemPrice returns the most specific / most recent match", () => {
-    const rows = [
+    const rows: Array<{
+      name: string;
+      item_code: string;
+      price_list: string;
+      price_list_rate: number;
+      currency: string;
+      selling?: number;
+      modified?: string;
+    }> = [
       {
         name: "IP-OLD",
         item_code: "ITEM-001",
@@ -299,8 +307,8 @@ describe("Part 2: Item Price auto-rate integration (§10.4)", () => {
 
   it("pickBestItemPrice prefers matching UOM when present", () => {
     const rows = [
-      { name: "IP-NOS", price_list_rate: 100, currency: "ETB", uom: "Nos", modified: "2026-06-01" },
-      { name: "IP-KG", price_list_rate: 200, currency: "ETB", uom: "Kg", modified: "2026-06-02" },
+      { name: "IP-NOS", item_code: "X", price_list: "Standard Selling", price_list_rate: 100, currency: "ETB", selling: 1, uom: "Nos", modified: "2026-06-01" },
+      { name: "IP-KG", item_code: "X", price_list: "Standard Selling", price_list_rate: 200, currency: "ETB", selling: 1, uom: "Kg", modified: "2026-06-02" },
     ];
     const match = pickBestItemPrice(rows, {
       itemCode: "X",
@@ -316,7 +324,7 @@ describe("Part 2: Item Price auto-rate integration (§10.4)", () => {
 
   it("lookupItemPriceRate is a thin wrapper around pickBestItemPrice", () => {
     const rows = [
-      { name: "IP-A", price_list_rate: 99, currency: "ETB", modified: "2026-06-01" },
+      { name: "IP-A", item_code: "X", price_list: "Standard Selling", price_list_rate: 99, currency: "ETB", selling: 1, modified: "2026-06-01" },
     ];
     const rate = lookupItemPriceRate(rows, {
       itemCode: "X",
