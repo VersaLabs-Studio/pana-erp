@@ -26,6 +26,7 @@ import {
   FormDatePicker,
   FormSelect,
 } from "@/components/form";
+import { QuickAddField } from "@/components/quick-add/QuickAddField";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate } from "@/hooks/generic";
@@ -249,7 +250,8 @@ export default function NewStockEntryPage() {
                         required
                       />
                       <div />
-                      <FormFrappeSelect
+                      {/* 2L 1A: Quick-Add enabled Source Warehouse */}
+                      <QuickAddField
                         control={control}
                         name="from_warehouse"
                         label="Source Warehouse"
@@ -258,7 +260,8 @@ export default function NewStockEntryPage() {
                         placeholder="Select source..."
                         filters={[["is_group", "=", 0]]}
                       />
-                      <FormFrappeSelect
+                      {/* 2L 1A: Quick-Add enabled Target Warehouse */}
+                      <QuickAddField
                         control={control}
                         name="to_warehouse"
                         label="Target Warehouse"
@@ -300,7 +303,8 @@ export default function NewStockEntryPage() {
                             return (
                               <tr key={field.id} className="group">
                                 <td className="px-3 py-2 align-top">
-                                  <FormFrappeSelect
+                                  {/* 2L 1A: Quick-Add enabled per-row Item */}
+                                  <QuickAddField
                                     control={control}
                                     name={`items.${index}.item_code`}
                                     doctype="Item"

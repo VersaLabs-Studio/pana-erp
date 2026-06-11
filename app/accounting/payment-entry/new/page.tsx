@@ -220,6 +220,80 @@ function CreatePaymentEntryForm() {
     { enabled: !!watchedParty && watchedPaymentType !== "Internal Transfer" },
   );
 
+  // 2L P1: Auto-resolve default accounts for paid_from / paid_to.
+  // - For "Receive" (Customer) → paid_to = default bank/cash, paid_from = party receivable
+  // - For "Pay" (Supplier)      → paid_from = default bank/cash, paid_to = party payable
+  // The Company default bank/cash account is fetched once on mount; the
+  // party's default receivable/payable is fetched on party selection.
+  const { data: defaultCashAccount } = useFrappeList<{ name: string }>(
+    "Account",
+    {
+      fields: ["name"],
+      filters: [
+        ["account_type", "=", "Cash"],
+        ["is_group", "=", 0],
+        ["company", "=", getActiveCompany()],
+      ],
+      limit: 1,
+    },
+    { enabled: watchedPaymentType !== "Internal Transfer" },
+  );
+  const { data: defaultBankAccount } = useFrappeList<{ name: string }>(
+    "Account",
+    {
+      fields: ["name"],
+      filters: [
+        ["account_type", "=", "Bank"],
+        ["is_group", "=", 0],
+        ["company", "=", getActiveCompany()],
+      ],
+      limit: 1,
+    },
+    { enabled: watchedPaymentType !== "Internal Transfer" },
+  );
+  const partyAccountType = watchedPartyType === "Supplier" ? "Payable" : "Receivable";
+  const { data: partyDefaultAccount } = useFrappeList<{ name: string }>(
+    "Account",
+    {
+      fields: ["name"],
+      filters: [
+        ["account_type", "=", partyAccountType],
+        ["is_group", "=", 0],
+        ["company", "=", getActiveCompany()],
+      ],
+      limit: 1,
+    },
+    { enabled: !!watchedParty && watchedPaymentType !== "Internal Transfer" },
+  );
+
+  // Auto-populate paid_from / paid_to as soon as we have a party + accounts
+  useEffect(() => {
+    if (watchedPaymentType === "Internal Transfer") return;
+    const cashOrBank = defaultBankAccount?.[0]?.name || defaultCashAccount?.[0]?.name || "";
+    const partyAccount = partyDefaultAccount?.[0]?.name || "";
+    if (!cashOrBank || !partyAccount) return;
+    if (watchedPaymentType === "Receive") {
+      // Customer pays us: money comes from customer's Receivable, goes to our bank
+      const current = getValues("paid_from");
+      if (!current) setValue("paid_from", partyAccount);
+      const currentTo = getValues("paid_to");
+      if (!currentTo) setValue("paid_to", cashOrBank);
+    } else if (watchedPaymentType === "Pay") {
+      // We pay a supplier: money leaves our bank, reduces supplier's Payable
+      const current = getValues("paid_from");
+      if (!current) setValue("paid_from", cashOrBank);
+      const currentTo = getValues("paid_to");
+      if (!currentTo) setValue("paid_to", partyAccount);
+    }
+  }, [
+    watchedPaymentType,
+    defaultBankAccount,
+    defaultCashAccount,
+    partyDefaultAccount,
+    setValue,
+    getValues,
+  ]);
+
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),
     [autoFilledFields],
@@ -561,6 +635,52 @@ function CreatePaymentEntryForm() {
                       <Summary label="Company" value={v.company} />
                       <Summary label="Mode of Payment" value={v.mode_of_payment} />
                       <Summary label="Posting Date" value={v.posting_date} />
+                    </div>
+
+                    {/* 2L P1: paid_from / paid_to — RENDERED + auto-resolved.
+                        These are Frappe-required for the POST; previously the
+                        wizard never showed them, so the user couldn't satisfy
+                        the validation. The auto-resolve useEffect above fills
+                        them with sensible defaults. The user can override. */}
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormFrappeSelect
+                        control={control}
+                        name="paid_from"
+                        label={v.payment_type === "Receive" ? "Paid From (Customer Receivable)" : "Paid From (Bank/Cash)"}
+                        required
+                        doctype="Account"
+                        filters={
+                          v.payment_type === "Receive"
+                            ? [
+                                ["account_type", "=", "Receivable"],
+                                ["is_group", "=", 0],
+                              ]
+                            : [
+                                ["account_type", "in", ["Bank", "Cash"]],
+                                ["is_group", "=", 0],
+                              ]
+                        }
+                        placeholder="Select account..."
+                      />
+                      <FormFrappeSelect
+                        control={control}
+                        name="paid_to"
+                        label={v.payment_type === "Receive" ? "Paid To (Bank/Cash)" : "Paid To (Supplier Payable)"}
+                        required
+                        doctype="Account"
+                        filters={
+                          v.payment_type === "Receive"
+                            ? [
+                                ["account_type", "in", ["Bank", "Cash"]],
+                                ["is_group", "=", 0],
+                              ]
+                            : [
+                                ["account_type", "=", "Payable"],
+                                ["is_group", "=", 0],
+                              ]
+                        }
+                        placeholder="Select account..."
+                      />
                     </div>
 
                     {/* Reference no/date */}

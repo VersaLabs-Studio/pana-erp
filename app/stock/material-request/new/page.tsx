@@ -22,6 +22,7 @@ import {
   FormDatePicker,
   FormSelect,
 } from "@/components/form";
+import { QuickAddField } from "@/components/quick-add/QuickAddField";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate } from "@/hooks/generic";
@@ -234,7 +235,8 @@ export default function NewMaterialRequestPage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                      <FormFrappeSelect
+                      {/* 2L 1A: Quick-Add enabled Warehouse */}
+                      <QuickAddField
                         control={control}
                         name="set_warehouse"
                         label={isTransfer ? "Target Warehouse" : "Default Warehouse"}
@@ -243,7 +245,8 @@ export default function NewMaterialRequestPage() {
                         filters={[["is_group", "=", 0]]}
                       />
                       {isTransfer && (
-                        <FormFrappeSelect
+                        /* 2L 1A: Quick-Add enabled Source Warehouse */
+                        <QuickAddField
                           control={control}
                           name="set_from_warehouse"
                           label="Source Warehouse"
@@ -295,7 +298,8 @@ export default function NewMaterialRequestPage() {
                           {fields.map((field, index) => (
                             <tr key={field.id} className="group">
                               <td className="px-3 py-2 align-top">
-                                <FormFrappeSelect
+                                {/* 2L 1A: Quick-Add enabled per-row Item */}
+                                <QuickAddField
                                   control={control}
                                   name={`items.${index}.item_code`}
                                   doctype="Item"
@@ -341,7 +345,8 @@ export default function NewMaterialRequestPage() {
                                 />
                               </td>
                               <td className="px-3 py-2 align-top">
-                                <FormFrappeSelect
+                                {/* 2L 1A: Quick-Add enabled per-row UOM */}
+                                <QuickAddField
                                   control={control}
                                   name={`items.${index}.uom`}
                                   doctype="UOM"
@@ -350,7 +355,8 @@ export default function NewMaterialRequestPage() {
                                 />
                               </td>
                               <td className="px-3 py-2 align-top">
-                                <FormFrappeSelect
+                                {/* 2L 1A: Quick-Add enabled per-row Warehouse */}
+                                <QuickAddField
                                   control={control}
                                   name={`items.${index}.warehouse`}
                                   doctype="Warehouse"

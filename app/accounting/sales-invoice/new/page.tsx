@@ -22,6 +22,8 @@ import {
   FormFrappeSelect,
   FormDatePicker,
 } from "@/components/form";
+import { QuickAddField } from "@/components/quick-add/QuickAddField";
+import { ItemRateAutoFill } from "@/lib/flows/item-price-lookup";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
@@ -286,7 +288,8 @@ export default function NewSalesInvoicePage() {
                         loading={loadingDN}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.customer : undefined}
                       >
-                        <FormFrappeSelect
+                        {/* 2L 1A: Quick-Add enabled Customer */}
+                        <QuickAddField
                           control={control}
                           name="customer"
                           label="Customer"
@@ -369,7 +372,8 @@ export default function NewSalesInvoicePage() {
                             return (
                               <tr key={field.id} className="group">
                                 <td className="px-3 py-2 align-top">
-                                  <FormFrappeSelect
+                                  {/* 2L 1A: Quick-Add enabled per-row Item */}
+                                  <QuickAddField
                                     control={control}
                                     name={`items.${index}.item_code`}
                                     doctype="Item"
@@ -384,10 +388,6 @@ export default function NewSalesInvoicePage() {
                                     onValueChange={(_val, doc) => {
                                       if (doc) {
                                         setValue(
-                                          `items.${index}.rate`,
-                                          Number(doc.standard_rate) || 0,
-                                        );
-                                        setValue(
                                           `items.${index}.uom`,
                                           doc.stock_uom || "Nos",
                                         );
@@ -395,8 +395,18 @@ export default function NewSalesInvoicePage() {
                                           `items.${index}.item_name`,
                                           doc.item_name || "",
                                         );
+                                        // 2L Part 2: rate is auto-filled by ItemRateAutoFill
                                       }
                                     }}
+                                  />
+                                  {/* 2L Part 2: Auto-rate via Item Price (selling) */}
+                                  <ItemRateAutoFill<SIForm>
+                                    itemCodePath={`items.${index}.item_code`}
+                                    ratePath={`items.${index}.rate`}
+                                    priceList={watchedAll?.selling_price_list || ""}
+                                    currency={watchedAll?.currency || "ETB"}
+                                    side="selling"
+                                    setValue={setValue as any}
                                   />
                                 </td>
                                 <td className="px-3 py-2 align-top">
