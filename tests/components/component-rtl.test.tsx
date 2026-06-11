@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FlowWizard } from "@/components/flows/FlowWizard";
+import { FlowRail } from "@/components/flows/FlowRail";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import {
   GuidedErrorDialog,
@@ -487,5 +488,160 @@ describe("resolveFrappeError — integration with extractFrappeMessage", () => {
         expect(detail).not.toBe("[object Object]");
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FlowRail — rendered href (G2 test)
+// ---------------------------------------------------------------------------
+describe("FlowRail — rendered href RTL", () => {
+  it("Create anchor uses buildCreateUrl route, not symbolic id", () => {
+    const result = {
+      flowId: "quotation-to-sales-order",
+      stages: [
+        {
+          id: "quotation",
+          label: "Quotation",
+          doctype: "Quotation",
+          status: "current" as const,
+          documentName: "QTN-001",
+          documentUrl: "/sales/quotation/QTN-001",
+        },
+        {
+          id: "sales-order",
+          label: "Sales Order",
+          doctype: "Sales Order",
+          status: "pending" as const,
+          canCreateDownstream: true,
+          createAction: "create_sales_order",
+        },
+      ],
+      currentIndex: 0,
+      completedCount: 0,
+      pendingCount: 1,
+      isComplete: false,
+    };
+
+    const { container } = render(
+      <FlowRail
+        result={result}
+        currentDocName="QTN-001"
+        sourceDoctype="Quotation"
+      />,
+    );
+
+    // The "Create" anchor should have a real URL, not a symbolic id
+    const links = container.querySelectorAll("a");
+    const createLink = Array.from(links).find(
+      (a) => a.textContent?.includes("Sales Order") || a.getAttribute("href")?.includes("/sales/sales-order/new"),
+    );
+    expect(createLink).toBeDefined();
+    const href = createLink?.getAttribute("href");
+    expect(href).toContain("/sales/sales-order/new");
+    expect(href).toContain("quotation=QTN-001");
+    // Must NOT be a symbolic id like "sales-order" or "create_sales_order"
+    expect(href).not.toBe("create_sales_order");
+    expect(href).not.toBe("sales-order");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Quick-Add registry (Phase 2K Feature A)
+// ---------------------------------------------------------------------------
+describe("Quick-Add registry — 9 doctypes covered (master §11.4)", () => {
+  it("supports Customer, Supplier, Item, Contact, Address, Lead, Warehouse, UOM, Item Group", async () => {
+    const { isQuickAddSupported, getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const required = [
+      "Customer",
+      "Supplier",
+      "Item",
+      "Contact",
+      "Address",
+      "Lead",
+      "Warehouse",
+      "UOM",
+      "Item Group",
+    ];
+    for (const dt of required) {
+      expect(isQuickAddSupported(dt)).toBe(true);
+      const entry = getQuickAddEntry(dt);
+      expect(entry).toBeDefined();
+      expect(entry!.label).toBeTruthy();
+      expect(entry!.fields.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("Customer entry has customer_name + customer_type fields", async () => {
+    const { getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const entry = getQuickAddEntry("Customer");
+    expect(entry).toBeDefined();
+    const fieldNames = entry!.fields.map((f) => f.name);
+    expect(fieldNames).toContain("customer_name");
+    expect(fieldNames).toContain("customer_type");
+  });
+
+  it("Address entry has address_title (required) — nested link seed compatible", async () => {
+    const { getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const entry = getQuickAddEntry("Address");
+    expect(entry).toBeDefined();
+    const addressTitle = entry!.fields.find((f) => f.name === "address_title");
+    expect(addressTitle).toBeDefined();
+    expect(addressTitle!.required).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-Flow adjacency (Phase 2K Feature B)
+// ---------------------------------------------------------------------------
+describe("Cross-flow adjacency — back-link short-circuit", () => {
+  it("Sales Order has a forward edge to Sales Invoice with a back-link query", async () => {
+    const { getAdjacencies } = await import("@/lib/flows/flow-adjacency");
+    const edges = getAdjacencies("Sales Order");
+    expect(edges.length).toBeGreaterThan(0);
+    const siEdge = edges.find((e) => e.targetDoctype === "Sales Invoice");
+    expect(siEdge).toBeDefined();
+    expect(siEdge!.direction).toBe("forward");
+    // Back-link query exists for SI
+    expect(siEdge!.backLink).not.toBeNull();
+    expect(siEdge!.backLink!.doctype).toBe("Sales Invoice");
+  });
+
+  it("Stock Reconciliation is standalone — no adjacency", async () => {
+    const { getAdjacencies, hasAdjacency } = await import(
+      "@/lib/flows/flow-adjacency"
+    );
+    expect(hasAdjacency("Stock Reconciliation")).toBe(false);
+    expect(getAdjacencies("Stock Reconciliation")).toHaveLength(0);
+  });
+
+  it("buildAdjacencyCreateHref uses real route + param", async () => {
+    const { getAdjacencies, buildAdjacencyCreateHref } = await import(
+      "@/lib/flows/flow-adjacency"
+    );
+    const edges = getAdjacencies("Sales Order");
+    const siEdge = edges.find((e) => e.targetDoctype === "Sales Invoice");
+    expect(siEdge).toBeDefined();
+    const href = buildAdjacencyCreateHref(siEdge!, "SAL-ORD-2026-00001");
+    expect(href).toBe("/accounting/sales-invoice/new?sales_order=SAL-ORD-2026-00001");
+  });
+
+  it("fillBackLinkFilter substitutes <name> with the source name", async () => {
+    const { fillBackLinkFilter } = await import("@/lib/flows/flow-adjacency");
+    const result = fillBackLinkFilter(
+      ["", "sales_order", "=", "<name>"] as [
+        string,
+        string,
+        string,
+        unknown,
+      ],
+      "SAL-ORD-2026-00001",
+    );
+    expect(result[3]).toBe("SAL-ORD-2026-00001");
   });
 });

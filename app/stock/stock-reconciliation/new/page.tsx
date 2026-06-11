@@ -164,6 +164,7 @@ export default function NewStockReconciliationPage() {
     createMutation.mutate({
       purpose: values.purpose,
       posting_date: values.posting_date,
+      set_posting_time: 1,
       company: getActiveCompany(),
       items: items.map((it, idx) => ({
         item_code: it.item_code,

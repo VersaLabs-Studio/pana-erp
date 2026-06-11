@@ -263,9 +263,12 @@ export default function StockLedgerPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">
+                        <Link
+                          href={`/stock/stock-ledger/${encodeURIComponent(entry.name)}`}
+                          className="font-medium text-primary hover:underline"
+                        >
                           {entry.item_code}
-                        </div>
+                        </Link>
                         {entry.item_name && (
                           <div className="text-xs text-muted-foreground truncate max-w-[180px]">
                             {entry.item_name}

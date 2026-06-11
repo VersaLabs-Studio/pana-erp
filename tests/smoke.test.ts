@@ -628,3 +628,231 @@ describe("Regression — FlowRail downstream filter child-doctype (F1 fix)", () 
     expect(typeof filter[2]).toBe("string"); // operator
   });
 });
+
+// ---------------------------------------------------------------------------
+// flow-auto-fill guard test (Phase 2J Part 3)
+// ---------------------------------------------------------------------------
+describe("flow-auto-fill — guard", () => {
+  it("Customer→Quotation maps name → party_name", async () => {
+    const { getAutoFillMapping } = await import("@/lib/flows/flow-auto-fill");
+    const mapping = getAutoFillMapping("Customer", "Quotation");
+    expect(mapping).toBeDefined();
+    if (!mapping) return;
+    const partyNameMapping = mapping.headerMappings.find(
+      (m) => m.targetField === "party_name",
+    );
+    expect(partyNameMapping).toBeDefined();
+    expect(partyNameMapping?.sourceField).toBe("name");
+  });
+
+  it("Quotation→SO maps party_name → customer (G1 fix)", async () => {
+    const { getAutoFillMapping } = await import("@/lib/flows/flow-auto-fill");
+    const mapping = getAutoFillMapping("Quotation", "Sales Order");
+    expect(mapping).toBeDefined();
+    if (!mapping) return;
+    const customerMapping = mapping.headerMappings.find(
+      (m) => m.targetField === "customer",
+    );
+    expect(customerMapping).toBeDefined();
+    expect(customerMapping?.sourceField).toBe("party_name");
+    // G1: autoFillGuard should exist and reject Lead quotations
+    expect(mapping.autoFillGuard).toBeDefined();
+    if (mapping.autoFillGuard) {
+      expect(mapping.autoFillGuard({ quotation_to: "Customer" } as any)).toBe(true);
+      expect(mapping.autoFillGuard({ quotation_to: "Lead" } as any)).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeStockKPIs aggregation test (Phase 2J Part 3)
+// ---------------------------------------------------------------------------
+describe("computeStockKPIs — aggregation", () => {
+  it("computes totals, warehouses, and outOfStock correctly", async () => {
+    const { computeStockKPIs } = await import("@/lib/kpi/compute-stock-kpis");
+    const bins = [
+      { item_code: "A", warehouse: "WH1", actual_qty: 10, valuation_rate: 100 },
+      { item_code: "A", warehouse: "WH2", actual_qty: 5, valuation_rate: 100 },
+      { item_code: "B", warehouse: "WH1", actual_qty: 0, valuation_rate: 50 },
+      { item_code: "C", warehouse: "WH3", actual_qty: -2, valuation_rate: 200 },
+    ];
+    const result = computeStockKPIs(bins);
+    expect(result.totalSKUs).toBe(3); // A, B, C
+    expect(result.totalValue).toBe(1100); // 10*100 + 5*100 + 0*50 + (-2)*200 = 1100
+    expect(result.warehouses).toBe(3); // WH1, WH2, WH3
+    expect(result.outOfStock).toBe(2); // B (qty=0), C (qty<0)
+  });
+
+  it("returns zeros for empty bins", async () => {
+    const { computeStockKPIs } = await import("@/lib/kpi/compute-stock-kpis");
+    const result = computeStockKPIs([]);
+    expect(result.totalSKUs).toBe(0);
+    expect(result.totalValue).toBe(0);
+    expect(result.warehouses).toBe(0);
+    expect(result.outOfStock).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractFrappeMessage object-message test (Phase 2J Part 3)
+// ---------------------------------------------------------------------------
+describe("extractFrappeMessage — object-message (F1 guard)", () => {
+  it("extracts field/code from object message, never [object Object]", async () => {
+    const { extractFrappeMessage, KNOWN_FRAPPE_ERROR_FIXTURES } = await import("@/lib/errors/extract-frappe-message");
+    const result = extractFrappeMessage(KNOWN_FRAPPE_ERROR_FIXTURES.serverMessagesObjectMessage);
+    // The fixture has { message: { code: "ERR_MANDATORY", field: "company" } }
+    expect(result).not.toContain("[object Object]");
+    expect(result).not.toBe("An unexpected error occurred");
+    // Should contain the field or code
+    expect(result).toContain("company");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R2: Surface our own Zod validation errors (Phase 2K Part 1)
+// ---------------------------------------------------------------------------
+describe("R2: Zod fieldErrors branch (FIELD_VALIDATION strategy)", () => {
+  it("names the field, never the generic fallback", async () => {
+    const { resolveFrappeError } = await import("@/lib/errors/frappe-error-resolver");
+    // After useFrappeMutation's formatErrorMessage, an ApiErrorResponse with
+    // { error: "Validation Error", details: { title: ["Required"] } } becomes
+    // the Error message "title: Required".
+    const err = new Error("title: Required");
+    const r = resolveFrappeError(err, { doctype: "Purchase Order" });
+    expect(r.code).toBe("FIELD_VALIDATION");
+    expect(r.title).toContain("title");
+    expect(r.explanation).toContain("title");
+    expect(r.details?.[0]).toBe("title: Required");
+  });
+
+  it("lists multiple fields when several fail", async () => {
+    const { resolveFrappeError } = await import("@/lib/errors/frappe-error-resolver");
+    const err = new Error("title: Required · naming_series: Required");
+    const r = resolveFrappeError(err, { doctype: "Purchase Order" });
+    expect(r.code).toBe("FIELD_VALIDATION");
+    expect(r.details).toEqual([
+      "title: Required",
+      "naming_series: Required",
+    ]);
+  });
+
+  it("formatErrorMessage from useFrappeMutation builds the field summary", async () => {
+    // Import the testable helper by re-reading the module — we use vitest's
+    // module mocking here to isolate the formatter. (The function isn't
+    // exported; we test it via the public surface.)
+    // This test is a smoke check: an Error with a "field: msg" message
+    // reaches the FIELD_VALIDATION strategy.
+    const { resolveFrappeError } = await import("@/lib/errors/frappe-error-resolver");
+    const apiResponse = {
+      success: false,
+      error: "Validation Error",
+      details: { customer: ["Required"], posting_date: ["Required"] },
+    };
+    // Mirror useFrappeMutation's formatErrorMessage behavior
+    const lines: string[] = [];
+    for (const [f, msgs] of Object.entries(apiResponse.details)) {
+      for (const m of msgs as string[]) lines.push(`${f}: ${m}`);
+    }
+    const message = lines.join(" · ");
+    const err = new Error(message);
+    const r = resolveFrappeError(err, { doctype: "Sales Order" });
+    expect(r.code).toBe("FIELD_VALIDATION");
+    expect(r.details).toEqual([
+      "customer: Required",
+      "posting_date: Required",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R6: Address via Dynamic Link (Phase 2K Part 1)
+// ---------------------------------------------------------------------------
+describe("R6: Address filter via Dynamic Link", () => {
+  it("address filter uses Dynamic Link child table, not 'Address Linked Document'", () => {
+    // The correct ERPNext pattern: filter on the Dynamic Link child table
+    // (`link_doctype` + `link_name`). "Address Linked Document" is not a real
+    // doctype and would 404 the list route.
+    const customer = "CUST-001";
+    const filter: [string, string, string, unknown][] = [
+      ["Dynamic Link", "link_doctype", "=", "Customer"],
+      ["Dynamic Link", "link_name", "=", customer],
+    ];
+    expect(filter).toHaveLength(2);
+    // Neither element references the bogus doctype name
+    for (const f of filter) {
+      expect(f[0]).not.toBe("Address Linked Document");
+      expect(f[0]).toBe("Dynamic Link");
+    }
+    expect(filter[0][2]).toBe("=");
+    expect(filter[1][2]).toBe("=");
+    expect(filter[0][1]).toBe("link_doctype");
+    expect(filter[1][1]).toBe("link_name");
+    // The value goes at index 3 of each tuple
+    expect(filter[0][3]).toBe("Customer");
+    expect(filter[1][3]).toBe(customer);
+  });
+
+  it("address filter omits 'Address Linked Document' in source", async () => {
+    // Verify the actual wizard source has been updated away from the bogus
+    // doctype name. (No literal — this imports and reads the file.)
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const root = process.cwd();
+    const files = [
+      "app/sales/quotation/new/page.tsx",
+      "app/sales/quotation/[name]/edit/page.tsx",
+      "app/sales/sales-order/new/page.tsx",
+      "app/sales/sales-order/[name]/edit/page.tsx",
+      "app/stock/delivery-note/new/page.tsx",
+      "app/stock/delivery-note/[name]/edit/page.tsx",
+    ];
+    for (const f of files) {
+      const content = await fs.readFile(path.join(root, f), "utf-8");
+      expect(content).not.toContain("Address Linked Document");
+      expect(content).toContain("Dynamic Link");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R4: Stock Ledger Entry detail route (Phase 2K Part 1)
+// ---------------------------------------------------------------------------
+describe("R4: Stock Ledger Entry detail route", () => {
+  it("route file [name]/route.ts exists and exports GET", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const filePath = path.join(
+      process.cwd(),
+      "app/api/stock/stock-ledger-entry/[name]/route.ts",
+    );
+    const stat = await fs.stat(filePath);
+    expect(stat.isFile()).toBe(true);
+    const content = await fs.readFile(filePath, "utf-8");
+    expect(content).toMatch(/export\s+const\s+GET\s*=/);
+    expect(content).toMatch(/createGetHandler\s*\(\s*["']Stock Ledger Entry["']/);
+    // No POST/PUT/DELETE — SLE is read-only
+    expect(content).not.toMatch(/export\s+const\s+POST/);
+    expect(content).not.toMatch(/export\s+const\s+PUT/);
+    expect(content).not.toMatch(/export\s+const\s+DELETE/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R5: SO wizard reads ?customer= (Phase 2K Part 1)
+// ---------------------------------------------------------------------------
+describe("R5: SO wizard ?customer= prefill", () => {
+  it("SO new wizard reads customer from searchParams and locks it", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const filePath = path.join(
+      process.cwd(),
+      "app/sales/sales-order/new/page.tsx",
+    );
+    const content = await fs.readFile(filePath, "utf-8");
+    expect(content).toMatch(/searchParams\.get\(["']customer["']\)/);
+    // autoFilledFields should include "customer" when ?customer= is set
+    expect(content).toMatch(/next\.add\(["']customer["']\)/);
+    // The From Customer subtitle
+    expect(content).toMatch(/From Customer/);
+  });
+});

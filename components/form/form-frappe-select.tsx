@@ -40,6 +40,16 @@ interface FormFrappeSelectProps<T extends FieldValues> {
   className?: string;
   /** Whether select is disabled */
   disabled?: boolean;
+  /**
+   * Optional footer slot — rendered below the options list. Quick-Add uses
+   * this to render "Create new <Doctype>" inside the dropdown.
+   */
+  footer?: React.ReactNode;
+  /**
+   * Optional footer slot for the empty state — rendered when the options
+   * list is empty.
+   */
+  emptyFooter?: React.ReactNode;
 }
 
 /**
@@ -86,6 +96,8 @@ export function FormFrappeSelect<T extends FieldValues>({
   onValueChange,
   className,
   disabled = false,
+  footer,
+  emptyFooter,
 }: FormFrappeSelectProps<T>) {
   return (
     <FormField
@@ -113,6 +125,8 @@ export function FormFrappeSelect<T extends FieldValues>({
                 filters={filters}
                 orderBy={orderBy}
                 disabled={disabled}
+                footer={footer}
+                emptyFooter={emptyFooter}
                 className={cn(
                   "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
                   className,
@@ -135,6 +149,8 @@ export function FormFrappeSelect<T extends FieldValues>({
                   filters={filters}
                   orderBy={orderBy}
                   disabled={disabled}
+                  footer={footer}
+                  emptyFooter={emptyFooter}
                   className={cn(
                     "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
                     className,

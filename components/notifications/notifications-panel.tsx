@@ -2,13 +2,15 @@
 
 // components/notifications/notifications-panel.tsx
 // B9: Notification history panel — B1 surface, dual-theme, accessible.
+// F7: Detail view — clicking an item with detail/actions shows explanation + steps.
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/lib/stores/use-notifications";
+import type { Notification, NotificationAction } from "@/lib/stores/notification-store";
 import {
   CheckCircle2,
   AlertCircle,
@@ -17,6 +19,8 @@ import {
   Bell,
   X,
   CheckCheck,
+  ChevronLeft,
+  ArrowRight,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +68,7 @@ export function NotificationsPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const router = useRouter();
+  const [detailItem, setDetailItem] = useState<Notification | null>(null);
 
   // Escape to close
   useEffect(() => {
@@ -75,6 +80,11 @@ export function NotificationsPanel({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
+  // Reset detail view when panel closes
+  useEffect(() => {
+    if (!open) setDetailItem(null);
+  }, [open]);
+
   // Focus trap — focus first focusable element on open
   useEffect(() => {
     if (!open || !panelRef.current) return;
@@ -85,13 +95,29 @@ export function NotificationsPanel({
   }, [open]);
 
   const handleItemClick = useCallback(
-    (id: string, href?: string) => {
-      markRead(id);
-      if (href) {
-        router.push(href); // G5: use Next.js client routing, not window.location.href
+    (item: Notification) => {
+      markRead(item.id);
+      // F7: if item has detail or actions, show detail view
+      if (item.detail || (item.actions && item.actions.length > 0)) {
+        setDetailItem(item);
+        return;
+      }
+      if (item.href) {
+        router.push(item.href);
       }
     },
     [markRead, router],
+  );
+
+  const handleAction = useCallback(
+    (action: NotificationAction) => {
+      if (action.href) {
+        router.push(action.href);
+      } else if (action.run) {
+        action.run();
+      }
+    },
+    [router],
   );
 
   return (
@@ -121,18 +147,29 @@ export function NotificationsPanel({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
               <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-muted-foreground" />
+                {detailItem ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setDetailItem(null)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Bell className="h-4 w-4 text-muted-foreground" />
+                )}
                 <h3 className="text-sm font-semibold text-foreground">
-                  Notifications
+                  {detailItem ? "Notification Detail" : "Notifications"}
                 </h3>
-                {unreadCount > 0 && (
+                {!detailItem && unreadCount > 0 && (
                   <span className="text-[10px] font-medium tabular-nums text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
                     {unreadCount}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                {unreadCount > 0 && (
+                {!detailItem && unreadCount > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -154,9 +191,71 @@ export function NotificationsPanel({
               </div>
             </div>
 
-            {/* List */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto">
-              {notifications.length === 0 ? (
+              {detailItem ? (
+                /* F7: Detail View */
+                <div className="p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 shrink-0">{kindIcon(detailItem.kind)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {detailItem.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                        {relativeTime(detailItem.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {detailItem.message && (
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {detailItem.message}
+                    </p>
+                  )}
+
+                  {detailItem.detail && (
+                    <div className="rounded-xl bg-muted/30 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                        Explanation
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">
+                        {detailItem.detail}
+                      </p>
+                    </div>
+                  )}
+
+                  {detailItem.actions && detailItem.actions.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Actions
+                      </p>
+                      {detailItem.actions.map((action, i) => (
+                        <Button
+                          key={i}
+                          variant="outline"
+                          className="w-full justify-between rounded-xl h-auto py-3 px-4"
+                          onClick={() => handleAction(action)}
+                        >
+                          <span className="text-sm">{action.label}</span>
+                          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+
+                  {detailItem.href && (
+                    <Button
+                      className="w-full rounded-xl"
+                      onClick={() => {
+                        router.push(detailItem.href!);
+                      }}
+                    >
+                      Go to document
+                    </Button>
+                  )}
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Bell className="h-8 w-8 text-muted-foreground/30 mb-3" />
                   <p className="text-sm text-muted-foreground">
@@ -171,7 +270,7 @@ export function NotificationsPanel({
                   {notifications.map((n) => (
                     <button
                       key={n.id}
-                      onClick={() => handleItemClick(n.id, n.href)}
+                      onClick={() => handleItemClick(n)}
                       className={cn(
                         "w-full flex items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/30",
                         !n.read && "bg-primary/5",

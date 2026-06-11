@@ -29,6 +29,34 @@ function stripHtml(input: string): string {
 }
 
 /**
+ * F1: Extract a readable string from an object message.
+ * Frappe often sends `{ message: { code, field } }` or similar.
+ * Falls back to JSON.stringify of the meaningful subset.
+ */
+function extractObjectMessage(obj: unknown): string {
+  if (typeof obj === "string") return stripHtml(obj);
+  if (typeof obj !== "object" || obj === null) return String(obj);
+  const o = obj as Record<string, unknown>;
+  if (typeof o.message === "string") return stripHtml(o.message);
+  if (typeof o.error === "string") return stripHtml(o.error);
+  if (typeof o.exception === "string") return stripHtml(o.exception);
+  if (typeof o.field === "string" && typeof o.code === "string") {
+    return `${o.field}: ${o.code}`;
+  }
+  if (typeof o.field === "string") return `Missing field: ${o.field}`;
+  if (typeof o.code === "string") return o.code;
+  // Meaningful subset — skip large arrays/logs
+  const meaningful: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      meaningful[k] = v;
+    }
+  }
+  if (Object.keys(meaningful).length > 0) return JSON.stringify(meaningful);
+  return JSON.stringify(obj);
+}
+
+/**
  * G4: Single exit gate — every return from extractFrappeMessage passes
  * through this. Catches [object Object], "[object Object]", and any
  * stringified-object patterns.
@@ -67,7 +95,7 @@ export function extractFrappeMessage(err: unknown): string {
             const parsed = JSON.parse(entry);
             if (typeof parsed === "object" && parsed !== null && "message" in parsed) {
               const msg = parsed.message;
-              return typeof msg === "string" ? stripHtml(msg) : String(msg);
+              return typeof msg === "string" ? stripHtml(msg) : extractObjectMessage(msg);
             }
           } catch {
             // not JSON — treat as plain string
@@ -77,7 +105,7 @@ export function extractFrappeMessage(err: unknown): string {
         }
         if (typeof entry === "object" && entry !== null && "message" in entry) {
           const msg = (entry as { message: unknown }).message;
-          return typeof msg === "string" ? stripHtml(msg) : String(msg);
+          return typeof msg === "string" ? stripHtml(msg) : extractObjectMessage(msg);
         }
         return String(entry);
       });

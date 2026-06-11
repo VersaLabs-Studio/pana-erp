@@ -623,7 +623,7 @@ export default function CustomerMasterHub() {
               className="rounded-full"
               onClick={() =>
                 router.push(
-                  `/sales/quotation/new?party_name=${encodeURIComponent(name)}`,
+                  `/sales/quotation/new?customer=${encodeURIComponent(name)}`,
                 )
               }
             >
@@ -957,7 +957,7 @@ export default function CustomerMasterHub() {
                   <QuickAction
                     icon={FileText}
                     label="Create Quotation"
-                    href={`/sales/quotation/new?party_name=${encodeURIComponent(name)}`}
+                    href={`/sales/quotation/new?customer=${encodeURIComponent(name)}`}
                     variant="default"
                   />
                   <QuickAction
@@ -1081,7 +1081,7 @@ export default function CustomerMasterHub() {
                       size="sm"
                       onClick={() =>
                         router.push(
-                          `/sales/quotation/new?party_name=${encodeURIComponent(name)}`,
+                  `/sales/quotation/new?customer=${encodeURIComponent(name)}`,
                         )
                       }
                     >
