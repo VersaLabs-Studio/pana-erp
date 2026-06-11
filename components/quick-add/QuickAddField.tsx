@@ -1,15 +1,26 @@
-// components/form/form-frappe-select.tsx
-// Obsidian ERP v4.0 - Reusable Form Frappe Select Component
-
 "use client";
 
+// components/quick-add/QuickAddField.tsx
+// Obsidian ERP v4.0 — Inline Quick-Add Field (master §11).
+//
+// Drop-in replacement for `FormFrappeSelect` that exposes a "Create new
+// <Doctype>" affordance in the dropdown footer. The footer opens a
+// `QuickAddModal` (Radix Dialog overlay — no route change), and on success
+// the new record's `name` is written back to the field, the select query is
+// invalidated, and the host wizard's state is preserved.
+
+import { useState, useCallback } from "react";
 import { Control, FieldPath, FieldValues } from "react-hook-form";
-import { FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Plus } from "lucide-react";
 import { FrappeSelect } from "@/components/smart/frappe-select";
 import { DataField } from "@/components/smart/data-field";
+import { FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { QuickAddModal } from "./QuickAddModal";
+import { getQuickAddEntry, isQuickAddSupported } from "@/lib/flows/quick-add-registry";
 import { cn } from "@/lib/utils";
 
-interface FormFrappeSelectProps<T extends FieldValues> {
+interface QuickAddFieldProps<T extends FieldValues> {
   /** Form control from useForm */
   control: Control<T>;
   /** Field name (must match schema) */
@@ -30,7 +41,7 @@ interface FormFrappeSelectProps<T extends FieldValues> {
   labelField?: string;
   /** Additional Frappe filters for querying */
   filters?: ([string, string, unknown] | [string, string, string, unknown])[];
-  /** Order by field and direction (use table prefix for Dynamic Link joins, e.g. "`tabAddress`.name") */
+  /** Order by field and direction (use table prefix for Dynamic Link joins) */
   orderBy?: { field: string; order?: "asc" | "desc" };
   /** Extra fields to fetch (e.g. ["standard_rate", "stock_uom"]) */
   extraFields?: string[];
@@ -41,46 +52,26 @@ interface FormFrappeSelectProps<T extends FieldValues> {
   /** Whether select is disabled */
   disabled?: boolean;
   /**
-   * Optional footer slot — rendered below the options list. Quick-Add uses
-   * this to render "Create new <Doctype>" inside the dropdown.
+   * When true, the dropdown footer exposes "Create new <Doctype>" and opens
+   * a QuickAddModal on click. Defaults to true; the modal silently no-ops
+   * if the doctype isn't in the registry.
    */
-  footer?: React.ReactNode;
+  enableQuickAdd?: boolean;
   /**
-   * Optional footer slot for the empty state — rendered when the options
-   * list is empty.
+   * Seed values pre-populated in the QuickAdd modal (e.g. `link_doctype` and
+   * `link_name` when adding an Address from inside a Customer).
    */
-  emptyFooter?: React.ReactNode;
+  quickAddSeed?: Record<string, unknown>;
 }
 
 /**
- * Reusable form select that fetches options from Frappe
+ * Quick-Add enabled FormFrappeSelect.
  *
- * @example
- * ```tsx
- * <FormFrappeSelect
- *   control={form.control}
- *   name="item_group"
- *   label="Item Group"
- *   required
- *   doctype="Item Group"
- *   labelField="item_group_name"
- * />
- *
- * // With Dynamic Link filters (for Address/Contact)
- * <FormFrappeSelect
- *   control={control}
- *   name="customer_address"
- *   label="Address"
- *   doctype="Address"
- *   filters={[
- *     ["Dynamic Link", "link_doctype", "=", "Customer"],
- *     ["Dynamic Link", "link_name", "=", customerName],
- *   ]}
- *   orderBy={{ field: "`tabAddress`.name", order: "asc" }}
- * />
- * ```
+ * Use as a drop-in for `FormFrappeSelect` when the host wizard should let the
+ * user create a missing master inline. Renders "Create new <Doctype>" in the
+ * dropdown footer (and also in the empty state when the option list is empty).
  */
-export function FormFrappeSelect<T extends FieldValues>({
+export function QuickAddField<T extends FieldValues>({
   control,
   name,
   label,
@@ -96,9 +87,25 @@ export function FormFrappeSelect<T extends FieldValues>({
   onValueChange,
   className,
   disabled = false,
-  footer,
-  emptyFooter,
-}: FormFrappeSelectProps<T>) {
+  enableQuickAdd = true,
+  quickAddSeed,
+}: QuickAddFieldProps<T>) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const supportsQuickAdd = enableQuickAdd && isQuickAddSupported(doctype);
+  const entry = supportsQuickAdd ? getQuickAddEntry(doctype) : undefined;
+
+  // Footer: ＋ Create new <Doctype> (lives inside the dropdown)
+  const footer = supportsQuickAdd && entry ? (
+    <Button
+      type="button"
+      variant="ghost"
+      className="w-full justify-start rounded-xl h-auto py-2.5 px-3 text-sm font-medium text-primary hover:bg-primary/5"
+      onClick={() => setModalOpen(true)}
+    >
+      <Plus className="mr-2 h-4 w-4" /> Create new {entry.label}
+    </Button>
+  ) : null;
+
   return (
     <FormField
       control={control}
@@ -106,10 +113,19 @@ export function FormFrappeSelect<T extends FieldValues>({
       render={({ field }) => {
         const handleChange = (val: string, doc?: any) => {
           field.onChange(val);
-          if (onValueChange) {
-            onValueChange(val, doc);
-          }
+          if (onValueChange) onValueChange(val, doc);
         };
+
+        // QuickAdd success — write the new name into the controlled field
+        // directly (the footer click bypasses FrappeSelect's onChange).
+        const handleQuickAddSuccess = useCallback(
+          (result: { name: string; doctype: string } | undefined) => {
+            if (!result) return;
+            field.onChange(result.name);
+            if (onValueChange) onValueChange(result.name, { name: result.name });
+          },
+          [field, onValueChange],
+        );
 
         return (
           <FormItem>
@@ -126,7 +142,7 @@ export function FormFrappeSelect<T extends FieldValues>({
                 orderBy={orderBy}
                 disabled={disabled}
                 footer={footer}
-                emptyFooter={emptyFooter}
+                emptyFooter={footer}
                 className={cn(
                   "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
                   className,
@@ -150,7 +166,7 @@ export function FormFrappeSelect<T extends FieldValues>({
                   orderBy={orderBy}
                   disabled={disabled}
                   footer={footer}
-                  emptyFooter={emptyFooter}
+                  emptyFooter={footer}
                   className={cn(
                     "h-12 rounded-xl bg-secondary/30 hover:bg-secondary/50 focus:bg-card border-0",
                     className,
@@ -159,6 +175,15 @@ export function FormFrappeSelect<T extends FieldValues>({
               </DataField>
             )}
             <FormMessage />
+            {supportsQuickAdd && entry && (
+              <QuickAddModal
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+                entry={entry}
+                seed={quickAddSeed}
+                onSuccess={handleQuickAddSuccess}
+              />
+            )}
           </FormItem>
         );
       }}
@@ -166,4 +191,4 @@ export function FormFrappeSelect<T extends FieldValues>({
   );
 }
 
-export default FormFrappeSelect;
+export default QuickAddField;

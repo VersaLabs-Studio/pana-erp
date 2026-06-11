@@ -544,3 +544,104 @@ describe("FlowRail — rendered href RTL", () => {
     expect(href).not.toBe("sales-order");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quick-Add registry (Phase 2K Feature A)
+// ---------------------------------------------------------------------------
+describe("Quick-Add registry — 9 doctypes covered (master §11.4)", () => {
+  it("supports Customer, Supplier, Item, Contact, Address, Lead, Warehouse, UOM, Item Group", async () => {
+    const { isQuickAddSupported, getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const required = [
+      "Customer",
+      "Supplier",
+      "Item",
+      "Contact",
+      "Address",
+      "Lead",
+      "Warehouse",
+      "UOM",
+      "Item Group",
+    ];
+    for (const dt of required) {
+      expect(isQuickAddSupported(dt)).toBe(true);
+      const entry = getQuickAddEntry(dt);
+      expect(entry).toBeDefined();
+      expect(entry!.label).toBeTruthy();
+      expect(entry!.fields.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("Customer entry has customer_name + customer_type fields", async () => {
+    const { getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const entry = getQuickAddEntry("Customer");
+    expect(entry).toBeDefined();
+    const fieldNames = entry!.fields.map((f) => f.name);
+    expect(fieldNames).toContain("customer_name");
+    expect(fieldNames).toContain("customer_type");
+  });
+
+  it("Address entry has address_title (required) — nested link seed compatible", async () => {
+    const { getQuickAddEntry } = await import(
+      "@/lib/flows/quick-add-registry"
+    );
+    const entry = getQuickAddEntry("Address");
+    expect(entry).toBeDefined();
+    const addressTitle = entry!.fields.find((f) => f.name === "address_title");
+    expect(addressTitle).toBeDefined();
+    expect(addressTitle!.required).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-Flow adjacency (Phase 2K Feature B)
+// ---------------------------------------------------------------------------
+describe("Cross-flow adjacency — back-link short-circuit", () => {
+  it("Sales Order has a forward edge to Sales Invoice with a back-link query", async () => {
+    const { getAdjacencies } = await import("@/lib/flows/flow-adjacency");
+    const edges = getAdjacencies("Sales Order");
+    expect(edges.length).toBeGreaterThan(0);
+    const siEdge = edges.find((e) => e.targetDoctype === "Sales Invoice");
+    expect(siEdge).toBeDefined();
+    expect(siEdge!.direction).toBe("forward");
+    // Back-link query exists for SI
+    expect(siEdge!.backLink).not.toBeNull();
+    expect(siEdge!.backLink!.doctype).toBe("Sales Invoice");
+  });
+
+  it("Stock Reconciliation is standalone — no adjacency", async () => {
+    const { getAdjacencies, hasAdjacency } = await import(
+      "@/lib/flows/flow-adjacency"
+    );
+    expect(hasAdjacency("Stock Reconciliation")).toBe(false);
+    expect(getAdjacencies("Stock Reconciliation")).toHaveLength(0);
+  });
+
+  it("buildAdjacencyCreateHref uses real route + param", async () => {
+    const { getAdjacencies, buildAdjacencyCreateHref } = await import(
+      "@/lib/flows/flow-adjacency"
+    );
+    const edges = getAdjacencies("Sales Order");
+    const siEdge = edges.find((e) => e.targetDoctype === "Sales Invoice");
+    expect(siEdge).toBeDefined();
+    const href = buildAdjacencyCreateHref(siEdge!, "SAL-ORD-2026-00001");
+    expect(href).toBe("/accounting/sales-invoice/new?sales_order=SAL-ORD-2026-00001");
+  });
+
+  it("fillBackLinkFilter substitutes <name> with the source name", async () => {
+    const { fillBackLinkFilter } = await import("@/lib/flows/flow-adjacency");
+    const result = fillBackLinkFilter(
+      ["", "sales_order", "=", "<name>"] as [
+        string,
+        string,
+        string,
+        unknown,
+      ],
+      "SAL-ORD-2026-00001",
+    );
+    expect(result[3]).toBe("SAL-ORD-2026-00001");
+  });
+});
