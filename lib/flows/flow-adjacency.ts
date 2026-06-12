@@ -110,13 +110,25 @@ function f3(field: string, op: "=" | "!=", value: unknown): [string, string, unk
 function toBackLinkQuery(def: FlowLinkDef): BackLinkQuery | null {
   if (def.pattern === "header_link") return null;
 
-  const isChildTable = def.queryDoctype?.includes(" ") ?? false;
+  // 2N Part 1.1 fix: the prior heuristic `queryDoctype?.includes(" ")`
+  // was wrong (it treated 2-word *parent* doctypes like "Sales Order" as
+  // child tables). The reliable signal is `returnParent: true`. We also
+  // use the same heuristic to decide whether the backLink.doctype
+  // reported to the legacy `BackLinkQuery` API is the *parent* (the
+  // caller wants to query the parent) or the *child* (the caller wants
+  // to query the child table directly). The original 2L contract is
+  // that `backLink.doctype` is the parent doctype (the consumer
+  // filters on the child via the filter's 4-tuple leading slot).
+  const isChildTable = def.returnParent === true;
   const filters: [string, string, string, unknown][] = [];
+  const parentDoctype = def.to;
 
   if (isChildTable) {
+    // 4-tuple filter: [childDoctype, field, "=", "<name>"]
     filters.push([def.queryDoctype!, def.field!, "=", "<name>"]);
   } else {
-    // Header field on the queried parent
+    // Header field on the queried parent — empty doctype prefix in
+    // the 4-tuple so Frappe scopes the filter to the queried parent.
     filters.push(["", def.field!, "=", "<name>"]);
   }
 
@@ -125,7 +137,7 @@ function toBackLinkQuery(def: FlowLinkDef): BackLinkQuery | null {
   }
 
   return {
-    doctype: def.queryDoctype!,
+    doctype: parentDoctype,
     filters,
     selectFields: def.selectFields ?? (def.returnParent ? ["name", "parent"] : ["name"]),
   };

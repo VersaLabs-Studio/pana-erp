@@ -451,9 +451,12 @@ export function buildLinkFilter(
     return [base];
   }
   // back_link
-  const isChildTable =
-    def.queryDoctype !== undefined &&
-    def.queryDoctype.includes(" "); // child tables have spaces in their names
+  // 2N Part 1.1 fix: the prior heuristic `queryDoctype.includes(" ")` was
+  // wrong — it treated "Sales Order" (a 2-word *parent* doctype) as a
+  // child table. The reliable signal is `returnParent: true`, which we
+  // set ONLY for true child-table queries (Sales Invoice Item, Delivery
+  // Note Item, Payment Entry Reference, …).
+  const isChildTable = def.returnParent === true;
   if (isChildTable) {
     // 4-tuple: [childDoctype, field, "=", value]
     const base: [string, string, string, unknown] = [
@@ -465,6 +468,8 @@ export function buildLinkFilter(
     return def.extraFilters ? [base, ...def.extraFilters] : [base];
   }
   // header field on the queried parent (e.g. "Work Order", "Purchase Order")
+  // 4-tuple with empty doctype — the filter is on the queried parent's
+  // header field; Frappe scopes the filter to the queried parent.
   const base: [string, string, string, unknown] = [
     "",
     def.field!,
