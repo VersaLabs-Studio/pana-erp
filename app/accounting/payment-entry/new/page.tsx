@@ -29,6 +29,7 @@ import {
   FormDatePicker,
   FormSelect,
 } from "@/components/form";
+import { QuickAddField } from "@/components/quick-add/QuickAddField";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc, useFrappeList } from "@/hooks/generic";
@@ -437,7 +438,14 @@ function CreatePaymentEntryForm() {
                         loading={loadingInvoice}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.party : undefined}
                       >
-                        <FormFrappeSelect
+                        {/* 2M Part 4B: Quick-Add enabled Party. Doctype is
+                            Customer/Supplier/Employee/Shareholder per
+                            watchedPartyType; QuickAddField only renders the
+                            "Create new" footer for doctypes in the
+                            QUICK_ADD_REGISTRY (Customer, Supplier). The
+                            Employee/Shareholder cases gracefully fall
+                            through to a plain select. */}
+                        <QuickAddField
                           control={control}
                           name="party"
                           label="Party"
