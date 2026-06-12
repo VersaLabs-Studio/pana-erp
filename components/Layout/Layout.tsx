@@ -210,8 +210,14 @@ const navigation = [
   {
     title: "Reports",
     icon: BarChart3,
-    href: "/reports",
-    items: [],
+    // 2N Part 3.2: Reports group is a sub-section of Accounting. We link
+    // each financial report directly rather than nesting a parent route.
+    items: [
+      { title: "Profit & Loss", href: "/accounting/reports/profit-and-loss", icon: TrendingUp },
+      { title: "Balance Sheet", href: "/accounting/reports/balance-sheet", icon: BarChart3 },
+      { title: "Accounts Receivable", href: "/accounting/reports/accounts-receivable", icon: Wallet },
+      { title: "Accounts Payable", href: "/accounting/reports/accounts-payable", icon: Wallet },
+    ],
   },
 ];
 
