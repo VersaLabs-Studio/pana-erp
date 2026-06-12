@@ -239,6 +239,11 @@ export default function WorkOrderDetailPage() {
 
   const progress = wo.qty > 0 ? ((wo.produced_qty || 0) / wo.qty) * 100 : 0;
 
+  // 2N Part 4.2: WO execution spine — these buttons deep-link into the
+  // Stock Entry new page with `purpose` and `work_order` pre-filled (the
+  // SE wizard now reads those URL params and prefills the form). They
+  // were previously disabled with `disabledReason: "Coming soon"` because
+  // the SE wizard didn't accept the params; both gates are now live.
   const whatsNext = [
     isDraft && {
       label: "Submit Work Order",
@@ -248,20 +253,16 @@ export default function WorkOrderDetailPage() {
       isLoading: updateMutation.isPending,
     },
     status === "Not Started" && {
-      label: "Start Production",
-      description: "Transfer materials and begin manufacturing",
+      label: "Transfer materials",
+      description: "Create a Material Transfer Stock Entry for this WO",
       onClick: handleStartProduction,
       isPrimary: true,
-      disabled: !isModuleBuilt("Stock Entry"),
-      disabledReason: "Coming soon",
     },
     status === "In Process" && {
       label: "Finish Production",
-      description: "Create manufacture Stock Entry",
+      description: "Create a Manufacture Stock Entry (FG produced)",
       onClick: handleFinishProduction,
       isPrimary: true,
-      disabled: !isModuleBuilt("Stock Entry"),
-      disabledReason: "Coming soon",
     },
     ["Not Started", "In Process"].includes(status) && {
       label: "Request Materials",
