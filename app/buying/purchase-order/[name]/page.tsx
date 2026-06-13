@@ -18,6 +18,7 @@ import {
   Loader2,
   Package,
   CheckCircle2,
+  PackageCheck,
 } from "lucide-react";
 
 import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
@@ -29,6 +30,7 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
+import { ReceiveMaterialsModal } from "@/components/stock/ReceiveMaterialsModal";
 import { useFlowChain } from "@/hooks/flows/use-flow-chain";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
 import type { PurchaseOrder } from "@/types/doctype-types";
@@ -58,6 +60,8 @@ export default function PurchaseOrderDetailPage() {
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
+  // 2P Part 2.6 — ReceiveMaterialsModal trigger
+  const [openReceive, setOpenReceive] = useState(false);
   const { resolution, showError, dismiss } = useGuidedError();
 
   const {
@@ -168,12 +172,13 @@ export default function PurchaseOrderDetailPage() {
       isLoading: updateMutation.isPending,
     },
     isSubmitted && {
-      label: "Create Purchase Receipt",
+      label: "Receive items",
       description: "Record goods receipt from supplier",
-      onClick: () =>
-        router.push(
-          `/stock/purchase-receipt/new?purchase_order=${encodeURIComponent(name)}`,
-        ),
+      // 2P Part 2.6 — open the ReceiveMaterialsModal (one-click) instead
+      // of deep-linking to the PR wizard. The modal does the create+submit
+      // and routes to the new PR detail on success.
+      onClick: () => setOpenReceive(true),
+      isPrimary: true,
       disabled: !isModuleBuilt("Purchase Receipt"),
       disabledReason: "Module not available",
     },
@@ -440,6 +445,11 @@ export default function PurchaseOrderDetailPage() {
         onConfirm={handleReject}
       />
       <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
+      <ReceiveMaterialsModal
+        open={openReceive}
+        onOpenChange={setOpenReceive}
+        source={{ kind: "po", poName: name }}
+      />
     </div>
   );
 }
