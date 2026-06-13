@@ -117,8 +117,53 @@ export default function NewMaterialRequestPage() {
   const prefillItemName = searchParams.get("item_name");
   const prefillQty = searchParams.get("qty");
   const prefillWarehouse = searchParams.get("warehouse");
+  // 2P Part 2.4 — accept a structured "shortfall" list from
+  // StartProductionModal. Format: `item:qty,item:qty,…` (URL-encoded
+  // comma). Multiple rows can be pre-populated in one click — replaces
+  // the prior "blank form" experience.
+  const prefillShortfall = searchParams.get("shortfall");
+  const prefillWorkOrder = searchParams.get("work_order");
 
   useEffect(() => {
+    // Multiple-row shortfall prefill
+    if (prefillShortfall) {
+      const entries = decodeURIComponent(prefillShortfall)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const idx = s.indexOf(":");
+          if (idx < 0) return null;
+          const code = s.slice(0, idx);
+          const qty = Number(s.slice(idx + 1)) || 0;
+          if (!code || qty <= 0) return null;
+          return { item_code: code, qty };
+        })
+        .filter((v): v is { item_code: string; qty: number } => v !== null);
+      if (entries.length > 0) {
+        setValue("items.0.item_code", entries[0]!.item_code);
+        setValue("items.0.qty", entries[0]!.qty);
+        if (entries.length > 1) {
+          // Append the rest
+          for (let i = 1; i < entries.length; i++) {
+            append({
+              item_code: entries[i]!.item_code,
+              item_name: "",
+              qty: entries[i]!.qty,
+              uom: "Nos",
+              warehouse: prefillWarehouse ?? "",
+              schedule_date: "",
+            });
+          }
+        }
+        if (prefillWarehouse) {
+          setValue("items.0.warehouse", prefillWarehouse);
+          setValue("set_warehouse", prefillWarehouse);
+        }
+        return;
+      }
+    }
+    // Single-row prefill (existing)
     if (!prefillItemCode) return;
     setValue("items.0.item_code", prefillItemCode);
     if (prefillItemName) setValue("items.0.item_name", prefillItemName);
@@ -127,7 +172,15 @@ export default function NewMaterialRequestPage() {
       setValue("items.0.warehouse", prefillWarehouse);
       setValue("set_warehouse", prefillWarehouse);
     }
-  }, [prefillItemCode, prefillItemName, prefillQty, prefillWarehouse, setValue]);
+  }, [
+    prefillShortfall,
+    prefillItemCode,
+    prefillItemName,
+    prefillQty,
+    prefillWarehouse,
+    setValue,
+    append,
+  ]);
 
   const watchedAll = useWatch({ control });
   const watchedItems = watchedAll?.items ?? [];

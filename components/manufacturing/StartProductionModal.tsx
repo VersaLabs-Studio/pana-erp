@@ -55,6 +55,7 @@ import { useFrappeCreate, useFrappeList, useFrappeUpdate } from "@/hooks/generic
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { getActiveCompany } from "@/lib/settings/company";
+import { resolveCompanyWarehouses } from "@/lib/settings/warehouses";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,6 +107,25 @@ export function StartProductionModal({
   const router = useRouter();
   const { resolution, showError, dismiss } = useGuidedError();
   const [isCreating, setIsCreating] = useState(false);
+  // 2P Part 2.4 — implicit-warehouse resolution. If the WO has blank
+  // `source_warehouse` / `wip_warehouse`, fall back to the active
+  // company's canonical Stores / WIP (via lib/settings/warehouses.ts).
+  // The advanced Stock-Entry wizard keeps the explicit pickers.
+  const [implicitWarehouses, setImplicitWarehouses] = useState<{
+    stores: string;
+    wip: string;
+    fg: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    if (sourceWarehouse && wipWarehouse) {
+      setImplicitWarehouses(null);
+      return;
+    }
+    resolveCompanyWarehouses()
+      .then((w) => setImplicitWarehouses({ stores: w.stores, wip: w.wip, fg: w.fg }))
+      .catch(() => setImplicitWarehouses(null));
+  }, [open, sourceWarehouse, wipWarehouse]);
 
   // 2O Part 5.1 — idempotency: surface any existing Material Transfer
   // SE for this WO so the user doesn't double-create.
@@ -145,8 +165,8 @@ export function StartProductionModal({
     return m;
   }, [bins]);
 
-  const sourceWh = sourceWarehouse || "";
-  const targetWh = wipWarehouse || "";
+  const sourceWh = sourceWarehouse || implicitWarehouses?.stores || "";
+  const targetWh = wipWarehouse || implicitWarehouses?.wip || "";
   const summaryLines = useMemo(() => {
     return requiredItems.map((it) => {
       const required = Number(it.required_qty) || 0;
