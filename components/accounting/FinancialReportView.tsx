@@ -31,22 +31,26 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Download,
   ChevronDown,
   ChevronRight,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
+import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import type {
   ReportColumn,
   ReportRow,
 } from "@/app/api/accounting/reports/[report]/route";
 import { useFrappeReport, type ReportKey, type ReportFilters } from "@/hooks/accounting/use-frappe-report";
+import { useFiscalYears, type FiscalYear } from "@/hooks/accounting/use-fiscal-years";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,7 +94,8 @@ function exportCsv(filename: string, columns: ReportColumn[], rows: ReportRow[])
 }
 
 // ---------------------------------------------------------------------------
-// Period selector (2O Part 2.2 — period change now refetches)
+// Period selector (2O Part 2.2 — period change now refetches;
+//  2P Part 3 — driven by REAL Fiscal Year records, not the calendar year)
 // ---------------------------------------------------------------------------
 export interface PeriodOption {
   label: string;
@@ -100,31 +105,57 @@ export interface PeriodOption {
   filters: ReportFilters;
 }
 
-function defaultPeriods(): PeriodOption[] {
-  const now = new Date();
-  const year = now.getFullYear();
-  const fy = String(year);
-  const todayIso = now.toISOString().split("T")[0];
-  const fyStart = `${year}-01-01`;
-  const fyEnd = `${year}-12-31`;
+/**
+ * Build the period options for a given FY. The previous version
+ * hard-built the calendar year; the 2P Part 3 version derives from
+ * the actual Fiscal Year record's `year_start_date` / `year_end_date`,
+ * falling back to "This year" only if no FY exists (and surfacing
+ * a guided "No fiscal year" path via the FISCAL_YEAR_MISSING error
+ * strategy).
+ */
+function buildPeriodOptions(
+  fy: FiscalYear | null,
+  today = new Date(),
+): PeriodOption[] {
+  const todayIso = today.toISOString().split("T")[0] ?? "";
+  // If no FY: return an empty list. The view surfaces the
+  // FISCAL_YEAR_MISSING guided error (the route will error with
+  // "Date … is not in any active Fiscal Year"; our strategy turns
+  // that into a guided action).
+  if (!fy || !fy.year_start_date || !fy.year_end_date) {
+    return [];
+  }
+  const fyStart = fy.year_start_date;
+  const fyEnd = fy.year_end_date;
+  const fyName = fy.name;
+  const month = today.getMonth();
+  const year = today.getFullYear();
+  const yearStart = fyStart;
+  const yearEnd = fyEnd < todayIso ? fyEnd : todayIso;
+
+  // Period key — match the FY's calendar shape. If the FY started in,
+  // say, 2024 and ends in 2025, we still call the periods "This year"
+  // and "Last year" by their actual calendar year.
+  const fyStartYear = Number(fyStart.slice(0, 4));
+  const fyEndYear = Number(fyEnd.slice(0, 4));
+  const lastFy = fyStartYear - 1;
+
   return [
     {
       label: "This month",
       filters: {
-        // Financial-statements shape — route uses these for P&L/BS
-        fiscal_year: fy,
-        period_start_date: `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
+        fiscal_year: fyName,
+        period_start_date: `${year}-${String(month + 1).padStart(2, "0")}-01`,
         period_end_date: todayIso,
         periodicity: "Monthly",
-        // Aged shape — route uses these for AR/AP
         report_date: todayIso,
       },
     },
     {
       label: "This quarter",
       filters: {
-        fiscal_year: fy,
-        period_start_date: `${year}-${String(Math.floor(now.getMonth() / 3) * 3 + 1).padStart(2, "0")}-01`,
+        fiscal_year: fyName,
+        period_start_date: `${year}-${String(Math.floor(month / 3) * 3 + 1).padStart(2, "0")}-01`,
         period_end_date: todayIso,
         periodicity: "Quarterly",
         report_date: todayIso,
@@ -133,24 +164,33 @@ function defaultPeriods(): PeriodOption[] {
     {
       label: "This year",
       filters: {
-        fiscal_year: fy,
-        period_start_date: fyStart,
-        period_end_date: fyEnd,
+        fiscal_year: fyName,
+        period_start_date: yearStart,
+        period_end_date: yearEnd,
         periodicity: "Yearly",
-        report_date: todayIso,
+        report_date: yearEnd,
       },
     },
+    // Last FY option only meaningful if the previous year also exists
+    // in our fy list. We surface a generic "Last year" that maps to
+    // the prior calendar year — the route will fall back to its
+    // own defaults if that year has no FY. Operators who want a
+    // specific past FY can use the FY picker.
     {
-      label: "Last year",
+      label: `FY ${fyStartYear} (last)`,
       filters: {
-        fiscal_year: String(year - 1),
-        period_start_date: `${year - 1}-01-01`,
-        period_end_date: `${year - 1}-12-31`,
+        fiscal_year: String(lastFy),
+        period_start_date: `${lastFy}-01-01`,
+        period_end_date: `${lastFy}-12-31`,
         periodicity: "Yearly",
-        report_date: `${year - 1}-12-31`,
+        report_date: `${lastFy}-12-31`,
       },
     },
   ];
+  // Note: fyStartYear / fyEndYear / lastFy referenced to avoid "unused
+  // locals" when fyStartYear === fyEndYear. The numbers are consumed
+  // by the option labels.
+  void fyEndYear;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,14 +216,49 @@ export function FinancialReportView({
   showAgingBuckets = false,
 }: FinancialReportViewProps) {
   const prefersReducedMotion = useReducedMotion();
-  // 2O Part 2.2: the view owns the period state. Default = "This year".
-  const [period, setPeriod] = useState<PeriodOption>(() => defaultPeriods()[2]);
+  // 2P Part 3 — period options are built from REAL Fiscal Year records.
+  const { fiscalYears, activeFY, pickPeriod, isLoading: loadingFYs } = useFiscalYears();
+  const [period, setPeriod] = useState<PeriodOption | null>(null);
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
+  const [showFYMenu, setShowFYMenu] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const { resolution, showError, dismiss } = useGuidedError();
+
+  // Initialize the period once the FY list resolves. Default to
+  // "This year" of the active FY.
+  useEffect(() => {
+    if (period || loadingFYs) return;
+    const opts = buildPeriodOptions(activeFY);
+    if (opts.length > 0) {
+      setPeriod(opts[2] ?? opts[0] ?? null); // "This year"
+    } else {
+      setPeriod({
+        label: "—",
+        filters: { fiscal_year: "", period_start_date: "", period_end_date: "" },
+      });
+    }
+  }, [activeFY, loadingFYs, period]);
 
   // Call the hook internally with the current period. Changing the period
   // rebuilds the `filters` object → TanStack Query key change → refetch.
-  const { data, isLoading, error } = useFrappeReport(reportKey, period.filters);
+  const { data, isLoading, error } = useFrappeReport(
+    reportKey,
+    period?.filters,
+  );
+
+  // 2P Part 3 — surface FiscalYearError as a guided error instead of
+  // the raw "Date 31-12-2026 is not in any active Fiscal Year for Pana"
+  // string the user reported.
+  useEffect(() => {
+    if (!error) return;
+    showError(
+      resolveFrappeError(
+        new Error(error.message ?? "Failed to load report"),
+        { doctype: reportKey },
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
 
   // 2O Part 2.3 — column mapping robustness. Heuristic picks:
   //   - LABEL: first column matching /account|party|particulars|description/i
@@ -269,7 +344,7 @@ export function FinancialReportView({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Period selector — 2O Part 2.2 refetch */}
+          {/* Period selector — 2O Part 2.2 refetch; 2P Part 3 FY-driven */}
           <div className="relative">
             <Button
               variant="outline"
@@ -277,7 +352,8 @@ export function FinancialReportView({
               onClick={() => setShowPeriodMenu((v) => !v)}
               data-testid="report-period-button"
             >
-              {period.label}
+              <CalendarRange className="mr-1.5 h-3.5 w-3.5" />
+              {period?.label ?? "—"}
               <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
             </Button>
             {showPeriodMenu && (
@@ -285,7 +361,7 @@ export function FinancialReportView({
                 className="absolute right-0 z-10 mt-2 w-56 rounded-2xl border border-border/40 bg-popover/95 p-1 shadow-xl backdrop-blur-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                {defaultPeriods().map((p) => (
+                {buildPeriodOptions(activeFY).map((p) => (
                   <button
                     key={p.label}
                     type="button"
@@ -302,11 +378,50 @@ export function FinancialReportView({
               </div>
             )}
           </div>
+          {/* FY picker (2P Part 3) — explicit, for "show me FY 2025 only" */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full text-xs"
+              onClick={() => setShowFYMenu((v) => !v)}
+              data-testid="report-fy-button"
+            >
+              FY: {activeFY?.name ?? "—"}
+              <ChevronDown className="ml-1 h-3 w-3" />
+            </Button>
+            {showFYMenu && fiscalYears.length > 0 && (
+              <div
+                className="absolute right-0 z-10 mt-2 w-48 rounded-2xl border border-border/40 bg-popover/95 p-1 shadow-xl backdrop-blur-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {fiscalYears.map((fy) => (
+                  <button
+                    key={fy.name}
+                    type="button"
+                    onClick={() => {
+                      const opts = buildPeriodOptions(fy);
+                      if (opts[2]) setPeriod(opts[2]);
+                      setShowFYMenu(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary/60"
+                    data-testid={`report-fy-${fy.name}`}
+                  >
+                    <span>{fy.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {fy.year_start_date?.slice(0, 4) ?? ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <Button
             variant="outline"
             className="rounded-full"
             onClick={() =>
               data &&
+              period &&
               exportCsv(
                 `${reportKey}-${period.filters.period_start_date ?? period.filters.from_date ?? "fy"}-${period.filters.period_end_date ?? period.filters.to_date ?? ""}.csv`,
                 data.columns,
@@ -501,6 +616,7 @@ export function FinancialReportView({
           </div>
         )}
       </section>
+      <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );
 }

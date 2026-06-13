@@ -116,8 +116,7 @@ const strategies: ErrorStrategy[] = [
       const field = fieldMatch?.[1] ?? "A required field";
 
       return {
-        title: "Missing required information",
-        explanation: `${field} is required before you can continue. Please fill it in and try again.`,
+        title: "Missing required information",        explanation: `${field} is required before you can continue. Please fill it in and try again.`,
         details: [`Field: ${field}`],
         severity: "warning",
         actions: [
@@ -405,14 +404,64 @@ const strategies: ErrorStrategy[] = [
           },
           {
             label: "Dismiss",
-            kind: "dismiss" as const,
-            variant: "ghost" as const,
+            kind: "dismiss",
+            variant: "ghost",
             run: () => {},
           },
         ],
       };
     },
   },
+
+  // FISCAL_YEAR_MISSING (2P Part 3) — ERPNext's `frappe.controllers.queries
+  // .validate_dates` raises "Date … is not in any active Fiscal Year for
+  // <Company>" when the requested period falls outside any registered FY.
+  // We turn this into a guided action: open the Fiscal Year settings.
+  {
+    code: "FISCAL_YEAR_MISSING",
+    match: (m) =>
+      /is not in any active Fiscal Year/i.test(m) ||
+      /Fiscal\s+Year.*not\s+found/i.test(m) ||
+      /From Date and To Date are mandatory/i.test(m),
+    resolve: (msg, ctx) => {
+      // Try to extract the company name + offending date
+      const dateMatch = msg.match(/Date\s+([\d\-]+)/i);
+      const companyMatch = msg.match(/for\s+(.+?)(?:\.|$)/i);
+      return {
+        title: "No fiscal year covers this period",
+        explanation: companyMatch?.[1]
+          ? `The company "${companyMatch[1].trim()}" has no active Fiscal Year that covers ${
+              dateMatch?.[1] ?? "the requested dates"
+            }. Add a Fiscal Year that includes this period, or pick a different one.`
+          : `No active Fiscal Year covers the requested period. Add one in Settings, or pick a different period.`,
+        details: [
+          ...(dateMatch?.[1] ? [`Requested date: ${dateMatch[1]}`] : []),
+          ...(ctx.doctype ? [`Report: ${ctx.doctype}`] : []),
+        ],
+        severity: "error",
+        actions: [
+          {
+            label: "Open Fiscal Year settings",
+            kind: "navigate",
+            variant: "default",
+            href: "/app/accounting/setup/fiscal-year",
+            run: () => {
+              if (typeof window !== "undefined" && ctx.doctype) {
+                window.location.href = "/accounting/setup";
+              }
+            },
+          },
+          {
+            label: "Dismiss",
+            kind: "dismiss",
+            variant: "ghost",
+            run: () => {},
+          },
+        ],
+      };
+    },
+  },
+
 
   // 2N Part 1.6: LINKED_DOC_NOT_SUBMITTED — Frappe's submit-time guard. When
   // the user creates a child doc (e.g. Payment Entry against a Sales Invoice,

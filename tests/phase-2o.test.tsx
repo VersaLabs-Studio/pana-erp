@@ -238,8 +238,11 @@ describe("Part 2.2: FinancialReportView owns period state + refetches on change"
       "utf-8",
     );
     expect(content).toMatch(/useFrappeReport\s*\(/);
-    // Period state lives in the view (not a page-level const):
-    expect(content).toMatch(/useState<PeriodOption>/);
+    // Period state lives in the view (not a page-level const). 2P
+    // Part 3 changed the type to `PeriodOption | null` because the
+    // period is now built from a real Fiscal Year list (which may
+    // be empty before the list resolves).
+    expect(content).toMatch(/useState<PeriodOption(\s*\|\s*null)?>/);
     // The selector mutates the period → re-derives filters → TanStack
     // Query key change → refetch (no manual refetch call needed).
     expect(content).toMatch(/setPeriod\s*\(/);
