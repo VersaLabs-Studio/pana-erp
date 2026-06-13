@@ -1,21 +1,41 @@
 "use client";
 
 // app/stock/stock-balance/page.tsx
-// Obsidian ERP v4.0 — Stock Balance Read-Only Page
+// Obsidian ERP v4.0 — Stock Health (2P Part 2.7).
+//
+// Upgrade over the prior read-only Bin table: a status pill per row
+// (In stock / Low / Out) computed from the Item Reorder child table,
+// a one-click "Reorder" action for low rows (pre-fills a Material
+// Request draft), and a "Stock count" action that opens the
+// StockCountModal (which writes a Stock Reconciliation under the
+// hood — the operator never types the word "Reconciliation").
 
 import { useState, useMemo } from "react";
-import { Scale, Package, Warehouse, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Scale,
+  Package,
+  Warehouse,
+  AlertTriangle,
+  CheckCircle2,
+  ShoppingCart,
+  ClipboardList,
+  Plus,
+  type LucideIcon,
+} from "lucide-react";
 import { useFrappeList } from "@/hooks/generic";
 import {
   PageHeader,
   EmptyState,
   LoadingState,
 } from "@/components/smart";
-import { StatusBadge } from "@/components/smart/status-badge";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FrappeSelect } from "@/components/smart/frappe-select";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { cn } from "@/lib/utils";
 import { computeStockKPIs } from "@/lib/kpi/compute-stock-kpis";
+import { StockCountModal } from "@/components/stock/StockCountModal";
 
 interface Bin {
   name: string;
@@ -27,6 +47,14 @@ interface Bin {
   valuation_rate?: number;
   projected_qty?: number;
   stock_value?: number;
+}
+
+interface ReorderRow {
+  name: string;
+  parent?: string;
+  warehouse?: string;
+  warehouse_reorder_level?: number;
+  warehouse_reorder_qty?: number;
 }
 
 function formatNumber(n: number): string {
@@ -45,9 +73,13 @@ function formatCurrency(n: number): string {
   }).format(n);
 }
 
+type StockStatus = "in-stock" | "low" | "out";
+
 export default function StockBalancePage() {
+  const router = useRouter();
   const [itemFilter, setItemFilter] = useState<string>("");
   const [warehouseFilter, setWarehouseFilter] = useState<string>("");
+  const [openCount, setOpenCount] = useState(false);
 
   const filters = useMemo<
     [string, string, unknown][] | undefined
@@ -79,6 +111,27 @@ export default function StockBalancePage() {
     limit: 500,
   });
 
+  // 2P Part 2.7 — pull the Item Reorder child table so we can compute
+  // a per-row status pill (In stock / Low / Out). Without a reorder
+  // row we just show the absolute qty.
+  const { data: reorderRows = [] } = useFrappeList<ReorderRow>("Item Reorder", {
+    fields: ["name", "parent", "warehouse", "warehouse_reorder_level", "warehouse_reorder_qty"],
+    limit: 500,
+  });
+
+  // Index reorder rows by (parent, warehouse) → { level, qty }.
+  const reorderIndex = useMemo(() => {
+    const out = new Map<string, { level: number; qty: number }>();
+    for (const r of reorderRows) {
+      if (!r.parent || !r.warehouse) continue;
+      out.set(`${r.parent}::${r.warehouse}`, {
+        level: Number(r.warehouse_reorder_level) || 0,
+        qty: Number(r.warehouse_reorder_qty) || 0,
+      });
+    }
+    return out;
+  }, [reorderRows]);
+
   const sortedBins = useMemo(() => {
     if (!bins) return [];
     return [...bins].sort((a, b) => {
@@ -93,6 +146,34 @@ export default function StockBalancePage() {
     [sortedBins]
   );
 
+  // 2P Part 2.7 — low-stock count (Item has a reorder row AND its
+  // current on-hand < reorder level).
+  const lowCount = useMemo(() => {
+    let count = 0;
+    for (const b of sortedBins) {
+      const r = reorderIndex.get(`${b.item_code}::${b.warehouse}`);
+      if (r && (Number(b.actual_qty) || 0) < r.level) count += 1;
+    }
+    return count;
+  }, [sortedBins, reorderIndex]);
+
+  function statusForBin(bin: Bin): StockStatus {
+    const onHand = Number(bin.actual_qty) || 0;
+    if (onHand <= 0) return "out";
+    const r = reorderIndex.get(`${bin.item_code}::${bin.warehouse}`);
+    if (r && onHand < r.level) return "low";
+    return "in-stock";
+  }
+
+  function handleReorder(bin: Bin) {
+    const r = reorderIndex.get(`${bin.item_code}::${bin.warehouse}`);
+    const qty = r?.qty ?? 1;
+    // 2P Part 2.7 — prefill the MR with the item + reorder qty.
+    router.push(
+      `/stock/material-request/new?item_code=${encodeURIComponent(bin.item_code)}&qty=${qty}&warehouse=${encodeURIComponent(bin.warehouse)}`,
+    );
+  }
+
   if (error) {
     return (
       <div className="p-8 text-center text-destructive">
@@ -104,8 +185,30 @@ export default function StockBalancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stock Balance"
-        subtitle={`${sortedBins.length} bin${sortedBins.length !== 1 ? "s" : ""}`}
+        title="Stock Health"
+        subtitle={`${sortedBins.length} bin${sortedBins.length !== 1 ? "s" : ""} · see what's on hand, what's running low, and reorder in one click`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={() => setOpenCount(true)}
+              data-testid="open-stock-count"
+            >
+              <ClipboardList className="mr-1.5 h-4 w-4" /> Stock count
+            </Button>
+            <Button
+              className="rounded-full"
+              onClick={() =>
+                router.push(
+                  "/stock/material-request/new?material_request_type=Purchase",
+                )
+              }
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New Material Request
+            </Button>
+          </div>
+        }
       />
 
       {/* KPI Bar */}
@@ -129,10 +232,10 @@ export default function StockBalancePage() {
           isLoading={isLoading}
         />
         <KPICard
-          title="Out of Stock"
-          value={kpis.outOfStock}
+          title="Low / Out"
+          value={lowCount}
           icon={AlertTriangle}
-          variant={kpis.outOfStock > 0 ? "danger" : "success"}
+          variant={lowCount > 0 ? "danger" : "success"}
           isLoading={isLoading}
         />
       </div>
@@ -187,20 +290,23 @@ export default function StockBalancePage() {
                   <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
                     Warehouse
                   </th>
+                  <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </th>
                   <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
                     On Hand
                   </th>
                   <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
-                    Reserved
+                    Reorder Level
                   </th>
                   <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
                     Available
                   </th>
                   <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
-                    Valuation Rate
+                    Value
                   </th>
                   <th className="text-right px-4 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground">
-                    Value
+                    Action
                   </th>
                 </tr>
               </thead>
@@ -208,15 +314,17 @@ export default function StockBalancePage() {
                 {sortedBins.map((bin) => {
                   const available = bin.actual_qty - (bin.reserved_qty ?? 0);
                   const value = bin.actual_qty * (bin.valuation_rate ?? 0);
-                  const isZeroOrNegative = bin.actual_qty <= 0;
-
+                  const status = statusForBin(bin);
+                  const r = reorderIndex.get(`${bin.item_code}::${bin.warehouse}`);
                   return (
                     <tr
                       key={bin.name}
                       className={cn(
                         "border-b border-border/30 last:border-b-0 transition-colors hover:bg-secondary/30",
-                        isZeroOrNegative && "bg-destructive/5"
+                        status === "out" && "bg-destructive/5",
+                        status === "low" && "bg-warning/5",
                       )}
+                      data-testid={`stock-row-${bin.item_code}`}
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground">
@@ -231,31 +339,35 @@ export default function StockBalancePage() {
                       <td className="px-4 py-3 text-muted-foreground">
                         {bin.warehouse}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {isZeroOrNegative ? (
-                          <StatusBadge
-                            status={bin.actual_qty < 0 ? "out of stock" : "low stock"}
-                            size="sm"
-                          />
-                        ) : (
-                          <span className="font-medium text-foreground">
-                            {formatNumber(bin.actual_qty)}
-                          </span>
-                        )}
+                      <td className="px-4 py-3">
+                        <StatusPill status={status} />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">
+                        {formatNumber(bin.actual_qty)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {bin.reserved_qty ? formatNumber(bin.reserved_qty) : "—"}
+                        {r ? formatNumber(r.level) : "—"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">
                         {formatNumber(available)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {bin.valuation_rate
-                          ? formatNumber(bin.valuation_rate)
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">
                         {formatCurrency(value)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {status === "out" || status === "low" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={() => handleReorder(bin)}
+                            data-testid={`reorder-${bin.item_code}`}
+                          >
+                            <ShoppingCart className="mr-1.5 h-3 w-3" /> Reorder
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -265,6 +377,44 @@ export default function StockBalancePage() {
           </div>
         </div>
       )}
+
+      <StockCountModal open={openCount} onOpenChange={setOpenCount} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StatusPill — small badge showing stock status (In stock / Low / Out).
+// ---------------------------------------------------------------------------
+function StatusPill({ status }: { status: StockStatus }) {
+  const map: Record<StockStatus, { label: string; cls: string; icon: LucideIcon }> = {
+    "in-stock": {
+      label: "In stock",
+      cls: "bg-success/15 text-success border-success/30",
+      icon: CheckCircle2,
+    },
+    low: {
+      label: "Low",
+      cls: "bg-warning/15 text-warning border-warning/30",
+      icon: AlertTriangle,
+    },
+    out: {
+      label: "Out",
+      cls: "bg-destructive/15 text-destructive border-destructive/30",
+      icon: AlertTriangle,
+    },
+  };
+  const entry = map[status];
+  const Icon = entry.icon;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+        entry.cls,
+      )}
+    >
+      <Icon className="mr-1 inline h-3 w-3" /> {entry.label}
+    </Badge>
   );
 }
