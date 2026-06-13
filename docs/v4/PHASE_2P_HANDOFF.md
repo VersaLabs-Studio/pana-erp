@@ -9,8 +9,12 @@
 
 ## §0 — Orientation & Boundaries (READ FIRST, AND LAST)
 
-- **Branch:** create `feat/v4-phase-2p-enterprise-ship` off `develop` (current tip after 2O
-  co-sign — confirm with `git log -1 develop`). Do NOT branch off the 2O feature branch.
+- **Branch:** `feat/v4-phase-2p-enterprise-ship` is **already cut and pushed** off `develop`
+  `1809626` (the Phase-2O-merged tip). Just check it out — don't re-cut. 2O was co-signed and
+  merged WITHOUT a separate live regate (Kidus crossed over): the Brain hotfixes below resolved
+  the 2O retest P0s, and the remaining 2O findings are folded into this phase. **The 2P live
+  retest therefore also re-verifies the hotfixes** (see Part 11 item 0) — treat them as trusted
+  but unconfirmed-live.
 - **Reporting contract:** `docs/v4/MESH_REPORTING_CONTRACT.md` is binding. In particular:
   **claim = code = diff** (every ✅ must point at a real diff); **no orphan modules / no
   `__init__.ts` / no god-modules**; **you do NOT run a dev server** — Kidus runs the live
@@ -414,6 +418,11 @@ A first-run onboarding wizard (`app/onboarding/` + a guard that redirects a fres
 ---
 
 ## PART 11 — Manual Live-Retest Checklist (fill in your run notes; Kidus verifies live)
+0. **Hotfix carry-over (2O was not separately regated):** open several transactional detail pages
+   (SO, SI, PI, WO) → NO "change in the order of Hooks" crash; the network log shows NO
+   `DocType  not found` 404s, NO `Field not permitted in query` 417s, and NO calls to routeless
+   child doctypes (`…-item`, `payment-entry-reference`). Header-field links (SO→WO, MR→PO, PO→PR)
+   resolve. If any of these regress, STOP — the base hotfixes broke.
 1. Detail page hard-refresh → FlowRail + CrossFlow + WhatsNext skeleton → content; rail paints fast,
    no 16-request storm in the network tab.
 2. Create SI from an SO → SO's Invoice stage lights up with the SI name; CrossFlow "View <SI>".
