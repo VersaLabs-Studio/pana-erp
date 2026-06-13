@@ -8,6 +8,7 @@
 
 "use client";
 
+import { useMemo } from "react";
 import {
   Calculator,
   FileText,
@@ -25,8 +26,9 @@ import {
   type HubKpi,
   type HubAction,
   type HubRecentItem,
-  type HubAlert,
+  type   HubAlert,
 } from "@/components/dashboard/ModuleHub";
+import { AgingBars, type AgingRow } from "@/components/dashboard/aging-bars";
 
 const ETB = new Intl.NumberFormat("en-ET", {
   style: "currency",
@@ -38,15 +40,19 @@ export default function AccountingDashboardPage() {
   // KPIs
   const { data: receivablesRows = [] } = useFrappeList<{
     outstanding_amount: number;
+    due_date?: string;
+    customer?: string;
   }>("Sales Invoice", {
-    fields: ["outstanding_amount"],
+    fields: ["outstanding_amount", "due_date", "customer"],
     filters: [["docstatus", "=", 1]],
     limit: 1000,
   });
   const { data: payablesRows = [] } = useFrappeList<{
     outstanding_amount: number;
+    due_date?: string;
+    supplier?: string;
   }>("Purchase Invoice", {
-    fields: ["outstanding_amount"],
+    fields: ["outstanding_amount", "due_date", "supplier"],
     filters: [["docstatus", "=", 1]],
     limit: 1000,
   });
@@ -167,6 +173,85 @@ export default function AccountingDashboardPage() {
 
   // Reports is not a ModuleHub primitive; add a single "Reports" action
   // pointing to the P&L report (3.x wires up the rest).
+  // -- 2P Part 4 — AR/AP aging stacked-bars chart ---------------------------
+  // Outstanding balances bucketed by `due_date` vs today. Top 5
+  // customers + top 5 suppliers; the chart shows the four 30/60/90/90+
+  // buckets with the success → info → warning → destructive ramp.
+  const today = new Date().toISOString().split("T")[0] ?? "";
+  const agingData = useMemo<AgingRow[]>(() => {
+    function bucketFor(due: string | undefined): 0 | 1 | 2 | 3 {
+      if (!due) return 0;
+      const ms = new Date(today).getTime() - new Date(due).getTime();
+      const days = Math.floor(ms / 86_400_000);
+      if (days <= 30) return 0;
+      if (days <= 60) return 1;
+      if (days <= 90) return 2;
+      return 3;
+    }
+    function topN<T extends { name: string; v: number }>(
+      rows: T[],
+      n: number,
+    ): T[] {
+      return [...rows]
+        .sort((a, b) => b.v - a.v)
+        .slice(0, n)
+        .map((r) => r);
+    }
+    // Aggregate per-customer outstanding into the 4 buckets
+    type Agg = { name: string; v: number; b0: number; b1: number; b2: number; b3: number };
+    const recMap = new Map<string, Agg>();
+    for (const r of receivablesRows) {
+      const k = String(r.customer ?? "—");
+      const amt = Number(r.outstanding_amount) || 0;
+      if (amt <= 0) continue;
+      const cur = recMap.get(k) ?? { name: k, v: 0, b0: 0, b1: 0, b2: 0, b3: 0 };
+      cur.v += amt;
+      const b = bucketFor(r.due_date);
+      if (b === 0) cur.b0 += amt;
+      else if (b === 1) cur.b1 += amt;
+      else if (b === 2) cur.b2 += amt;
+      else cur.b3 += amt;
+      recMap.set(k, cur);
+    }
+    const supMap = new Map<string, Agg>();
+    for (const r of payablesRows) {
+      const k = String(r.supplier ?? "—");
+      const amt = Number(r.outstanding_amount) || 0;
+      if (amt <= 0) continue;
+      const cur = supMap.get(k) ?? { name: k, v: 0, b0: 0, b1: 0, b2: 0, b3: 0 };
+      cur.v += amt;
+      const b = bucketFor(r.due_date);
+      if (b === 0) cur.b0 += amt;
+      else if (b === 1) cur.b1 += amt;
+      else if (b === 2) cur.b2 += amt;
+      else cur.b3 += amt;
+      supMap.set(k, cur);
+    }
+    const top5Rec = topN([...recMap.values()], 5);
+    const top5Sup = topN([...supMap.values()], 5);
+    const rows: AgingRow[] = [];
+    for (const a of top5Rec) {
+      rows.push({
+        label: a.name,
+        bucket1: a.b0,
+        bucket2: a.b1,
+        bucket3: a.b2,
+        bucket4: a.b3,
+      });
+    }
+    for (const a of top5Sup) {
+      rows.push({
+        label: a.name,
+        bucket1: a.b0,
+        bucket2: a.b1,
+        bucket3: a.b2,
+        bucket4: a.b3,
+      });
+    }
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receivablesRows, payablesRows, today]);
+
   return (
     <>
       <ModuleHub
@@ -183,6 +268,16 @@ export default function AccountingDashboardPage() {
         recentTitle="Recent payment entries"
         alerts={alerts}
       />
+
+      {/* 2P Part 4 — AR/AP aging chart */}
+      <div className="mt-6">
+        <AgingBars
+          data={agingData}
+          isLoading={false}
+          title="Aging"
+          subtitle="Top 5 customers + top 5 suppliers · outstanding"
+        />
+      </div>
       {/* 2N Part 3: Financial Reporting links (visible from the hub for
           easy navigation; the report pages themselves land in Part 3.2). */}
       <div className="mt-6 rounded-2xl border border-border/40 bg-card p-5 shadow-sm shadow-black/5 sm:p-6">
