@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useFrappeList } from "@/hooks/generic";
 import { useCurrentUser, hasRole } from "@/hooks/useCurrentUser";
+import { Can } from "@/components/auth/Can";
 import { PageHeader, LoadingState } from "@/components/smart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -120,9 +121,11 @@ export default function UsersSettingsPage() {
           title="User Management"
           subtitle={`${users.length} user${users.length === 1 ? "" : "s"} · invite team members, assign roles, enable/disable accounts`}
         />
-        <Button className="rounded-full" onClick={() => setOpenInvite(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> Invite user
-        </Button>
+        <Can role="System Manager">
+          <Button className="rounded-full" onClick={() => setOpenInvite(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Invite user
+          </Button>
+        </Can>
       </motion.div>
 
       {error && (

@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { StartProductionModal } from "@/components/manufacturing/StartProductionModal";
 import { FinishProductionModal } from "@/components/manufacturing/FinishProductionModal";
+import { CreateJobModal } from "@/components/manufacturing/CreateJobModal";
 import {
   binLevelsByItemWarehouse,
   checkReadiness,
@@ -165,6 +166,8 @@ export default function ManufacturingJobsCockpitPage() {
   // at a time; opening a new one closes the prior.
   const [openStart, setOpenStart] = useState<WorkOrder | null>(null);
   const [openFinish, setOpenFinish] = useState<WorkOrder | null>(null);
+  // 2P Part 2.3 — CreateJobModal (one-click "New job" on the Cockpit).
+  const [openCreate, setOpenCreate] = useState(false);
 
   if (isLoading) return <LoadingState />;
 
@@ -183,16 +186,17 @@ export default function ManufacturingJobsCockpitPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             className="rounded-full"
-            onClick={() => router.push("/manufacturing/work-order")}
+            onClick={() => setOpenCreate(true)}
+            data-testid="cockpit-new-job"
           >
-            <ArrowRight className="mr-1.5 h-4 w-4" /> All work orders
+            <Plus className="mr-1.5 h-4 w-4" /> New job
           </Button>
           <Button
             variant="outline"
             className="rounded-full"
-            onClick={() => router.push("/manufacturing/work-order/new")}
+            onClick={() => router.push("/manufacturing/work-order")}
           >
-            <Plus className="mr-1.5 h-4 w-4" /> New job
+            <ArrowRight className="mr-1.5 h-4 w-4" /> All work orders
           </Button>
         </div>
       </motion.div>
@@ -297,6 +301,9 @@ export default function ManufacturingJobsCockpitPage() {
             source_warehouse: r.source_warehouse,
           }))}
         />
+      )}
+      {openCreate && (
+        <CreateJobModal open={openCreate} onOpenChange={setOpenCreate} />
       )}
     </div>
   );
