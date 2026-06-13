@@ -143,13 +143,15 @@ describe("Part 1.1: flow-link-map is the canonical link table", () => {
     expect(f[0]).toEqual(["Sales Invoice Item", "delivery_note", "=", "DN-001"]);
   });
 
-  it("buildLinkFilter returns a 4-tuple with empty doctype for header back_link", () => {
+  it("buildLinkFilter returns a 3-tuple for a header back_link", () => {
     // (Quotation → Sales Order) is a back-link on the SO header field
-    // `quotation`. The filter targets the queried parent's header, so
-    // the doctype slot is `""`.
+    // `quotation`. The filter is on the queried doctype's OWN field, so it
+    // is a 3-tuple `[field, op, value]` — a leading "" doctype is invalid
+    // Frappe filter syntax (it raises "DocType not found") and was the 2O
+    // blank-flow / 404 regression.
     const link = findFlowLink("Quotation", "Sales Order")!;
     const f = buildLinkFilter(link, "QTN-001");
-    expect(f[0]).toEqual(["", "quotation", "=", "QTN-001"]);
+    expect(f[0]).toEqual(["quotation", "=", "QTN-001"]);
   });
 
   it("defaultSelectFields returns name+parent for returnParent links", () => {

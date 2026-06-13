@@ -431,22 +431,42 @@ function readStageResolution(
   if (!data || data.length === 0) return null;
   const row = data[0];
   if (!row) return null;
-  // The link we're resolving against:
-  //   - direct / header-link: plan.link
-  //   - two-hop: plan.secondLink (the edge from intermediate to target)
-  const link: FlowLinkDef =
-    plan.kind === "two-hop" ? plan.secondLink : plan.link;
-  if (link.returnParent && row.parent) return row.parent;
+  // We always query the PARENT doctype now: child-table back-links are
+  // resolved via a child-table filter on the parent (see
+  // resolveQueryDoctype), so the matched row's `name` is the resolved
+  // document in every case. `row.parent` is no longer consulted — the
+  // previous code queried the child doctype directly, whose API route does
+  // not exist (e.g. /api/accounting/sales-invoice-item → 404), so the
+  // SO→SI / SO→DN / SI→PE links never resolved.
   return row.name ?? null;
 }
 
 function pickPrimaryDoctype(plan: StagePlan | undefined): string {
   if (!plan) return "";
   if (plan.kind === "direct" || plan.kind === "header-link") {
-    return plan.link.queryDoctype ?? plan.link.to;
+    return resolveQueryDoctype(plan.link);
   }
   // current / two-hop / none: not used by the primary slot
   return "";
+}
+
+/**
+ * The doctype to actually QUERY (and therefore the API route) for a link.
+ *
+ * For child-table back-links (`returnParent: true`) the registry's
+ * `queryDoctype` is the CHILD table (e.g. "Sales Invoice Item"), which has
+ * NO API route. Frappe resolves child-table filters against the PARENT, so
+ * we query the parent (`link.to`, e.g. "Sales Invoice") and keep the
+ * child-table filter `[childDoctype, field, "=", value]` that
+ * `buildLinkFilter` already emits. The matched parent row's `name` is the
+ * resolved document (see `readStageResolution`).
+ *
+ * For header-field links (`returnParent` falsy) the query doctype is the
+ * parent itself, so `queryDoctype` (or `to`) is correct as-is.
+ */
+function resolveQueryDoctype(link: FlowLinkDef): string {
+  if (link.returnParent) return link.to;
+  return link.queryDoctype ?? link.to;
 }
 
 function pickPrimaryOptions(
@@ -488,7 +508,7 @@ function pickPrimaryEnabled(
 function pickSecondaryDoctype(plan: StagePlan | undefined): string {
   if (!plan) return "";
   if (plan.kind === "two-hop") {
-    return plan.secondLink.queryDoctype ?? plan.secondLink.to;
+    return resolveQueryDoctype(plan.secondLink);
   }
   return "";
 }
@@ -535,7 +555,8 @@ function readIntermediateName(
   if (!data || data.length === 0) return null;
   const row = data[0];
   if (!row) return null;
-  if (plan.firstLink.returnParent && row.parent) return row.parent;
+  // The intermediate is also resolved via a PARENT query (see
+  // resolveQueryDoctype), so its `name` is the intermediate document.
   return row.name ?? null;
 }
 

@@ -82,6 +82,24 @@ export function CrossFlowActionsMenu({
 
   const edges = useMemo(() => getAdjacencies(doctype), [doctype]);
 
+  // Build a quick lookup: targetDoctype → stageStatus from the chain.
+  // (2O Part 1.4) This is the single source of truth — same data the rail
+  // renders. We never run our own per-edge back-link query.
+  // RULES OF HOOKS: this useMemo MUST run before any early return below.
+  // Previously it sat AFTER the `edges.length === 0` and `isLoading`
+  // returns, so the executed hook count changed when `chainLoading`
+  // flipped → "change in the order of Hooks" crash on every detail page.
+  const stageStatusByDoctype = useMemo(() => {
+    const out: Record<string, { resolvedName?: string; status: string }> = {};
+    for (const s of chain.stages) {
+      out[s.doctype] = {
+        resolvedName: s.documentName,
+        status: s.status,
+      };
+    }
+    return out;
+  }, [chain]);
+
   if (edges.length === 0) {
     return null; // Standalone doctype — no rail
   }
@@ -114,20 +132,6 @@ export function CrossFlowActionsMenu({
   // groups so linked docs are clearly stated in both directions.
   const backward = edges.filter((e) => e.direction === "backward");
   const forward = edges.filter((e) => e.direction === "forward");
-
-  // Build a quick lookup: targetDoctype → stageStatus from the chain.
-  // (2O Part 1.4) This is the single source of truth — same data the rail
-  // renders. We never run our own per-edge back-link query.
-  const stageStatusByDoctype = useMemo(() => {
-    const out: Record<string, { resolvedName?: string; status: string }> = {};
-    for (const s of chain.stages) {
-      out[s.doctype] = {
-        resolvedName: s.documentName,
-        status: s.status,
-      };
-    }
-    return out;
-  }, [chain]);
 
   return (
     <div
@@ -264,9 +268,11 @@ export function CrossFlowActionsInline({
   className,
 }: CrossFlowActionsMenuProps) {
   const edges = useMemo(() => getAdjacencies(doctype), [doctype]);
-  if (edges.length === 0) return null;
 
   // 2O Part 1.4: same single source of truth for the inline variant.
+  // RULES OF HOOKS: useFlowChain + this useMemo must run before the
+  // `edges.length === 0` early return — otherwise a standalone doctype
+  // (no edges) executes fewer hooks than a flow doctype and React throws.
   const { result: chain, isLoading: chainLoading } = useFlowChain(doctype, name);
   const stageStatusByDoctype = useMemo(() => {
     const out: Record<string, { resolvedName?: string; status: string }> = {};
@@ -275,6 +281,8 @@ export function CrossFlowActionsInline({
     }
     return out;
   }, [chain]);
+
+  if (edges.length === 0) return null;
 
   if (chainLoading) {
     return (
