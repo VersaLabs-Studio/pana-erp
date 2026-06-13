@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -47,6 +47,7 @@ import { useFrappeCreate, useFrappeList, useFrappeUpdate } from "@/hooks/generic
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { getActiveCompany } from "@/lib/settings/company";
+import { resolveCompanyWarehouses } from "@/lib/settings/warehouses";
 import type { WORequiredItem } from "./StartProductionModal";
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,25 @@ export function FinishProductionModal({
   const { resolution, showError, dismiss } = useGuidedError();
   const [isCreating, setIsCreating] = useState(false);
 
+  // 2P Part 2.5 — implicit-warehouse resolution. If the WO's
+  // wip_warehouse / fg_warehouse are blank, fall back to the active
+  // company's canonical WIP / FG (via lib/settings/warehouses.ts).
+  const [implicitWarehouses, setImplicitWarehouses] = useState<{
+    stores: string;
+    wip: string;
+    fg: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    if (wipWarehouse && fgWarehouse) {
+      setImplicitWarehouses(null);
+      return;
+    }
+    resolveCompanyWarehouses()
+      .then((w) => setImplicitWarehouses({ stores: w.stores, wip: w.wip, fg: w.fg }))
+      .catch(() => setImplicitWarehouses(null));
+  }, [open, wipWarehouse, fgWarehouse]);
+
   // 2O Part 5.3 — idempotency: surface any existing Manufacture SE.
   const { data: existingSEs = [] } = useFrappeList<{ name: string }>(
     "Stock Entry",
@@ -100,8 +120,22 @@ export function FinishProductionModal({
   );
   const existingSE = existingSEs.length > 0 ? existingSEs[0] : null;
 
-  const wipWh = wipWarehouse || "";
-  const fgWh = fgWarehouse || "";
+  // 2P Part 2.5 — second idempotency guard: if the WO is already
+  // "Completed" we block a second Manufacture. Show "View output"
+  // instead. ERPNext's WO status is the canonical signal.
+  const { data: woStatus = [] } = useFrappeList<{ name: string; status: string }>(
+    "Work Order",
+    {
+      fields: ["status"],
+      filters: [["name", "=", workOrderName]],
+      limit: 1,
+    },
+    { enabled: open && !!workOrderName },
+  );
+  const woCompleted = woStatus[0]?.status === "Completed";
+
+  const wipWh = wipWarehouse || implicitWarehouses?.wip || "";
+  const fgWh = fgWarehouse || implicitWarehouses?.fg || "";
 
   // qty to declare as produced in THIS entry
   const declareQty = useMemo(() => {
@@ -222,6 +256,16 @@ export function FinishProductionModal({
             </div>
           )}
 
+          {/* 2P Part 2.5 — "already finished" guard (idempotency on the
+              WO status). The WO is Completed → no second Manufacture. */}
+          {woCompleted && !existingSE && (
+            <div className="rounded-xl border border-info/30 bg-info/5 px-3 py-2 text-xs text-info">
+              <strong>This job is already marked Completed.</strong> Opening a
+              second Manufacture is not allowed. View the Work Order output
+              from the Jobs board.
+            </div>
+          )}
+
           {/* Produced summary */}
           <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -293,6 +337,7 @@ export function FinishProductionModal({
                 isCreating ||
                 declareQty <= 0 ||
                 !!existingSE ||
+                woCompleted ||
                 !wipWh ||
                 !fgWh
               }
