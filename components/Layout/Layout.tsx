@@ -76,7 +76,7 @@ const navigation = [
     title: "CRM",
     icon: Users,
     items: [
-      { title: "Dashboard", href: "/crm", icon: LayoutDashboard },
+      { title: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
       { title: "Leads", href: "/crm/lead", icon: Target },
       { title: "Customers", href: "/crm/customer", icon: Users },
       { title: "Contacts", href: "/crm/contact", icon: User },
@@ -102,6 +102,7 @@ const navigation = [
     title: "Inventory",
     icon: Package,
     items: [
+      { title: "Dashboard", href: "/stock/dashboard", icon: LayoutDashboard },
       { title: "Items", href: "/stock/item", icon: Box },
       { title: "Warehouses", href: "/stock/warehouse", icon: Warehouse },
       { title: "Delivery Notes", href: "/stock/delivery-note", icon: Truck },
@@ -134,6 +135,7 @@ const navigation = [
     title: "Buying",
     icon: ShoppingCart,
     items: [
+      { title: "Dashboard", href: "/buying/dashboard", icon: LayoutDashboard },
       {
         title: "Suppliers",
         href: "/buying/supplier",
@@ -152,6 +154,11 @@ const navigation = [
     icon: Factory,
     items: [
       {
+        title: "Dashboard",
+        href: "/manufacturing/dashboard",
+        icon: LayoutDashboard,
+      },
+      {
         title: "Work Orders",
         href: "/manufacturing/work-order",
         icon: ClipboardList,
@@ -166,6 +173,7 @@ const navigation = [
     title: "HR",
     icon: Briefcase,
     items: [
+      { title: "Dashboard", href: "/hr/dashboard", icon: LayoutDashboard },
       { title: "Employees", href: "/hr/employee", icon: Users },
       { title: "Settings", href: "/hr/settings", icon: Settings },
     ],
@@ -174,7 +182,7 @@ const navigation = [
     title: "Accounting",
     icon: Calculator,
     items: [
-      { title: "Dashboard", href: "/accounting", icon: LayoutDashboard },
+      { title: "Dashboard", href: "/accounting/dashboard", icon: LayoutDashboard },
       {
         title: "Sales Invoices",
         href: "/accounting/sales-invoice",
@@ -202,8 +210,14 @@ const navigation = [
   {
     title: "Reports",
     icon: BarChart3,
-    href: "/reports",
-    items: [],
+    // 2N Part 3.2: Reports group is a sub-section of Accounting. We link
+    // each financial report directly rather than nesting a parent route.
+    items: [
+      { title: "Profit & Loss", href: "/accounting/reports/profit-and-loss", icon: TrendingUp },
+      { title: "Balance Sheet", href: "/accounting/reports/balance-sheet", icon: BarChart3 },
+      { title: "Accounts Receivable", href: "/accounting/reports/accounts-receivable", icon: Wallet },
+      { title: "Accounts Payable", href: "/accounting/reports/accounts-payable", icon: Wallet },
+    ],
   },
 ];
 

@@ -3,9 +3,13 @@
 // app/stock/stock-entry/new/page.tsx
 // Obsidian ERP v4.0 — Stock Entry Create (V4 SmartForm Wizard)
 // 2-step FlowWizard: Entry Type & Warehouses → Items & Review.
+// 2N Part 4.2: accepts `?purpose=<value>&work_order=<name>` URL params so
+// the Work Order detail page can deep-link into a prefilled Stock Entry
+// (Material Transfer for Manufacture / Manufacture) for the manufacturing
+// spine. Also auto-fills the items from the WO's required_items.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -114,18 +118,26 @@ const ETB = new Intl.NumberFormat("en-ET", {
 // ---------------------------------------------------------------------------
 export default function NewStockEntryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [step, setStep] = useState(0);
   const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
 
+  // 2N Part 4.2: read `purpose` and `work_order` from URL at mount so the
+  // form opens prefilled when the WO detail page deep-links in. The
+  // useEffect below also handles late-bound updates (e.g. back-nav).
+  const initialPurpose = searchParams.get("purpose") ?? "Material Transfer";
+  const initialWorkOrder = searchParams.get("work_order") ?? "";
+
   const form = useForm<SEForm>({
     defaultValues: {
       naming_series: "MAT-STE-.YYYY.-",
-      stock_entry_type: "Material Transfer",
-      purpose: "Material Transfer",
+      stock_entry_type: initialPurpose,
+      purpose: initialPurpose,
       posting_date: new Date().toISOString().split("T")[0],
       from_warehouse: "",
       to_warehouse: "",
+      work_order: initialWorkOrder,
       items: [{ ...EMPTY_ITEM }],
     },
   });
@@ -136,6 +148,22 @@ export default function NewStockEntryPage() {
   const watchedAll = useWatch({ control });
   const watchedItems = watchedAll?.items ?? [];
   const watchedPurpose = watchedAll?.purpose ?? "";
+
+  // 2N Part 4.2: URL-param prefill for the manufacturing spine. The WO
+  // detail page's "Transfer materials" / "Finish" buttons deep-link to
+  // `/stock/stock-entry/new?purpose=Material Transfer for Manufacture&work_order=<name>`
+  // or `?purpose=Manufacture&work_order=<name>`. We prefill `purpose` and
+  // `work_order` here so the wizard opens on the right entry. (The
+  // `useEffect` is the late-bound updater; the initial values were already
+  // read above in `useForm` defaultValues, so this catches navigations
+  // after mount.)
+  useEffect(() => {
+    const purposeParam = searchParams.get("purpose");
+    const workOrderParam = searchParams.get("work_order");
+    if (purposeParam) setValue("purpose", purposeParam);
+    if (workOrderParam) setValue("work_order", workOrderParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Keep stock_entry_type in sync with purpose
   useEffect(() => {
