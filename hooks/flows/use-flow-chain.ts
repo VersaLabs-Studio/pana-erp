@@ -1,5 +1,6 @@
 // hooks/flows/use-flow-chain.ts
-// Obsidian ERP v4.0 — Unified Flow Resolution (master §13, 2N Part 1.1, 2O Part 1).
+// Obsidian ERP v4.0 — Unified Flow Resolution (master §13, 2N Part 1.1,
+// 2O Part 1, 2P Part 1).
 //
 // Replaces the per-page `stageStatuses` blocks + `resolveFlowChain` call on
 // every transactional detail page with a single hook:
@@ -18,26 +19,20 @@
 // mutated-array cascade; Defect C — optional-stage stall). The previous
 // hop-by-hop cascade mutated `resolvedByStage` in place, never re-rendered,
 // and at most advanced one hop. This rewrite resolves each stage INDEPENDENTLY
-// from the current doc, reactively, per the Part 1 spec:
+// from the current doc, reactively, per the Part 1 spec.
 //
-//   1. For each non-current stage in the flow, the hook finds a resolution
-//      plan via the canonical `flow-link-map.ts`:
-//        a. DIRECT edge from current → stage: query with anchor=current name.
-//        b. TWO-HOP via some intermediate stage X (current→X→stage both
-//           registered): the target's filter reads X's resolved name
-//           reactively from `qX.data` — no mutated array, no manual cascade.
-//           React re-renders when X resolves; the target's filter changes;
-//           TanStack refetches with the new anchor.
-//        c. HEADER_LINK (CRM upstream): the current doc's header field
-//           (`party_name`, `quotation`, `lead_name`, …) holds the candidate
-//           name; we fetch the current doc once and verify.
-//        d. NONE: no resolvable edge → stage remains pending.
-//
-//   2. `stageStatuses` is built per-render from the live query results; each
-//      stage is consumed through `resolveFlowChain` exactly once.
-//
-//   3. `isLoading` is true when ANY *enabled* query is still in flight. The
-//      skeletons (Part 3) ride on this flag.
+// 2P Part 1.2 — KILL THE QUERY STORM. The previous version created a fresh
+// `options` object on every render of every slot, so TanStack Query saw a
+// new queryKey on every render (16 fresh entries per page per render) even
+// when the inputs hadn't changed. The fix: compute each slot's options
+// inside a `useMemo` whose dep array is the *identity* inputs (plan, name,
+// currentDoc, intermediate's resolved name), not the whole plans array.
+// When those inputs are stable, the options reference is stable, the
+// queryKey is stable, TanStack does NOT re-register the query. Disabled
+// slots stay registered as "idle" (no fetch). Enabled slots fetch on
+// first render, then dedupe on the same key on subsequent renders.
+// We also bump the per-query `staleTime` to 5 minutes (flow-resolution
+// is a back-link cache, not a live query).
 //
 // Rules of Hooks: we call a *fixed* number of `useFrappeList` hooks — 8
 // primary slots (one per stage in the longest flow) + 8 secondary slots
@@ -71,6 +66,12 @@ import type {
 // queries so React's Rules of Hooks are honored on every render.
 // ---------------------------------------------------------------------------
 const MAX_STAGES = 8;
+
+// Flow-resolution queries are back-link caches — they don't change within
+// a session. 5-minute staleTime avoids any refetch inside the same flow
+// navigation. (The factory default in `useFrappeList` is 1 minute; we
+// override here for these specific calls.)
+const FLOW_STALE_MS = 5 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Resolution plan per non-current stage
@@ -179,6 +180,20 @@ interface UseFlowChainResult {
 }
 
 // ---------------------------------------------------------------------------
+// Stable EMPTY options sentinel — frozen so a comparison is a no-op.
+// All `none`/`current` slots pass this exact reference.
+// ---------------------------------------------------------------------------
+const EMPTY_OPTIONS: { filters: []; fields: string[]; limit: 1 } = Object.freeze({
+  filters: [],
+  fields: ["name"],
+  limit: 1,
+}) as { filters: []; fields: string[]; limit: 1 };
+
+const DISABLED: { enabled: false } = Object.freeze({ enabled: false }) as {
+  enabled: false;
+};
+
+// ---------------------------------------------------------------------------
 // Public hook
 // ---------------------------------------------------------------------------
 export function useFlowChain(
@@ -238,45 +253,99 @@ export function useFlowChain(
   // `currentDoc`. For two-hop plans, the primary slot is disabled and the
   // corresponding SECONDARY slot (below) does the actual query.
   // -------------------------------------------------------------------------
+  // 2P Part 1.2: stable per-slot options, computed via useMemo. The
+  // identity inputs are (plan[i], name, currentDoc). When those don't
+  // change, the options reference is stable, the queryKey is stable,
+  // TanStack does NOT re-register the query. Disabled slots pass
+  // EMPTY_OPTIONS + DISABLED (frozen singletons) so their queryKey
+  // is the literal `["", "list", EMPTY_OPTIONS]` and is never re-keyed.
   const slot0 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[0]),
-    pickPrimaryOptions(plans[0], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[0], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[0], name, currentDoc ?? null),
+      [plans[0], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[0]), staleTime: FLOW_STALE_MS }),
+      [plans[0]],
+    ),
   );
   const slot1 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[1]),
-    pickPrimaryOptions(plans[1], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[1], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[1], name, currentDoc ?? null),
+      [plans[1], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[1]), staleTime: FLOW_STALE_MS }),
+      [plans[1]],
+    ),
   );
   const slot2 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[2]),
-    pickPrimaryOptions(plans[2], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[2], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[2], name, currentDoc ?? null),
+      [plans[2], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[2]), staleTime: FLOW_STALE_MS }),
+      [plans[2]],
+    ),
   );
   const slot3 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[3]),
-    pickPrimaryOptions(plans[3], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[3], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[3], name, currentDoc ?? null),
+      [plans[3], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[3]), staleTime: FLOW_STALE_MS }),
+      [plans[3]],
+    ),
   );
   const slot4 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[4]),
-    pickPrimaryOptions(plans[4], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[4], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[4], name, currentDoc ?? null),
+      [plans[4], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[4]), staleTime: FLOW_STALE_MS }),
+      [plans[4]],
+    ),
   );
   const slot5 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[5]),
-    pickPrimaryOptions(plans[5], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[5], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[5], name, currentDoc ?? null),
+      [plans[5], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[5]), staleTime: FLOW_STALE_MS }),
+      [plans[5]],
+    ),
   );
   const slot6 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[6]),
-    pickPrimaryOptions(plans[6], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[6], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[6], name, currentDoc ?? null),
+      [plans[6], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[6]), staleTime: FLOW_STALE_MS }),
+      [plans[6]],
+    ),
   );
   const slot7 = useFrappeList<{ name: string; parent?: string }>(
     pickPrimaryDoctype(plans[7]),
-    pickPrimaryOptions(plans[7], name, currentDoc ?? null, null),
-    pickPrimaryEnabled(plans[7], null),
+    useMemo(
+      () => pickPrimaryOptions(plans[7], name, currentDoc ?? null),
+      [plans[7], name, currentDoc],
+    ),
+    useMemo(
+      () => ({ enabled: pickPrimaryEnabled(plans[7]), staleTime: FLOW_STALE_MS }),
+      [plans[7]],
+    ),
   );
   const primary = [slot0, slot1, slot2, slot3, slot4, slot5, slot6, slot7];
 
@@ -287,45 +356,102 @@ export function useFlowChain(
   // derived from the INTERMEDIATE's primary query (so we close over
   // `primary[]` and the plan's `intermediate` index).
   // -------------------------------------------------------------------------
+  // 2P Part 1.2: same stable-options pattern. The options depend on
+  // (plan[i], intermediate's resolved name). When the intermediate hasn't
+  // resolved yet, options is EMPTY_OPTIONS and `enabled` is false (the
+  // frozen DISABLED singleton) — TanStack sees an unchanged disabled
+  // query. When the intermediate resolves, options changes (new filter
+  // object), enabled flips to true, TanStack fetches with the new key.
   const hop0 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[0]),
-    pickSecondaryOptions(plans[0], primary),
-    pickSecondaryEnabled(plans[0], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[0], primary),
+      // pickSecondaryOptions closes over `primary`; we list each slot's
+      // data + isLoading as the dep so it recomputes when the intermediate
+      // resolves (data is a fresh array each fetch).
+      [plans[0], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[0], primary), staleTime: FLOW_STALE_MS }),
+      [plans[0], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop1 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[1]),
-    pickSecondaryOptions(plans[1], primary),
-    pickSecondaryEnabled(plans[1], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[1], primary),
+      [plans[1], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[1], primary), staleTime: FLOW_STALE_MS }),
+      [plans[1], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop2 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[2]),
-    pickSecondaryOptions(plans[2], primary),
-    pickSecondaryEnabled(plans[2], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[2], primary),
+      [plans[2], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[2], primary), staleTime: FLOW_STALE_MS }),
+      [plans[2], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop3 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[3]),
-    pickSecondaryOptions(plans[3], primary),
-    pickSecondaryEnabled(plans[3], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[3], primary),
+      [plans[3], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[3], primary), staleTime: FLOW_STALE_MS }),
+      [plans[3], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop4 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[4]),
-    pickSecondaryOptions(plans[4], primary),
-    pickSecondaryEnabled(plans[4], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[4], primary),
+      [plans[4], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[4], primary), staleTime: FLOW_STALE_MS }),
+      [plans[4], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop5 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[5]),
-    pickSecondaryOptions(plans[5], primary),
-    pickSecondaryEnabled(plans[5], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[5], primary),
+      [plans[5], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[5], primary), staleTime: FLOW_STALE_MS }),
+      [plans[5], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop6 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[6]),
-    pickSecondaryOptions(plans[6], primary),
-    pickSecondaryEnabled(plans[6], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[6], primary),
+      [plans[6], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[6], primary), staleTime: FLOW_STALE_MS }),
+      [plans[6], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const hop7 = useFrappeList<{ name: string; parent?: string }>(
     pickSecondaryDoctype(plans[7]),
-    pickSecondaryOptions(plans[7], primary),
-    pickSecondaryEnabled(plans[7], primary),
+    useMemo(
+      () => pickSecondaryOptions(plans[7], primary),
+      [plans[7], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
+    useMemo(
+      () => ({ enabled: pickSecondaryEnabled(plans[7], primary), staleTime: FLOW_STALE_MS }),
+      [plans[7], primary[0]?.data, primary[1]?.data, primary[2]?.data, primary[3]?.data, primary[4]?.data, primary[5]?.data, primary[6]?.data, primary[7]?.data],
+    ),
   );
   const secondary = [hop0, hop1, hop2, hop3, hop4, hop5, hop6, hop7];
 
@@ -473,9 +599,8 @@ function pickPrimaryOptions(
   plan: StagePlan | undefined,
   currentName: string,
   currentDoc: Record<string, unknown> | null,
-  _intermediateName: string | null,
 ): { filters: ReturnType<typeof buildLinkFilter>; fields: string[]; limit: number } {
-  if (!plan) return { filters: [], fields: ["name"], limit: 1 };
+  if (!plan) return EMPTY_OPTIONS;
   if (plan.kind === "direct") {
     return {
       filters: buildLinkFilter(plan.link, currentName),
@@ -485,24 +610,21 @@ function pickPrimaryOptions(
   }
   if (plan.kind === "header-link") {
     const candidate = currentDoc?.[plan.field];
-    if (!candidate) return { filters: [], fields: ["name"], limit: 1 };
+    if (!candidate) return EMPTY_OPTIONS;
     return {
       filters: buildLinkFilter(plan.link, String(candidate)),
       fields: defaultSelectFields(plan.link),
       limit: 1,
     };
   }
-  return { filters: [], fields: ["name"], limit: 1 };
+  return EMPTY_OPTIONS;
 }
 
-function pickPrimaryEnabled(
-  plan: StagePlan | undefined,
-  _intermediateName: string | null,
-): { enabled: boolean } {
-  if (!plan) return { enabled: false };
-  if (plan.kind === "direct") return { enabled: true };
-  if (plan.kind === "header-link") return { enabled: true };
-  return { enabled: false };
+function pickPrimaryEnabled(plan: StagePlan | undefined): boolean {
+  if (!plan) return false;
+  if (plan.kind === "direct") return true;
+  if (plan.kind === "header-link") return true;
+  return false;
 }
 
 function pickSecondaryDoctype(plan: StagePlan | undefined): string {
@@ -517,11 +639,9 @@ function pickSecondaryOptions(
   plan: StagePlan | undefined,
   primary: ReadonlyArray<{ data?: ReadonlyArray<{ name: string; parent?: string }> | null } | undefined>,
 ): { filters: ReturnType<typeof buildLinkFilter>; fields: string[]; limit: number } {
-  if (!plan || plan.kind !== "two-hop") {
-    return { filters: [], fields: ["name"], limit: 1 };
-  }
+  if (!plan || plan.kind !== "two-hop") return EMPTY_OPTIONS;
   const anchor = readIntermediateName(plan, primary);
-  if (!anchor) return { filters: [], fields: ["name"], limit: 1 };
+  if (!anchor) return EMPTY_OPTIONS;
   return {
     filters: buildLinkFilter(plan.secondLink, anchor),
     fields: defaultSelectFields(plan.secondLink),
@@ -532,9 +652,9 @@ function pickSecondaryOptions(
 function pickSecondaryEnabled(
   plan: StagePlan | undefined,
   primary: ReadonlyArray<{ data?: ReadonlyArray<{ name: string; parent?: string }> | null } | undefined>,
-): { enabled: boolean } {
-  if (!plan || plan.kind !== "two-hop") return { enabled: false };
-  return { enabled: readIntermediateName(plan, primary) !== null };
+): boolean {
+  if (!plan || plan.kind !== "two-hop") return false;
+  return readIntermediateName(plan, primary) !== null;
 }
 
 /**

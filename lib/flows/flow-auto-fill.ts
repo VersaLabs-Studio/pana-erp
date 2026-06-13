@@ -162,6 +162,15 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
       { sourceField: "amount", targetField: "amount", isReadOnly: true, sourceLabel: "Amount" },
       { sourceField: "uom", targetField: "uom", isReadOnly: true, sourceLabel: "UOM" },
       { sourceField: "warehouse", targetField: "warehouse", isReadOnly: false, sourceLabel: "Warehouse" },
+      // 2P Part 1.3 — CRITICAL: per-item `sales_order` + `so_detail` so the
+      // new SI resolves from the SO side (flow rail reads SI Item.sales_order
+      // to light up the SO→SI back-link). Without these, the SO rail never
+      // finds the SI and the operator is asked to "create SI" again.
+      // Hand-mapping (vs. ERPNext's make_sales_invoice) is fine here — the
+      // server-side make-from helper is the recommended path; this is the
+      // fallback for the wizard UI.
+      { sourceField: "name", targetField: "sales_order", isReadOnly: true, sourceLabel: "Source SO" },
+      { sourceField: "name", targetField: "so_detail", isReadOnly: true, sourceLabel: "Source SO Row" },
     ],
     userMustFill: ["due_date", "set_posting_time"],
     defaults: {
@@ -179,6 +188,7 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
     sourceDoctype: "Delivery Note",
     targetDoctype: "Sales Invoice",
     headerMappings: [
+      { sourceField: "name", targetField: "delivery_note", isReadOnly: true, sourceLabel: "Delivery Note" },
       { sourceField: "customer", targetField: "customer", isReadOnly: true, sourceLabel: "Customer" },
       { sourceField: "customer_name", targetField: "customer_name", isReadOnly: true, sourceLabel: "Customer Name" },
       { sourceField: "company", targetField: "company", isReadOnly: true, sourceLabel: "Company" },
@@ -199,6 +209,9 @@ export const AUTO_FILL_REGISTRY: Record<string, AutoFillRegistryEntry> = {
       { sourceField: "amount", targetField: "amount", isReadOnly: true, sourceLabel: "Amount" },
       { sourceField: "uom", targetField: "uom", isReadOnly: true, sourceLabel: "UOM" },
       { sourceField: "warehouse", targetField: "warehouse", isReadOnly: true, sourceLabel: "Warehouse" },
+      // 2P Part 1.3 — per-item DN link (mirrors the SO→SI fix above).
+      { sourceField: "name", targetField: "delivery_note", isReadOnly: true, sourceLabel: "Source DN" },
+      { sourceField: "name", targetField: "dn_detail", isReadOnly: true, sourceLabel: "Source DN Row" },
     ],
     userMustFill: ["due_date", "set_posting_time"],
     defaults: {

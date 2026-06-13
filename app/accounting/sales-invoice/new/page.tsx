@@ -50,6 +50,12 @@ interface SIItem {
   rate: number;
   amount?: number;
   uom?: string;
+  // 2P Part 1.3 — per-item source-link fields. Set by the SO/DN prefill
+  // effect so the new SI is wired into the flow rail's back-link map.
+  sales_order?: string;
+  so_detail?: string;
+  delivery_note?: string;
+  dn_detail?: string;
 }
 
 interface SIForm {
@@ -175,10 +181,20 @@ export default function NewSalesInvoicePage() {
       mapping,
     ) as unknown as SIItem[];
 
+    // 2P Part 1.3 — per-item DN link (mirrors the SO→SI fix above).
+    const dnName = String(deliveryNote.name ?? "");
+    const sourceItems =
+      ((deliveryNote as { items?: Record<string, unknown>[] }).items) ?? [];
+    const itemsWithLink = items.map((it, i) => ({
+      ...it,
+      delivery_note: dnName,
+      dn_detail: String(sourceItems[i]?.name ?? ""),
+    }));
+
     reset({
       ...getValues(),
       ...(header as Partial<SIForm>),
-      items: items.length ? items : [{ ...EMPTY_ITEM }],
+      items: itemsWithLink.length ? itemsWithLink : [{ ...EMPTY_ITEM }],
       due_date: "",
     });
 
@@ -210,10 +226,26 @@ export default function NewSalesInvoicePage() {
       mapping,
     ) as unknown as SIItem[];
 
+    // 2P Part 1.3 — CRITICAL: per-item `sales_order` + `so_detail` link.
+    // The auto-fill registry's item mapping runs over each *source item row*,
+    // so `sourceField: "name"` would resolve to the SO Item row's own name
+    // (e.g. "Sales Order Item-1"), not the parent SO's name. ERPNext
+    // resolves the back-link from the SI side via `sales_order` ON THE
+    // ITEM ROW (the same field on the child table); without it the flow
+    // rail's "SO → SI" back-link never lights up. Post-fill here.
+    const soName = String(salesOrder.name ?? "");
+    const sourceItems =
+      ((salesOrder as { items?: Record<string, unknown>[] }).items) ?? [];
+    const itemsWithLink = items.map((it, i) => ({
+      ...it,
+      sales_order: soName,
+      so_detail: String(sourceItems[i]?.name ?? ""),
+    }));
+
     reset({
       ...getValues(),
       ...(header as Partial<SIForm>),
-      items: items.length ? items : [{ ...EMPTY_ITEM }],
+      items: itemsWithLink.length ? itemsWithLink : [{ ...EMPTY_ITEM }],
       due_date: "",
     });
 
