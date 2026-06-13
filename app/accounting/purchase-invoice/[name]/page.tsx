@@ -66,19 +66,14 @@ export default function PurchaseInvoiceDetailPage() {
   } = useFrappeDoc<PurchaseInvoice>("Purchase Invoice", name);
 
   // -- Upstream resolution: Purchase Orders linked to this PI ----------------
-  const { data: purchaseOrders, isLoading: loadingPO } = useFrappeList<{
-    name: string;
-  }>(
-    "Purchase Order",
-    {
-      filters: [["name", "in", []]], // Placeholder — real resolution via items
-      fields: ["name"],
-      limit: 5,
-    },
-    { enabled: false },
-  );
-
-  // -- Downstream resolution: Payment Entries linked to this PI --------------
+  // 2O Part 6.2 — removed the dead `useFrappeList("Purchase Order", ...)`
+  // with `enabled: false` and the unused `purchaseOrders` / `loadingPO`
+  // destructures. The flow-chain resolution via `useFlowChain` handles
+  // PI → PO via the link map (`Purchase Order` ↔ `Purchase Invoice`
+  // child table on `Purchase Invoice Item.purchase_order`).
+  // (PI → Payment Entry is the only remaining direct downstream query
+  // — it's the live one, and `useFlowChain` reads the same canonical
+  // back-link pattern as the rail.)
   const { data: paymentEntries, isLoading: loadingPE } = useFrappeList<{
     name: string;
   }>(
