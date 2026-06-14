@@ -42,6 +42,20 @@ import type { DeliveryNote } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 import { FieldWrap } from "@/components/form/field-wrap";
 
+// 2P-FINAL Part C — Map a `from` query-string value to the source
+// doctype label that `/api/erpnext/make-from` expects. We accept the
+// ERPNext-style human label ("Sales Order", "Delivery Note") and
+// the short slug ("SO", "DN") for back-compat with the 2M/2P
+// cross-flow WhatsNext links.
+type MakeFromSource = "Sales Order" | "Delivery Note";
+function resolveMakeFromSource(raw: string | null): MakeFromSource | null {
+  if (!raw) return null;
+  const k = raw.trim();
+  if (k === "Sales Order" || k === "SO") return "Sales Order";
+  if (k === "Delivery Note" || k === "DN") return "Delivery Note";
+  return null;
+}
+
 interface SIItem {
   item_code: string;
   item_name?: string;
@@ -122,6 +136,20 @@ export default function NewSalesInvoicePage() {
   const deliveryNoteId = searchParams.get("delivery_note");
   const salesOrderId = searchParams.get("sales_order"); // 2M Part 1A
   const customerId = searchParams.get("customer");
+  // 2P-FINAL Part C — the canonical make-from path. When the page
+  // is opened with `?from=Sales Order&name=…` (or
+  // `?from=Delivery Note&name=…`), we call /api/erpnext/make-from
+  // FIRST and hydrate the wizard from the returned draft. The old
+  // `?sales_order=` / `?delivery_note=` URLs (2M/2P) still work —
+  // they trigger the hand-mapping fallback.
+  const makeFromSource = resolveMakeFromSource(searchParams.get("from"));
+  const makeFromName = searchParams.get("name");
+  // Convenience alias: any source identified by `from=...&name=...`
+  // is also the "auto-prefill" signal that gates the make-from
+  // effect. We compute it once so the effect deps are stable.
+  const makeFromKey = makeFromSource && makeFromName
+    ? `${makeFromSource}::${makeFromName}`
+    : null;
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -261,6 +289,145 @@ export default function NewSalesInvoicePage() {
       description: "Set the due date to continue.",
     });
   }, [salesOrder, salesOrderId, reset, getValues]);
+
+  // 2P-FINAL Part C — CANONICAL MAKE-FROM PATH. When the URL has
+  // `?from=<Sales Order|Delivery Note>&name=<source-doc>` we call
+  // `/api/erpnext/make-from` (the server-side ERPNext mapper) and
+  // hydrate the wizard from the returned draft. ERPNext's mapper
+  // knows every per-item back-link, tax row, and pricing rule —
+  // more correct than the 2P Part 1 hand-mapping.
+  //
+  // The 2M/2P hand-mapping prefill is preserved as a SILENT
+  // FALLBACK. The make-from call is wrapped in try/catch; on any
+  // error (network, 5xx, empty draft, unsupported transition), the
+  // code logs to the console + falls through to the existing
+  // `salesOrder` / `deliveryNote` useFrappeDoc + hand-mapping
+  // effect below. The user sees the same UX either way.
+  useEffect(() => {
+    if (!makeFromSource || !makeFromName) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/erpnext/make-from", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceDoctype: makeFromSource,
+            sourceName: makeFromName,
+            targetDoctype: "Sales Invoice",
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(`make-from returned ${res.status}`);
+        }
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: { doctype?: string; doc?: Record<string, unknown> };
+          error?: string;
+          details?: string;
+        };
+        if (!json.success || !json.data?.doc) {
+          throw new Error(json.error ?? "make-from returned no doc");
+        }
+        if (cancelled) return;
+        const draft = json.data.doc as Record<string, unknown>;
+        const draftItems = Array.isArray(draft.items)
+          ? (draft.items as Array<Record<string, unknown>>)
+          : [];
+
+        // 2P-FINAL Part C — when the source is a SO, fill the
+        // per-item `sales_order` / `so_detail` from the draft (the
+        // server mapper sets them; we just normalize the key names
+        // for the wizard's SIItem shape). When the source is a DN,
+        // the mapper sets `delivery_note` / `dn_detail` directly on
+        // the items. Either way, the wizard's child-table slot
+        // receives the full back-link set.
+        const itemsWithLink: SIItem[] = draftItems.map((it) => {
+          const base: SIItem = {
+            item_code: String(it.item_code ?? ""),
+            item_name: it.item_name as string | undefined,
+            description: it.description as string | undefined,
+            qty: Number(it.qty ?? 1) || 1,
+            rate: Number(it.rate ?? 0) || 0,
+            amount:
+              Number(it.amount ?? 0) ||
+              (Number(it.qty ?? 1) || 1) * (Number(it.rate ?? 0) || 0),
+            uom: (it.uom as string | undefined) ?? "Nos",
+          };
+          if (makeFromSource === "Sales Order") {
+            base.sales_order = makeFromName;
+            base.so_detail = String(it.name ?? "");
+          } else {
+            base.delivery_note = makeFromName;
+            base.dn_detail = String(it.name ?? "");
+          }
+          return base;
+        });
+
+        // Header fields: copy any keys the draft has, mapped to the
+        // SIForm shape. Unknown / non-string fields are ignored.
+        const header: Partial<SIForm> = {};
+        const fieldMap: Array<[keyof SIForm, string]> = [
+          ["customer", "customer"],
+          ["customer_name", "customer_name"],
+          ["company", "company"],
+          ["posting_date", "posting_date"],
+          ["due_date", "due_date"],
+          ["currency", "currency"],
+          ["conversion_rate", "conversion_rate"],
+          ["selling_price_list", "selling_price_list"],
+          ["debit_to", "debit_to"],
+          ["cost_center", "cost_center"],
+        ];
+        for (const [formKey, draftKey] of fieldMap) {
+          const v = draft[draftKey];
+          if (v === undefined || v === null || v === "") continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (header as any)[formKey] = v;
+        }
+
+        reset({
+          ...getValues(),
+          ...header,
+          items: itemsWithLink.length ? itemsWithLink : [{ ...EMPTY_ITEM }],
+          // The mapper often leaves due_date blank — surface a
+          // sensible default so the wizard can advance.
+          due_date:
+            header.due_date ||
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split("T")[0] ||
+            "",
+        });
+
+        setAutoFilledFields(
+          new Set<string>([
+            ...Object.keys(header),
+            "items",
+          ]),
+        );
+
+        toast.success(`Loaded from ${makeFromSource} ${makeFromName}`, {
+          description: "Review the items, set the due date, then create.",
+        });
+      } catch (err) {
+        // Silent fallback per the handoff: do NOT surface a scary
+        // error to the user. The hand-mapping prefill effect below
+        // will run on the same `salesOrder` / `deliveryNote` query
+        // result when the corresponding `?sales_order=` / `?delivery_note=`
+        // is present. If neither is set, the user lands on a blank
+        // wizard — which is the same behavior as before 2P-FINAL.
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[2P-FINAL Part C] make-from failed; falling back to hand-mapping:",
+          err,
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [makeFromKey, makeFromSource, makeFromName, reset, getValues]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),

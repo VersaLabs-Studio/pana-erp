@@ -270,13 +270,17 @@ export default function AccountingDashboardPage() {
     >
       {/* 2P-FINAL Part B — AR/AP aging chart, moved into the shell.
           Same AgingBars component (2P Part 4) — just relocated from
-          a sibling div into the shell's children slot. */}
-      <AgingBars
-        data={agingData}
-        isLoading={false}
-        title="Aging"
-        subtitle="Top 5 customers + top 5 suppliers · outstanding"
-      />
+          a sibling div into the shell's children slot. The
+          testid-on-page matches the other 5 hubs (the AgingBars
+          component also carries `data-testid="aging-bars"`). */}
+      <div data-testid="aging-chart">
+        <AgingBars
+          data={agingData}
+          isLoading={false}
+          title="Aging"
+          subtitle="Top 5 customers + top 5 suppliers · outstanding"
+        />
+      </div>
       {/* 2N Part 3: Financial Reporting links (visible from the hub for
           easy navigation; the report pages themselves land in Part 3.2). */}
       <div className="mt-6 rounded-2xl border border-border/40 bg-card p-5 shadow-sm shadow-black/5 sm:p-6">
