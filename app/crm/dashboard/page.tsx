@@ -1,12 +1,15 @@
 // app/crm/dashboard/page.tsx
-// Obsidian ERP v4.0 — CRM Hub (master §4.1, 2N Part 2.2).
+// Obsidian ERP v4.0 — CRM Hub (master §4.1, 2N Part 2.2, 2P-FINAL Part B).
 //
-// Real data, no fallbacks. KPIs/actions/recent/alerts all driven by
-// `useFrappeList` aggregates. The shared `ModuleHub` component renders the
-// B1 chrome and stagger.
+// 2P-FINAL Part B — ONE SHELL, SIX CONFIGS. The hub renders through
+// `DashboardShell` (via the `ModuleHub` compat shim) and passes a
+// BarChart of leads vs converted (trailing 6 months) as the
+// `children` chart slot. The legacy `actions` quick-action grid is
+// preserved for the 2N ship look.
 
 "use client";
 
+import { useMemo } from "react";
 import {
   Users,
   UserCheck,
@@ -16,6 +19,16 @@ import {
   Plus,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useFrappeList } from "@/hooks/generic";
 import {
   ModuleHub,
@@ -31,7 +44,34 @@ const ETB = new Intl.NumberFormat("en-ET", {
   maximumFractionDigits: 0,
 });
 
+interface CrmPoint {
+  month: string;
+  leads: number;
+  converted: number;
+}
+
+function trailingSixMonths(now = new Date()): CrmPoint[] {
+  const pts: CrmPoint[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    pts.push({ month: `${y}-${m}`, leads: 0, converted: 0 });
+  }
+  return pts;
+}
+
+function isoMonth(s: string | undefined): string {
+  if (!s) return "";
+  return s.slice(0, 7);
+}
+
 export default function CrmDashboardPage() {
+  const now = new Date();
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+    .toISOString()
+    .split("T")[0];
+
   // KPIs
   const { data: openLeads = [] } = useFrappeList<{ name: string }>("Lead", {
     fields: ["name"],
@@ -72,6 +112,28 @@ export default function CrmDashboardPage() {
     filters: [["status", "=", "Draft"]],
     limit: 1,
   });
+
+  // 2P-FINAL Part B — leads vs converted, trailing 6 months.
+  const { data: sixMoLeads = [], isLoading: loadingLeads } = useFrappeList<{
+    creation: string;
+    status: string;
+  }>("Lead", {
+    fields: ["creation", "status"],
+    filters: [["creation", ">=", sixMonthsAgo]],
+    limit: 1000,
+  });
+  const leadTrend = useMemo<CrmPoint[]>(() => {
+    const buckets = trailingSixMonths(now);
+    const map = new Map(buckets.map((b) => [b.month, b]));
+    for (const l of sixMoLeads) {
+      const k = isoMonth(l.creation);
+      const cur = map.get(k);
+      if (!cur) continue;
+      cur.leads += 1;
+      if (l.status === "Converted") cur.converted += 1;
+    }
+    return buckets;
+  }, [sixMoLeads, now]);
 
   const kpis: HubKpi[] = [
     {
@@ -169,6 +231,63 @@ export default function CrmDashboardPage() {
       recent={recent}
       recentTitle="Recent leads"
       alerts={alerts}
-    />
+    >
+      {/* 2P-FINAL Part B — leads vs converted, trailing 6 months.
+          Grouped BarChart. OKLCH primary + success. */}
+      <div
+        className="rounded-2xl border border-border/40 bg-card p-5 shadow-sm shadow-black/5 sm:p-6"
+        data-testid="crm-leads-trend"
+        aria-label="Leads vs converted (last 6 months)"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">
+            Leads vs converted
+          </h2>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            6 months
+          </span>
+        </div>
+        {loadingLeads ? (
+          <div className="h-40 w-full" aria-hidden />
+        ) : (
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={leadTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={32}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border) / 0.4)",
+                    borderRadius: 12,
+                    fontSize: 12,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="converted"
+                  name="Converted"
+                  fill="hsl(var(--success))"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </ModuleHub>
   );
 }

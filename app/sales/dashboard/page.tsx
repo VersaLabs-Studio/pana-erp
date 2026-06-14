@@ -1,13 +1,15 @@
 // app/sales/dashboard/page.tsx
-// Obsidian ERP v4.0 — Sales Hub (master §4.1, 2N Part 2.2).
+// Obsidian ERP v4.0 — Sales Hub (master §4.1, 2N Part 2.2, 2P-FINAL Part B).
 //
-// 2N Part 2.2: rewritten on real data. The previous version used
-// `text-emerald-500`/`text-rose-500` literal colors and `bg-${color}`
-// dynamic Tailwind classes (which don't compile). This version uses the
-// shared `ModuleHub` component + `useFrappeList` aggregates only.
+// 2P-FINAL Part B — ONE SHELL, SIX CONFIGS. The hub now renders
+// through `DashboardShell` (via the `ModuleHub` compat shim) and
+// passes an AreaChart of trailing-6-months SI grand_total as the
+// `children` chart slot. The legacy `actions` quick-action grid is
+// preserved for the 2N ship look.
 
 "use client";
 
+import { useMemo } from "react";
 import {
   ShoppingCart,
   FileText,
@@ -18,6 +20,15 @@ import {
   Plus,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useFrappeList } from "@/hooks/generic";
 import {
   ModuleHub,
@@ -27,9 +38,44 @@ import {
   type HubAlert,
 } from "@/components/dashboard/ModuleHub";
 
+const ETB = new Intl.NumberFormat("en-ET", {
+  style: "currency",
+  currency: "ETB",
+  maximumFractionDigits: 0,
+});
+
+interface SalesTrendPoint {
+  /** "YYYY-MM" label, oldest first. */
+  month: string;
+  sales: number;
+}
+
+function trailingSixMonths(now = new Date()): SalesTrendPoint[] {
+  const pts: SalesTrendPoint[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    pts.push({ month: `${y}-${m}`, sales: 0 });
+  }
+  return pts;
+}
+
+function isoMonth(s: string | undefined): string {
+  if (!s) return "";
+  return s.slice(0, 7);
+}
+
 export default function SalesDashboardPage() {
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .split("T")[0];
+  // 2P-FINAL Part B — 6-month SI aggregate for the chart.
+  // We pull SI grand_total by posting_date over the last 6 months
+  // (limit 500 covers a busy month; safe ceiling). The aggregate
+  // is computed client-side from a single query.
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
     .toISOString()
     .split("T")[0];
 
@@ -96,6 +142,29 @@ export default function SalesDashboardPage() {
     "Quotation",
     { fields: ["name"], filters: [["status", "=", "Open"]], limit: 1 },
   );
+
+  // 2P-FINAL Part B — trailing-6-mo sales data (Σ SI grand_total by month).
+  const { data: sixMoSIs = [], isLoading: loadingTrend } = useFrappeList<{
+    grand_total: number;
+    posting_date: string;
+  }>("Sales Invoice", {
+    fields: ["grand_total", "posting_date"],
+    filters: [
+      ["docstatus", "=", 1],
+      ["posting_date", ">=", sixMonthsAgo],
+    ],
+    limit: 500,
+  });
+  const salesTrend = useMemo<SalesTrendPoint[]>(() => {
+    const buckets = trailingSixMonths(now);
+    const map = new Map(buckets.map((b) => [b.month, b]));
+    for (const inv of sixMoSIs) {
+      const k = isoMonth(inv.posting_date);
+      const cur = map.get(k);
+      if (cur) cur.sales += Number(inv.grand_total) || 0;
+    }
+    return buckets;
+  }, [sixMoSIs, now]);
 
   const kpis: HubKpi[] = [
     {
@@ -205,6 +274,80 @@ export default function SalesDashboardPage() {
       recent={recent}
       recentTitle="Recent quotations & orders"
       alerts={alerts}
-    />
+    >
+      {/* 2P-FINAL Part B — trailing-6-month sales AreaChart. Σ SI
+          grand_total grouped by month. OKLCH primary semantic. */}
+      <div
+        className="rounded-2xl border border-border/40 bg-card p-5 shadow-sm shadow-black/5 sm:p-6"
+        data-testid="sales-trend"
+        aria-label="Sales trend (last 6 months)"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">
+            Sales trend
+          </h2>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            6 months · Σ SI grand_total
+          </span>
+        </div>
+        {loadingTrend ? (
+          <div className="h-40 w-full" aria-hidden />
+        ) : salesTrend.every((p) => p.sales === 0) ? (
+          <div className="flex h-40 items-center justify-center text-xs text-muted-foreground">
+            No sales in the last 6 months yet.
+          </div>
+        ) : (
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={salesTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="salesArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
+                  tickFormatter={(v) =>
+                    Math.abs(v) >= 1_000_000
+                      ? `${(v / 1_000_000).toFixed(1)}M`
+                      : Math.abs(v) >= 1_000
+                        ? `${(v / 1_000).toFixed(0)}k`
+                        : String(v)
+                  }
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border) / 0.4)",
+                    borderRadius: 12,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => ETB.format(v)}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  name="Sales"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2.5}
+                  fill="url(#salesArea)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </ModuleHub>
   );
 }

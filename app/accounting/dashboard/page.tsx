@@ -1,10 +1,13 @@
 // app/accounting/dashboard/page.tsx
-// Obsidian ERP v4.0 — Accounting Hub (master §4.1, 2N Part 2.2).
+// Obsidian ERP v4.0 — Accounting Hub (master §4.1, 2N Part 2.2,
+// 2P-FINAL Part B).
 //
-// 2N Part 2.2: rewritten on real data. The previous version had hardcoded
-// `bg-blue-100`/`text-blue-600`/`bg-emerald-100` literal colors and a fake
-// "Reports" link list. This version uses the shared `ModuleHub` component
-// + `useFrappeList` aggregates only.
+// 2P-FINAL Part B — ONE SHELL, SIX CONFIGS. The hub renders through
+// `DashboardShell` (via the `ModuleHub` compat shim) and passes the
+// 2P-Part-4 AR/AP aging-bars chart as the `children` chart slot.
+// The 2P-Part-4 chart logic is preserved; the wrapper just changes.
+// The legacy `actions` quick-action grid is preserved for the 2N
+// ship look.
 
 "use client";
 
@@ -26,7 +29,7 @@ import {
   type HubKpi,
   type HubAction,
   type HubRecentItem,
-  type   HubAlert,
+  type HubAlert,
 } from "@/components/dashboard/ModuleHub";
 import { AgingBars, type AgingRow } from "@/components/dashboard/aging-bars";
 
@@ -171,12 +174,10 @@ export default function AccountingDashboardPage() {
     },
   ];
 
-  // Reports is not a ModuleHub primitive; add a single "Reports" action
-  // pointing to the P&L report (3.x wires up the rest).
-  // -- 2P Part 4 — AR/AP aging stacked-bars chart ---------------------------
-  // Outstanding balances bucketed by `due_date` vs today. Top 5
-  // customers + top 5 suppliers; the chart shows the four 30/60/90/90+
-  // buckets with the success → info → warning → destructive ramp.
+  // 2P-FINAL Part B — AR/AP aging stays as the chart (the handoff
+  // table says "keep the AR/AP aging-bars (already built) — move it
+  // into the shell"). The logic is preserved verbatim from 2P Part
+  // 4; only the rendering location changes.
   const today = new Date().toISOString().split("T")[0] ?? "";
   const agingData = useMemo<AgingRow[]>(() => {
     function bucketFor(due: string | undefined): 0 | 1 | 2 | 3 {
@@ -253,31 +254,29 @@ export default function AccountingDashboardPage() {
   }, [receivablesRows, payablesRows, today]);
 
   return (
-    <>
-      <ModuleHub
-        title="Accounting Hub"
-        subtitle="Invoices, payments, and reports."
-        icon={Calculator}
-        primaryAction={{
-          label: "New Sales Invoice",
-          href: "/accounting/sales-invoice/new",
-        }}
-        kpis={kpis}
-        actions={actions}
-        recent={recent}
-        recentTitle="Recent payment entries"
-        alerts={alerts}
+    <ModuleHub
+      title="Accounting Hub"
+      subtitle="Invoices, payments, and reports."
+      icon={Calculator}
+      primaryAction={{
+        label: "New Sales Invoice",
+        href: "/accounting/sales-invoice/new",
+      }}
+      kpis={kpis}
+      actions={actions}
+      recent={recent}
+      recentTitle="Recent payment entries"
+      alerts={alerts}
+    >
+      {/* 2P-FINAL Part B — AR/AP aging chart, moved into the shell.
+          Same AgingBars component (2P Part 4) — just relocated from
+          a sibling div into the shell's children slot. */}
+      <AgingBars
+        data={agingData}
+        isLoading={false}
+        title="Aging"
+        subtitle="Top 5 customers + top 5 suppliers · outstanding"
       />
-
-      {/* 2P Part 4 — AR/AP aging chart */}
-      <div className="mt-6">
-        <AgingBars
-          data={agingData}
-          isLoading={false}
-          title="Aging"
-          subtitle="Top 5 customers + top 5 suppliers · outstanding"
-        />
-      </div>
       {/* 2N Part 3: Financial Reporting links (visible from the hub for
           easy navigation; the report pages themselves land in Part 3.2). */}
       <div className="mt-6 rounded-2xl border border-border/40 bg-card p-5 shadow-sm shadow-black/5 sm:p-6">
@@ -311,6 +310,6 @@ export default function AccountingDashboardPage() {
           ))}
         </div>
       </div>
-    </>
+    </ModuleHub>
   );
 }

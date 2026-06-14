@@ -74,9 +74,21 @@ export interface DashboardConfig {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function DashboardShell({ config }: { config: DashboardConfig }) {
+// 2P-FINAL Part B — accept `children` as a prop (in addition to
+// `config.children`). The ModuleHub compat shim passes a React
+// fragment, so we forward both shapes into the content slot.
+export function DashboardShell({
+  config,
+  children,
+}: {
+  config: DashboardConfig;
+  children?: React.ReactNode;
+}) {
   const prefersReducedMotion = useReducedMotion();
-  const { title, subtitle, icon: Icon, primaryAction, kpis, alerts, recent, children } = config;
+  const { title, subtitle, icon: Icon, primaryAction, kpis, alerts, recent } = config;
+  // Children prop wins over config.children (the latter was the
+  // 2P Part 4 API; the former is the 2P-FINAL Part B API).
+  const content = children ?? config.children;
 
   return (
     <div className="space-y-8 pb-12">
@@ -144,7 +156,7 @@ export function DashboardShell({ config }: { config: DashboardConfig }) {
       </section>
 
       {/* Main content (charts, tables, etc.) */}
-      {children && <section aria-label={`${title} content`}>{children}</section>}
+      {content && <section aria-label={`${title} content`}>{content}</section>}
 
       {/* Alerts + Recent */}
       {(alerts?.length || recent?.length) ? (
