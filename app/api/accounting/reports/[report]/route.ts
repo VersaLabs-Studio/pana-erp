@@ -1,5 +1,6 @@
 // app/api/accounting/reports/[report]/route.ts
-// Obsidian ERP v4.0 — Financial Report Proxy (2N Part 3.1, 2O Part 2.1).
+// Obsidian ERP v4.0 — Financial Report Proxy (2N Part 3.1, 2O Part 2.1,
+// 2P-FINAL Part A.3).
 //
 // Server-side proxy to Frappe's standard query-report runner. The client
 // never talks to Frappe directly for reports — it calls this route, which
@@ -28,6 +29,13 @@
 //   - Financial statements (P&L, BS): the financial-statements shape.
 //   - Aged receivables / payables: a separate `report_date` + ageing shape.
 //
+// 2P-FINAL Part A.3 — USER CLIENT. The operator is running THEIR own
+// report — we want ERPNext to apply their per-company + per-role
+// report scope (e.g. a Sales User shouldn't see full-balance-sheet
+// data they have no perms for). Switched from `frappeClient.call` to
+// the user-scoped `getRequestClient`. `frappeClient.handleError` is
+// still used for error shaping (stateless, fine to keep).
+//
 // Supported `report` values (URL segment):
 //   - `profit-and-loss`       → "Profit and Loss Statement"
 //   - `balance-sheet`         → "Balance Sheet"
@@ -36,6 +44,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { frappeClient } from "@/lib/frappe-client";
+import { getRequestClient } from "@/lib/auth/resolve-user";
 import { getActiveCompany } from "@/lib/settings/company";
 
 // ---------------------------------------------------------------------------
@@ -266,12 +275,26 @@ export async function GET(
   const period = pickPeriod(searchParams);
   const filters = buildReportFilters(reportKey, period);
 
+  // 2P-FINAL Part A.3 — user-scoped client. Report data respects
+  // the requesting user's company + role scope. Fail closed (401).
+  const client = getRequestClient(request);
+  if (!client) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unauthorized",
+        details: "No valid session.",
+        statusCode: 401,
+      },
+      { status: 401 },
+    );
+  }
   try {
     // Frappe's query_report.run returns:
     //   { result: { columns: [...], result: [...], message?, chart? } }
     // Pass filters as a JSON string per Frappe's wire format.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: any = await (frappeClient.call as any).get(
+    const raw: any = await (client.call as any).get(
       "frappe.desk.query_report.run",
       {
         report_name: reportName,

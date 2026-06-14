@@ -24,9 +24,22 @@
 //     admin page. This route is a SPECIFIC bootstrapper for the implicit
 //     warehouse model — it KNOWS the three canonical names and the abbr
 //     suffix convention. Don't duplicate the resolver in CRUD.
+//
+// 2P-FINAL Part A.3 — ADMIN GATE. This is a tenant-bootstrap route; it
+// needs to create Warehouses the user may not have write-permission for
+// on a fresh tenant. Per the rule of thumb: "if the action is something
+// the logged-in user is doing → user client. If it's tenant bootstrap /
+// admin tooling → service account BEHIND A ROLE GATE." So we keep the
+// `frappeClient` service account (no sid-forwarding), but require
+// System Manager (or Stock Manager) to reach the elevated path. Without
+// the gate a regular Sales User could create warehouses.
 
 import { NextRequest, NextResponse } from "next/server";
 import { frappeClient } from "@/lib/frappe-client";
+import {
+  resolveUserContext,
+  userHasRole,
+} from "@/lib/auth/resolve-user";
 import { getActiveCompany } from "@/lib/settings/company";
 
 interface CompanyDoc {
@@ -120,7 +133,32 @@ async function createWarehouseIfMissing(
   }
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  // 2P-FINAL Part A.3 — admin-gate the service-account path.
+  const ctx = await resolveUserContext(request);
+  if (!ctx) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unauthorized",
+        details: "No valid session.",
+        statusCode: 401,
+      },
+      { status: 401 },
+    );
+  }
+  if (!userHasRole(ctx, ["System Manager", "Stock Manager"])) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Forbidden",
+        details: "System Manager or Stock Manager role required to bootstrap warehouses.",
+        statusCode: 403,
+      },
+      { status: 403 },
+    );
+  }
+
   const company = getActiveCompany();
   const abbr = await fetchCompanyAbbr(company);
 

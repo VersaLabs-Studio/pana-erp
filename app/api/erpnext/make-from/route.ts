@@ -1,5 +1,6 @@
 // app/api/erpnext/make-from/route.ts
-// Obsidian ERP v4.0 — Server-side ERPNext `make_*` mappers (2P Part 1.3).
+// Obsidian ERP v4.0 — Server-side ERPNext `make_*` mappers (2P Part 1.3,
+// 2P-FINAL Part C).
 //
 // The recommended path (per Phase 2P handoff): instead of hand-building
 // the new doctype's payload from the source's `auto-fill` registry, call
@@ -20,6 +21,18 @@
 //     The wizard UI sees those errors as guided messages, not as silent
 //     500s.
 //
+// 2P-FINAL Part A.3 — USER CLIENT. This route is a per-user mapping
+// read (the operator is creating THEIR own SI / DN / PI from a source
+// doc), so it uses the user-scoped FrappeApp (`getRequestClient`) and
+// forwards the `sid` as a Cookie. ERPNext runs its native perm check
+// for the user — they need at least READ on the source and CREATE on
+// the target. Fail closed (401) when no session.
+//
+// 2P-FINAL Part C — CANONICAL PATH. The SI "new" page now calls this
+// route FIRST and hydrates the wizard from the returned draft. The
+// hand-mapping prefill in `app/accounting/sales-invoice/new/page.tsx`
+// is preserved as a silent fallback for the route-error case.
+//
 // Supported transitions (URL: POST /api/erpnext/make-from):
 //   { sourceDoctype: "Sales Order",       targetDoctype: "Sales Invoice"   }
 //   { sourceDoctype: "Sales Order",       targetDoctype: "Delivery Note"   }
@@ -34,6 +47,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { frappeClient } from "@/lib/frappe-client";
+import { getRequestClient } from "@/lib/auth/resolve-user";
 
 // ---------------------------------------------------------------------------
 // Mapper table — (source, target) → ERPNext dotted-path + method name.
@@ -81,6 +95,21 @@ interface MakeFromRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // 2P-FINAL Part A.3 — per-request user-scoped client. The operator
+  // is creating THEIR own SI/DN/PI from a source doc, so this is a
+  // user action — use the user client and fail closed (401).
+  const client = getRequestClient(request);
+  if (!client) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unauthorized",
+        details: "No valid session.",
+        statusCode: 401,
+      },
+      { status: 401 },
+    );
+  }
   let body: MakeFromRequest;
   try {
     body = (await request.json()) as MakeFromRequest;
@@ -132,8 +161,11 @@ export async function POST(request: NextRequest) {
       args.target_doc = body.overrides;
     }
 
+    // 2P-FINAL A.3 — user-scoped call. ERPNext runs its native
+    // permission check; a user without READ on the source gets 403
+    // (PermissionError), mapped to a clean 403 via handleError.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: any = await (frappeClient.call as any).get(mapper.method, args);
+    const raw: any = await (client.call as any).get(mapper.method, args);
     const doc = Array.isArray(raw) ? raw[0] : raw?.message ?? raw;
 
     if (!doc || typeof doc !== "object") {

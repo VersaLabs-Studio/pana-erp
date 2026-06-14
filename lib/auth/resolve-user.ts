@@ -1,5 +1,6 @@
 // lib/auth/resolve-user.ts
-// Obsidian ERP v4.0 — Per-user identity + scoped Frappe client (2P Part 5).
+// Obsidian ERP v4.0 — Per-user identity + scoped Frappe client (2P Part 5,
+// 2P-FINAL Part A).
 //
 // 2P Part 5.1 — REPLACES THE PHASE-0 DEV STUB. The previous version
 // returned `{ userId: "Administrator" }` for every request — which
@@ -11,14 +12,22 @@
 //   2. Validates the session with Frappe's
 //      `frappe.auth.get_logged_user`. The session is a real,
 //      ERPNext-issued signed cookie — not a Next.js fake.
-//   3. Fetches the user's roles via `frappe.client.get` on `User`.
-//      The roles drive the RBAC UI in `useCurrentUser` / `<Can>`.
+//   3. Fetches the user's roles via `frappe.client.get_list` on
+//      `Has Role`. The roles drive the RBAC UI in `useCurrentUser`
+//      / `<Can>`.
 //
-// 2P Part 5.2 — Per-user scoped Frappe client. The new
-// `getRequestFrappeClient(request)` helper creates a per-request
-// FrappeApp instance authenticated as the user (using the `sid`
-// cookie as the auth header). This is the prerequisite for the
-// v4.1-AI executor (so the AI cannot do anything the user cannot).
+// 2P-FINAL Part A — FACTORY SID-FORWARDING. The new
+// `getRequestFrappeApp(request)` / `getRequestClient(request)` pair
+// returns a per-request FrappeApp that forwards the `sid` cookie via
+// the SDK's `customHeaders` 4th constructor arg. We pass
+// `useToken: false` so the SDK's request interceptor does NOT also
+// add `Authorization: Bearer <sid>` (Frappe would reject a session id
+// as a Bearer token — Bearer is for OAuth2 access tokens, not
+// cookies). The customHeaders path merges `Cookie: sid=...` into every
+// request, AND the SDK sets `withCredentials: true` so the browser
+// also sends the cookie on same-origin requests. This is the only
+// mechanism that gets Frappe to run its NATIVE DocPerm engine for
+// the requesting user — the service account bypassed it entirely.
 //
 // Why this lives in `lib/auth/`: the auth surface is shared by all
 // API routes, the layout guard, and the user-management admin page.
@@ -192,33 +201,62 @@ export async function resolveUserContext(
 }
 
 // ---------------------------------------------------------------------------
-// Public: per-request FrappeApp instance, authenticated as the user.
-// Uses the `sid` cookie as a Bearer token via frappe-js-sdk's
-// session-cookie auth mode (the SDK supports this with the
-// `useToken: false` + custom auth).
+// Public: per-request FrappeApp instance, authenticated AS THE USER.
+// (2P-FINAL Part A.1 — the cookie-forwarding ship-gate path.)
 //
-// Most existing API routes still use the singleton `frappeClient`
-// (service account) for read-only Frappe queries. The handoff says
-// "per-user scoped client" is the ship gate — but the migration of
-// every existing route is a 10+ commit change. v1 of the helper is
-// here; the routes switch to it incrementally (a follow-up phase
-// per the report's KNOWN GAPS).
+// The FrappeApp constructor is:
+//   new FrappeApp(url, tokenParams?, name?, customHeaders?)
+// We pass `useToken: false` (so the SDK's request interceptor does NOT
+// also set `Authorization: Bearer <sid>` — Frappe rejects a session id
+// as a Bearer token), and forward the `sid` via the 4th arg
+// (`customHeaders`). The SDK merges those into the axios headers
+// (see `frappe-js-sdk/lib/utils/axios.js` `getRequestHeaders`) and
+// sets `withCredentials: true` on the axios client (so the browser
+// also sends the cookie on same-origin requests).
+//
+// ERPNext then runs its native DocPerm engine for this user — a
+// Sales User with a sid will get 403 (PermissionError) for the
+// Journal Entry doctype, not the service-account 200 we had before.
 // ---------------------------------------------------------------------------
-export function getRequestFrappeClient(request: NextRequest): FrappeApp | null {
+export function getRequestFrappeApp(request: NextRequest): FrappeApp | null {
   const sid = readSidCookie(request);
   const base = getErpBaseUrl();
   if (!sid || !base) return null;
-  // The frappe-js-sdk FrappeApp constructor takes (url, options).
-  // We pass `useToken: false` + a `getToken` that returns the sid
-  // wrapped in a way that makes the SDK send it as the `Cookie`
-  // header (NOT Authorization). The SDK's default token mechanism
-  // sends `Authorization: token <key>:<secret>` which is the
-  // service-account flow; the user-sid flow needs raw cookies.
-  return new FrappeApp(base, {
-    useToken: true,
-    token: () => sid,
-    type: "Bearer",
-  });
+  return new FrappeApp(
+    base,
+    // tokenParams: explicitly NO token auth, so the SDK does not add
+    // an Authorization header. Frappe's session id is a cookie, not
+    // an OAuth2 access token.
+    { useToken: false, type: "Bearer" },
+    // name: not used for routing
+    undefined,
+    // customHeaders: forward the `sid` as a Cookie. The SDK merges
+    // this with its own Accept/Content-Type headers.
+    { Cookie: `sid=${sid}` },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public: per-request Frappe client (db + call surfaces) for the
+// factory handlers. The factory calls `client.db.getDocList(...)` etc.
+// ---------------------------------------------------------------------------
+export function getRequestClient(request: NextRequest):
+  | { db: ReturnType<FrappeApp["db"]>; call: ReturnType<FrappeApp["call"]> }
+  | null {
+  const app = getRequestFrappeApp(request);
+  if (!app) return null;
+  return { db: app.db(), call: app.call() };
+}
+
+// ---------------------------------------------------------------------------
+// Back-compat: keep the old name working. The 2P test asserts the
+// function exists; the implementation now forwards the `sid` as a
+// Cookie (instead of the broken Bearer approach). 2P-FINAL Part A
+// replaces all internal callers; this alias is a safety net for any
+// out-of-tree import.
+// ---------------------------------------------------------------------------
+export function getRequestFrappeClient(request: NextRequest): FrappeApp | null {
+  return getRequestFrappeApp(request);
 }
 
 // ---------------------------------------------------------------------------

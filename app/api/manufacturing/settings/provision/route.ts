@@ -11,9 +11,19 @@
 //
 //   Idempotent — re-running is a no-op. Returns the resolved settings so
 //   the caller can update its own state.
+//
+// 2P-FINAL Part A.3 — ADMIN GATE. Tenant-bootstrap route. Kept on the
+// `frappeClient` service account (no sid-forwarding) so a fresh
+// instance can be provisioned by the first admin who logs in. The
+// gate prevents a regular user from elevating to admin scope by
+// hitting the route.
 
 import { NextRequest, NextResponse } from "next/server";
 import { frappeClient } from "@/lib/frappe-client";
+import {
+  resolveUserContext,
+  userHasRole,
+} from "@/lib/auth/resolve-user";
 import { getActiveCompany } from "@/lib/settings/company";
 
 async function resolveWarehouses(company: string): Promise<{
@@ -52,7 +62,32 @@ async function resolveWarehouses(company: string): Promise<{
   };
 }
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
+  // 2P-FINAL Part A.3 — admin-gate the service-account path.
+  const ctx = await resolveUserContext(request);
+  if (!ctx) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unauthorized",
+        details: "No valid session.",
+        statusCode: 401,
+      },
+      { status: 401 },
+    );
+  }
+  if (!userHasRole(ctx, ["System Manager", "Manufacturing Manager"])) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Forbidden",
+        details: "System Manager or Manufacturing Manager role required to provision manufacturing settings.",
+        statusCode: 403,
+      },
+      { status: 403 },
+    );
+  }
+
   const company = getActiveCompany();
   const wh = await resolveWarehouses(company);
 
