@@ -69,28 +69,24 @@ export class UnauthorizedError extends Error {
 const _resolutionCache = new WeakMap<NextRequest, UserContext>();
 
 // ---------------------------------------------------------------------------
-// Helper: read the Frappe `sid` cookie. Frappe sets `sid` on the
-// top-level domain; on the same origin, the browser sends it
-// automatically. We look in BOTH the Cookie header and the
-// `next/headers` cookies store (Next 14+ exposes cookies()).
+// Helper: read the Frappe `sid` cookie from the incoming request.
+//
+// We read the raw `Cookie` header directly. That works in EVERY Next
+// version (13/14/15/16) and in middleware. The prior implementation
+// also called the async next-headers cookies helper as a fallback —
+// that helper is now async in Next 15+/16 and a sync call throws
+// the `sync-dynamic-apis` runtime error. We don't need it: browsers
+// send the `sid` cookie automatically on same-origin fetches, and
+// Next's `NextRequest` exposes the parsed `Cookie` header at
+// request time.
+//
+// Reference:
+//   https://nextjs.org/docs/messages/sync-dynamic-apis
 // ---------------------------------------------------------------------------
 function readSidCookie(request: NextRequest): string | null {
-  // Direct header (works in all Next versions + middleware).
   const cookieHeader = request.headers.get("cookie") ?? "";
   const m = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/);
   if (m && m[1]) return decodeURIComponent(m[1]);
-  // Next 14+ cookies() — try `next/headers` lazily (so we don't
-  // require it on older Next).
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { cookies } = require("next/headers") as {
-      cookies: () => { get: (n: string) => { value: string } | undefined };
-    };
-    const c = cookies().get("sid");
-    if (c?.value) return c.value;
-  } catch {
-    // Older Next or no next/headers available — fall through.
-  }
   return null;
 }
 

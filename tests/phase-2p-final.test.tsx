@@ -25,6 +25,20 @@ describe("Part A.1: getRequestFrappeApp forwards sid as a Cookie (NOT Bearer)", 
     expect(src).not.toMatch(/type:\s*"Bearer"[\s\S]{0,200}token:\s*\(\)\s*=>\s*sid/);
   });
 
+  it("readSidCookie does NOT call next/headers cookies() (Next 15+ async)", async () => {
+    // The prior implementation tried `cookies().get("sid")` as a
+    // fallback. In Next 15+/16, `cookies()` is async — calling it
+    // sync throws the `sync-dynamic-apis` runtime error and breaks
+    // every factory CRUD route. We removed that fallback: the raw
+    // `Cookie` header parse is sufficient (browsers send the sid
+    // cookie on same-origin fetches, and Next's NextRequest exposes
+    // the parsed Cookie header at request time).
+    const src = await fs.readFile("lib/auth/resolve-user.ts", "utf-8");
+    expect(src).not.toMatch(/from\s+["']next\/headers["']/);
+    expect(src).not.toMatch(/require\(["']next\/headers["']\)/);
+    expect(src).not.toMatch(/cookies\(\)\.get/);
+  });
+
   it("getRequestFrappeClient is preserved as a back-compat alias (2P test still green)", async () => {
     const src = await fs.readFile("lib/auth/resolve-user.ts", "utf-8");
     expect(src).toMatch(/export function getRequestFrappeClient/);
