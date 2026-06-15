@@ -383,3 +383,66 @@ describe("Part A/B/C — no orphan modules in 2P-FINAL", () => {
     expect(exists).toBe(true);
   });
 });
+
+// =============================================================================
+// Settings page — sidebar Preferences button wires to /settings
+// =============================================================================
+describe("Settings page + sidebar Preferences wiring", () => {
+  it("app/settings/page.tsx exists and renders the 4 sections", async () => {
+    const exists = await fs
+      .stat("app/settings/page.tsx")
+      .then(() => true)
+      .catch(() => false);
+    expect(exists).toBe(true);
+    const src = await fs.readFile("app/settings/page.tsx", "utf-8");
+    expect(src).toMatch(/Profile/);
+    expect(src).toMatch(/Preferences/);
+    expect(src).toMatch(/Notifications/);
+    expect(src).toMatch(/Security/);
+    // Anchors for the section-nav links.
+    expect(src).toMatch(/id:\s*["']profile["']/);
+    expect(src).toMatch(/id:\s*["']preferences["']/);
+    expect(src).toMatch(/id:\s*["']notifications["']/);
+    expect(src).toMatch(/id:\s*["']security["']/);
+  });
+
+  it("the page uses the live theme context (no hardcoded color)", async () => {
+    const src = await fs.readFile("app/settings/page.tsx", "utf-8");
+    expect(src).toMatch(/useTheme/);
+    expect(src).toMatch(/setTheme/);
+  });
+
+  it("the page uses the live current-user hook (real name/email/roles)", async () => {
+    const src = await fs.readFile("app/settings/page.tsx", "utf-8");
+    expect(src).toMatch(/useCurrentUser/);
+    // Profile fields read from the user context.
+    expect(src).toMatch(/user\?\.fullName/);
+    expect(src).toMatch(/user\?\.email/);
+    expect(src).toMatch(/user\?\.roles/);
+  });
+
+  it("the Notifications section LINKS to the existing /settings/notifications page", async () => {
+    const src = await fs.readFile("app/settings/page.tsx", "utf-8");
+    // The actual code is `<Link href="/settings/notifications" ...>`.
+    expect(src).toMatch(/href=["']\/settings\/notifications["']/);
+  });
+
+  it("the Layout sidebar Preferences item routes to /settings", async () => {
+    const src = await fs.readFile("components/Layout/Layout.tsx", "utf-8");
+    // The Preferences DropdownMenuItem now has an onSelect handler that
+    // routes to /settings. We assert on both the Preferences label
+    // AND the navigation call (loosened regex — the JSX block is
+    // longer than 300 chars after the label).
+    expect(src).toMatch(
+      /<DropdownMenuItem[\s\S]{0,2000}>[\s\S]{0,200}<Settings[\s\S]{0,200}Preferences[\s\S]{0,200}<\/DropdownMenuItem>/,
+    );
+    // The router.push(/settings) call lives in the Layout's user menu.
+    expect(src).toMatch(/router\.push\(["']\/settings["']\)/);
+  });
+
+  it("Layout imports useRouter for the Preferences navigation", async () => {
+    const src = await fs.readFile("components/Layout/Layout.tsx", "utf-8");
+    expect(src).toMatch(/import\s*\{[^}]*useRouter[^}]*\}\s*from\s*["']next\/navigation["']/);
+    expect(src).toMatch(/const router = useRouter\(\)/);
+  });
+});

@@ -51,7 +51,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNotifications } from "@/lib/stores/use-notifications";
 import { NotificationsPanel } from "@/components/notifications/notifications-panel";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -362,6 +362,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const { unreadCount } = useNotifications();
   const pathname = usePathname();
+  const router = useRouter();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -498,9 +499,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               My Account
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem className="rounded-xl py-2.5 focus:bg-secondary cursor-pointer transition-colors">
+            {/* Preferences — routes to /settings (single page, 4 sections). */}
+            <DropdownMenuItem
+              className="rounded-xl py-2.5 focus:bg-secondary cursor-pointer transition-colors"
+              onSelect={() => router.push("/settings")}
+            >
               <Settings className="mr-3 h-4 w-4" /> Preferences
             </DropdownMenuItem>
+            {/* Help & Support and Sign Out remain in-scope for a follow-up;
+                they currently render as no-op items (no onSelect handler). */}
             <DropdownMenuItem className="rounded-xl py-2.5 focus:bg-secondary cursor-pointer transition-colors">
               <HelpCircle className="mr-3 h-4 w-4" /> Help & Support
             </DropdownMenuItem>
