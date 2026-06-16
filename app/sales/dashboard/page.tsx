@@ -302,19 +302,19 @@ export default function SalesDashboardPage() {
               <AreaChart data={salesTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="salesArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                 <XAxis
                   dataKey="month"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={48}
@@ -328,8 +328,8 @@ export default function SalesDashboardPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border) / 0.4)",
+                    background: "var(--color-popover)",
+                    border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                     borderRadius: 12,
                     fontSize: 12,
                   }}
@@ -339,7 +339,7 @@ export default function SalesDashboardPage() {
                   type="monotone"
                   dataKey="sales"
                   name="Sales"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--color-primary)"
                   strokeWidth={2.5}
                   fill="url(#salesArea)"
                 />

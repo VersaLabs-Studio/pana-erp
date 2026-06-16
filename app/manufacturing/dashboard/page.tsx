@@ -271,15 +271,15 @@ export default function ManufacturingDashboardPage() {
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={woTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                 <XAxis
                   dataKey="month"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={32}
@@ -287,17 +287,17 @@ export default function ManufacturingDashboardPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border) / 0.4)",
+                    background: "var(--color-popover)",
+                    border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                     borderRadius: 12,
                     fontSize: 12,
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Draft" stackId="wo" fill="hsl(var(--muted-foreground))" />
-                <Bar dataKey="In Process" stackId="wo" fill="hsl(var(--info))" />
-                <Bar dataKey="Completed" stackId="wo" fill="hsl(var(--success))" />
-                <Bar dataKey="Cancelled" stackId="wo" fill="hsl(var(--destructive))" />
+                <Bar dataKey="Draft" stackId="wo" fill="var(--color-muted-foreground)" />
+                <Bar dataKey="In Process" stackId="wo" fill="var(--color-info)" />
+                <Bar dataKey="Completed" stackId="wo" fill="var(--color-success)" />
+                <Bar dataKey="Cancelled" stackId="wo" fill="var(--color-destructive)" />
               </BarChart>
             </ResponsiveContainer>
           </div>

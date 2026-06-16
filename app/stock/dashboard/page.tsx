@@ -256,10 +256,10 @@ export default function StockDashboardPage() {
                 layout="vertical"
                 margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) =>
@@ -273,15 +273,15 @@ export default function StockDashboardPage() {
                 <YAxis
                   type="category"
                   dataKey="item"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={120}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border) / 0.4)",
+                    background: "var(--color-popover)",
+                    border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                     borderRadius: 12,
                     fontSize: 12,
                   }}
@@ -290,7 +290,7 @@ export default function StockDashboardPage() {
                 <Bar
                   dataKey="value"
                   name="Value"
-                  fill="hsl(var(--primary))"
+                  fill="var(--color-primary)"
                   radius={[0, 4, 4, 0]}
                 />
               </BarChart>
