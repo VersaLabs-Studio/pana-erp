@@ -2,10 +2,10 @@
 
 import "@/app/globals.css";
 import { Suspense } from "react";
+import { usePathname } from "next/navigation";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import Layout from "@/components/Layout/Layout";
-import { SessionGuard } from "@/components/Layout/SessionGuard";
 import { Toaster } from "sonner";
 import { getQueryClient } from "@/lib/query-client";
 import { ToastProvider } from "@/components/ui/toast";
@@ -28,21 +28,16 @@ export default function LayoutClient({
   children: React.ReactNode;
 }) {
   const queryClient = getQueryClient();
+  const pathname = usePathname();
+  // The /login route renders standalone — no sidebar shell — but still
+  // inside the theme/query/toast providers so it themes + can navigate.
+  const isBare = pathname === "/login";
   return (
     <ThemeProvider defaultTheme="system">
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <Suspense fallback={<LoadingFallback />}>
-            {/* SessionGuard (post-2P-FINAL UX fix) — when there's no
-                Frappe sid cookie, every CRUD route 401s (correct
-                ship-gate behavior). Without this guard, the global
-                dashboard silently renders empty KPIs and the dev
-                console fills with 401s. The guard runs /api/auth/me
-                on mount, shows a sign-in card on 401, and only then
-                renders the children. Cached 5 min in sessionStorage. */}
-            <SessionGuard>
-              <Layout>{children}</Layout>
-            </SessionGuard>
+            {isBare ? children : <Layout>{children}</Layout>}
           </Suspense>
         </ToastProvider>
         <ReactQueryDevtools initialIsOpen={false} />
