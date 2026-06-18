@@ -48,8 +48,9 @@ import {
   BookOpen,
   Tag,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNotifications } from "@/lib/stores/use-notifications";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { NotificationsPanel } from "@/components/notifications/notifications-panel";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,19 @@ const navigation = [
         href: "/buying/purchase-order",
         icon: ClipboardList,
       },
+      // Procure-to-pay continues: receive goods, then bill them. Both
+      // pages live in their owning modules (stock / accounting) but the
+      // buyer's workflow runs through here, so we surface them in Buying.
+      {
+        title: "Purchase Receipts",
+        href: "/stock/purchase-receipt",
+        icon: Package,
+      },
+      {
+        title: "Purchase Invoices",
+        href: "/accounting/purchase-invoice",
+        icon: Receipt,
+      },
       { title: "Settings", href: "/buying/settings", icon: Settings },
     ],
   },
@@ -220,6 +234,38 @@ const navigation = [
     ],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Role-based menu visibility.
+//
+// The server already ENFORCES permissions (per-user sid forwarding →
+// ERPNext DocPerm). This is the UI half: don't surface a module a user
+// can't use. Mapped by ERPNext's standard module→role conventions; a
+// System Manager / Administrator sees everything. Empty list = public
+// (Overview). Fail closed while the user is still resolving (roles = [])
+// so we never flash modules the user lacks.
+// ---------------------------------------------------------------------------
+const SECTION_ROLES: Record<string, string[]> = {
+  Overview: [], // everyone
+  CRM: ["Sales User", "Sales Manager"],
+  Sales: ["Sales User", "Sales Manager"],
+  Inventory: ["Stock User", "Stock Manager"],
+  // Receiving against a PO is a stock activity, so stock roles see Buying too.
+  Buying: ["Purchase User", "Purchase Manager", "Stock User", "Stock Manager"],
+  Manufacturing: ["Manufacturing User", "Manufacturing Manager"],
+  HR: ["HR User", "HR Manager"],
+  Accounting: ["Accounts User", "Accounts Manager"],
+  Reports: ["Accounts User", "Accounts Manager"],
+};
+
+const ALL_ACCESS_ROLES = ["System Manager", "Administrator"];
+
+function canSeeSection(title: string, roles: string[]): boolean {
+  const required = SECTION_ROLES[title];
+  if (!required || required.length === 0) return true; // public / unmapped
+  if (roles.some((r) => ALL_ACCESS_ROLES.includes(r))) return true; // admin
+  return required.some((r) => roles.includes(r));
+}
 
 // Collapsible Nav Section Component
 function NavSection({
@@ -361,8 +407,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [openSections, setOpenSections] = useState<string[]>(["Inventory"]); // Default open
   const [notifOpen, setNotifOpen] = useState(false);
   const { unreadCount } = useNotifications();
+  const { user, isLoading: userLoading } = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
+
+  // Real signed-in identity (replaces the old hardcoded profile). Also
+  // makes the §A RBAC test legible — you can see which user you are.
+  const displayName = user?.fullName || user?.userId || "Account";
+  const displayRole = user?.userRole || "—";
+  const initials =
+    displayName
+      .split(/\s+/)
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore — navigate to /login regardless of the network result
+    }
+    router.push("/login");
+  }
+
+  // Only the modules this user's roles grant. This is a COSMETIC gate —
+  // the server enforces RBAC on every request regardless. We fail OPEN
+  // only while we don't yet have a resolved user (still loading, or no
+  // session — though middleware would have redirected): show the full
+  // menu rather than flash an empty sidebar. Once the user IS resolved we
+  // filter by their actual roles. Empty roles now legitimately means "no
+  // module access" (role discovery is reliable post-2P-FINAL), so a
+  // role-less user correctly sees only the public Overview. A System
+  // Manager / Administrator matches every section via canSeeSection.
+  const visibleNavigation = useMemo(() => {
+    if (userLoading || !user) return navigation;
+    return navigation.filter((s) => canSeeSection(s.title, user.roles ?? []));
+  }, [user, userLoading]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -443,7 +526,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide">
-        {navigation.map((section, idx) => (
+        {visibleNavigation.map((section, idx) => (
           <div
             key={section.title}
             className="animate-in fade-in slide-in-from-left-3"
@@ -471,17 +554,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             >
               <Avatar className="h-9 w-9 ring-2 ring-background shadow-md transition-transform duration-300 group-hover:scale-105">
-                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-xs font-bold">
-                  KA
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               {(!isSidebarCollapsed || isMobile) && (
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-sm font-semibold truncate">
-                    Kidus Abdula
+                    {displayName}
                   </span>
                   <span className="text-[10px] text-muted-foreground truncate">
-                    Administrator
+                    {displayRole}
                   </span>
                 </div>
               )}
@@ -506,13 +589,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <Settings className="mr-3 h-4 w-4" /> Preferences
             </DropdownMenuItem>
-            {/* Help & Support and Sign Out remain in-scope for a follow-up;
-                they currently render as no-op items (no onSelect handler). */}
+            {/* Help & Support is still a follow-up (no-op for now). */}
             <DropdownMenuItem className="rounded-xl py-2.5 focus:bg-secondary cursor-pointer transition-colors">
               <HelpCircle className="mr-3 h-4 w-4" /> Help & Support
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem className="rounded-xl py-2.5 text-destructive focus:bg-destructive/10 cursor-pointer transition-colors">
+            <DropdownMenuItem
+              className="rounded-xl py-2.5 text-destructive focus:bg-destructive/10 cursor-pointer transition-colors"
+              onSelect={handleSignOut}
+            >
               <LogOut className="mr-3 h-4 w-4" /> Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>

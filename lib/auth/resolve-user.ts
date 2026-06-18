@@ -112,12 +112,99 @@ function getErpBaseUrl(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Internal: fetch a User doc + role list using the user's session.
-// We do NOT use the service-account `frappeClient` (that would
-// bypass ERPNext's own permission engine). Instead, we hit Frappe
-// directly with the `sid` cookie, which causes ERPNext to run its
-// own auth/perm checks — so the resolution fails closed for users
-// that don't have access to the User doctype.
+// Internal: service-account auth header (server-only). Frappe token auth
+// is `Authorization: token <api_key>:<api_secret>` (NOT Bearer — Bearer is
+// OAuth2). Returns null when the credentials aren't configured, so callers
+// can fall back to the user's own session.
+//
+// WHY a service account for ROLE lookup (2P-FINAL fix): roles live on the
+// `Has Role` doctype, which a non-admin (e.g. a Sales User) has NO read
+// permission on. Querying `Has Role` with the *user's* sid therefore
+// returned `[]` for every non-admin — which tripped the sidebar's
+// fail-open guard and showed ALL menus to ALL non-admin users.
+//
+// Role discovery is an IDENTITY question ("what roles does this confirmed
+// user hold?"), not a data-access question — exactly what an auth layer is
+// expected to answer with its own credentials after it has verified who
+// the caller is. We still PROVE identity with the user's sid (Step 1,
+// `get_logged_user`); only the lookup of that confirmed user's roles +
+// profile uses the service account. Data-level CRUD stays gated on the
+// user's sid in the factory, so this does NOT widen what they can touch.
+// ---------------------------------------------------------------------------
+function getServiceAuthHeader(): string | null {
+  const key = process.env.ERP_API_KEY;
+  const secret = process.env.ERP_API_SECRET;
+  if (!key || !secret) return null;
+  return `token ${key}:${secret}`;
+}
+
+// ---------------------------------------------------------------------------
+// Internal: the slice of the Frappe `User` doc we read. `frappe.client.get`
+// returns child tables inline, so the `roles` child table (doctype
+// "Has Role") arrives in the SAME call as the profile fields — making the
+// User doc the single most reliable roles source.
+// ---------------------------------------------------------------------------
+interface FrappeUserDoc {
+  email?: string;
+  full_name?: string;
+  first_name?: string;
+  roles?: Array<{ role?: string }>;
+}
+
+/** Pull the role labels off a User doc's `roles` child table. */
+function rolesFromUserDoc(doc: FrappeUserDoc | null): string[] {
+  if (!doc || !Array.isArray(doc.roles)) return [];
+  return doc.roles
+    .map((r) => r?.role)
+    .filter((r): r is string => typeof r === "string" && r.length > 0);
+}
+
+/** Fetch a User doc (profile + roles child table) with the given auth. */
+async function fetchUserDoc(
+  base: string,
+  userId: string,
+  headers: Record<string, string>,
+): Promise<FrappeUserDoc | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw: any = await fetch(
+    `${base}/api/method/frappe.client.get?doctype=User&name=${encodeURIComponent(userId)}`,
+    { headers, cache: "no-store" },
+  ).then((r) => r.json().catch(() => null));
+  const doc = raw?.message ?? raw ?? null;
+  return doc && typeof doc === "object" ? (doc as FrappeUserDoc) : null;
+}
+
+/**
+ * Fallback role source: query the `Has Role` doctype directly. Used only
+ * when the User doc didn't carry its roles child table. The doctype name
+ * is encoded (it contains a space) so the request can't be mis-parsed.
+ */
+async function fetchHasRole(
+  base: string,
+  userId: string,
+  headers: Record<string, string>,
+): Promise<string[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw: any = await fetch(
+    `${base}/api/method/frappe.client.get_list?doctype=${encodeURIComponent(
+      "Has Role",
+    )}&filters=${encodeURIComponent(
+      JSON.stringify([["parent", "=", userId]]),
+    )}&fields=${encodeURIComponent(JSON.stringify(["role"]))}&limit_page_length=100`,
+    { headers, cache: "no-store" },
+  ).then((r) => r.json().catch(() => null));
+  const list = raw?.message ?? raw;
+  return Array.isArray(list)
+    ? list
+        .map((r) => (r as { role?: string })?.role)
+        .filter((r): r is string => typeof r === "string" && r.length > 0)
+    : [];
+}
+
+// ---------------------------------------------------------------------------
+// Internal: resolve identity (user's sid) + roles/profile (service account).
+// Returns null when the session is invalid — the resolution still FAILS
+// CLOSED on authentication (an invalid/expired sid yields no user).
 // ---------------------------------------------------------------------------
 async function fetchUserFromFrappe(sid: string): Promise<{
   userId: string;
@@ -128,7 +215,9 @@ async function fetchUserFromFrappe(sid: string): Promise<{
   const base = getErpBaseUrl();
   if (!base) return null;
   try {
-    // Step 1: get_logged_user — cheap call; returns the email or null.
+    // Step 1 — AUTHENTICATION (user's session). get_logged_user runs as
+    // the sid's owner; a bad/expired sid resolves to Guest/null → 401.
+    // This is the security gate and MUST use the user's own cookie.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const loggedRaw: any = await fetch(`${base}/api/method/frappe.auth.get_logged_user`, {
       headers: { Cookie: `sid=${sid}` },
@@ -138,30 +227,40 @@ async function fetchUserFromFrappe(sid: string): Promise<{
     if (!userId || typeof userId !== "string" || userId === "Guest") {
       return null;
     }
-    // Step 2: get the user doc + roles. ERPNext exposes roles on
-    // `User.roles` (child table) AND on the `Has Role` doctype. We
-    // fetch both to be safe.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rolesRaw: any = await fetch(
-      `${base}/api/method/frappe.client.get_list?doctype=Has Role&filters=${encodeURIComponent(
-        JSON.stringify([["parent", "=", userId]]),
-      )}&fields=${encodeURIComponent(JSON.stringify(["role"]))}&limit_page_length=100`,
-      { headers: { Cookie: `sid=${sid}` }, cache: "no-store" },
-    ).then((r) => r.json().catch(() => null));
-    const roles = ((rolesRaw?.message ?? rolesRaw) as Array<{ role: string }>).map(
-      (r) => r.role,
-    );
-    // Step 3: full user doc for full_name + email
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userRaw: any = await fetch(
-      `${base}/api/method/frappe.client.get?doctype=User&name=${encodeURIComponent(userId)}`,
-      { headers: { Cookie: `sid=${sid}` }, cache: "no-store" },
-    ).then((r) => r.json().catch(() => null));
-    const userDoc = userRaw?.message ?? userRaw ?? {};
+
+    // Step 2 — ROLE + PROFILE lookup via the SERVICE ACCOUNT. We read the
+    // confirmed user's own User doc, whose `roles` child table is the most
+    // reliable roles source (and carries full_name/email in the same call).
+    // Identity is already proven by Step 1, so using admin creds to look up
+    // *that* user's roles is an identity question, not privilege widening —
+    // CRUD stays gated on the user's sid in the factory. If service creds
+    // are absent, fall back to the user's own sid (an admin can read their
+    // own doc).
+    const serviceAuth = getServiceAuthHeader();
+    const lookupHeaders: Record<string, string> = serviceAuth
+      ? { Authorization: serviceAuth }
+      : { Cookie: `sid=${sid}` };
+
+    const userDoc = await fetchUserDoc(base, userId, lookupHeaders);
+    let roles = rolesFromUserDoc(userDoc);
+
+    // Fallback 1 — the doc didn't surface its roles child table: query
+    // `Has Role` directly with the same (service) auth.
+    if (roles.length === 0) {
+      roles = await fetchHasRole(base, userId, lookupHeaders);
+    }
+    // Fallback 2 — still empty AND we were using the service account:
+    // try the user's OWN sid. This is the admin-safety net — an admin can
+    // always read their own Has Role rows, so they can never be left
+    // role-less (which would collapse their sidebar to Overview only).
+    if (roles.length === 0 && serviceAuth) {
+      roles = await fetchHasRole(base, userId, { Cookie: `sid=${sid}` });
+    }
+
     return {
       userId,
-      email: userDoc.email ?? undefined,
-      fullName: userDoc.full_name ?? userDoc.first_name ?? undefined,
+      email: userDoc?.email ?? undefined,
+      fullName: userDoc?.full_name ?? userDoc?.first_name ?? undefined,
       roles,
     };
   } catch {

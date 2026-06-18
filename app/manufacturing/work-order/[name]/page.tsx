@@ -650,6 +650,7 @@ export default function WorkOrderDetailPage() {
       <StartProductionModal
         open={startOpen}
         onOpenChange={setStartOpen}
+        onCompleted={() => refetch()}
         workOrderName={wo.name}
         workOrderQty={Number(wo.qty) || 0}
         productionItem={wo.production_item}
@@ -670,6 +671,7 @@ export default function WorkOrderDetailPage() {
       <FinishProductionModal
         open={finishOpen}
         onOpenChange={setFinishOpen}
+        onCompleted={() => refetch()}
         workOrderName={wo.name}
         workOrderQty={Number(wo.qty) || 0}
         producedQty={Number(wo.produced_qty) || 0}

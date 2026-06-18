@@ -311,10 +311,12 @@ describe("Part 4: Dashboard data-richness (DashboardShell + aging-bars)", () => 
       "utf-8",
     );
     expect(src).toMatch(/AgingRow/);
-    expect(src).toMatch(/var\(--success\)/);
-    expect(src).toMatch(/var\(--info\)/);
-    expect(src).toMatch(/var\(--warning\)/);
-    expect(src).toMatch(/var\(--destructive\)/);
+    // OKLCH semantic tokens — Tailwind v4 `var(--color-…)` custom properties
+    // (the rebuild moved off the old `hsl(var(--…))` HSL wrapper).
+    expect(src).toMatch(/var\(--color-success\)/);
+    expect(src).toMatch(/var\(--color-info\)/);
+    expect(src).toMatch(/var\(--color-warning\)/);
+    expect(src).toMatch(/var\(--color-destructive\)/);
     // 4 buckets
     expect(src).toMatch(/bucket1/);
     expect(src).toMatch(/bucket2/);

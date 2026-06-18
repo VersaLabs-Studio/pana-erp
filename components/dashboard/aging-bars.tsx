@@ -46,10 +46,10 @@ const ETB = new Intl.NumberFormat("en-ET", {
 const BUCKET_COLORS = {
   // The handoff's "success → warning → destructive ramp" — but in
   // semantic OKLCH tokens via CSS vars (no hardcoded hex).
-  bucket1: "hsl(var(--success))",
-  bucket2: "hsl(var(--info))",
-  bucket3: "hsl(var(--warning))",
-  bucket4: "hsl(var(--destructive))",
+  bucket1: "var(--color-success)",
+  bucket2: "var(--color-info)",
+  bucket3: "var(--color-warning)",
+  bucket4: "var(--color-destructive)",
 } as const;
 
 export function AgingBars({
@@ -105,10 +105,10 @@ export function AgingBars({
               layout="vertical"
               margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
               <XAxis
                 type="number"
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v: number) =>
@@ -122,15 +122,15 @@ export function AgingBars({
               <YAxis
                 type="category"
                 dataKey="label"
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
                 width={80}
               />
               <Tooltip
                 contentStyle={{
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border) / 0.4)",
+                  background: "var(--color-popover)",
+                  border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                   borderRadius: 12,
                   fontSize: 12,
                 }}

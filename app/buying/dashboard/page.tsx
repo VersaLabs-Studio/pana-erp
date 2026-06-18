@@ -278,15 +278,15 @@ export default function BuyingDashboardPage() {
                 }))}
                 margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={48}
@@ -300,16 +300,16 @@ export default function BuyingDashboardPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border) / 0.4)",
+                    background: "var(--color-popover)",
+                    border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                     borderRadius: 12,
                     fontSize: 12,
                   }}
                   formatter={(v: number) => ETB.format(v)}
                 />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="ordered" name="Ordered" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="received" name="Received" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="ordered" name="Ordered" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="received" name="Received" fill="var(--color-info)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

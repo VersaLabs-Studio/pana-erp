@@ -271,7 +271,7 @@ describe("Part 2.2: FinancialReportView owns period state + refetches on change"
 // =============================================================================
 
 describe("Part 5.1/5.3: MFG automation modals", () => {
-  it("StartProductionModal exists and builds the Material Transfer for Manufacture payload", async () => {
+  it("StartProductionModal starts the WO via the canonical make-stock-entry route", async () => {
     const fs = await import("fs/promises");
     const exists = await fs
       .stat("components/manufacturing/StartProductionModal.tsx")
@@ -282,11 +282,13 @@ describe("Part 5.1/5.3: MFG automation modals", () => {
       "components/manufacturing/StartProductionModal.tsx",
       "utf-8",
     );
-    // The right purpose + warehouse shape for Material Transfer for Manufacture:
-    expect(content).toMatch(/Material Transfer for Manufacture/);
-    expect(content).toMatch(/from_warehouse/);
-    expect(content).toMatch(/to_warehouse/);
-    expect(content).toMatch(/work_order/);
+    // The modal no longer HAND-BUILDS the Stock Entry (a hand-built SE moved
+    // stock but left the WO header at "Not Started"). It POSTs to the
+    // canonical route, which calls ERPNext's own make_stock_entry, so the WO
+    // actually flips to In Process.
+    expect(content).toMatch(/runCanonicalTransfer/);
+    expect(content).toMatch(/\/make-stock-entry/);
+    expect(content).toMatch(/purpose:\s*"Material Transfer for Manufacture"/);
     // Idempotency check: surface any existing SE for the same WO+purpose.
     expect(content).toMatch(/existingSEs/);
     // Shortfall guidance: route to MR or Stock Reconciliation.
@@ -294,7 +296,7 @@ describe("Part 5.1/5.3: MFG automation modals", () => {
     expect(content).toMatch(/Stock Reconciliation/);
   });
 
-  it("FinishProductionModal exists and builds the Manufacture payload with the FG item + consumed rows", async () => {
+  it("FinishProductionModal finishes the WO via the canonical make-stock-entry route", async () => {
     const fs = await import("fs/promises");
     const exists = await fs
       .stat("components/manufacturing/FinishProductionModal.tsx")
@@ -305,12 +307,14 @@ describe("Part 5.1/5.3: MFG automation modals", () => {
       "components/manufacturing/FinishProductionModal.tsx",
       "utf-8",
     );
+    // Like Start, Finish no longer hand-builds the Manufacture SE — ERPNext
+    // builds the FG + consumption rows from the BOM via make_stock_entry, so
+    // the WO completes.
+    expect(content).toMatch(/runCanonicalManufacture/);
+    expect(content).toMatch(/\/make-stock-entry/);
     expect(content).toMatch(/purpose:\s*"Manufacture"/);
-    expect(content).toMatch(/is_finished_item:\s*1/);
-    expect(content).toMatch(/t_warehouse:\s*fgWh/);
-    expect(content).toMatch(/s_warehouse:\s*wipWh/);
     // Idempotency check (B3) for the Manufacture purpose:
-    expect(content).toMatch(/purpose/);
+    expect(content).toMatch(/existingSE/);
   });
 
   it("the Work Order detail page wires the modals + replaces the prior deep-link into the SE wizard", async () => {

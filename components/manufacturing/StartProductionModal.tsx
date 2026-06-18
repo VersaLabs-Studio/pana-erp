@@ -51,10 +51,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useFrappeCreate, useFrappeList, useFrappeUpdate } from "@/hooks/generic";
+import {
+  useFrappeDelete,
+  useFrappeList,
+  useFrappeUpdate,
+} from "@/hooks/generic";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
-import { getActiveCompany } from "@/lib/settings/company";
 import { resolveCompanyWarehouses } from "@/lib/settings/warehouses";
 
 // ---------------------------------------------------------------------------
@@ -82,6 +85,10 @@ export interface StartProductionModalProps {
   wipWarehouse?: string;
   fgWarehouse?: string;
   requiredItems: WORequiredItem[];
+  /** Called after a successful transfer so the parent (WO page) can
+   *  refetch and reflect the now-"In Process" status. When provided, the
+   *  modal stays on the Work Order instead of redirecting to the SE. */
+  onCompleted?: () => void;
 }
 
 const ETB = new Intl.NumberFormat("en-ET", {
@@ -103,6 +110,7 @@ export function StartProductionModal({
   wipWarehouse,
   fgWarehouse,
   requiredItems,
+  onCompleted,
 }: StartProductionModalProps) {
   const router = useRouter();
   const { resolution, showError, dismiss } = useGuidedError();
@@ -127,22 +135,50 @@ export function StartProductionModal({
       .catch(() => setImplicitWarehouses(null));
   }, [open, sourceWarehouse, wipWarehouse]);
 
-  // 2O Part 5.1 — idempotency: surface any existing Material Transfer
-  // SE for this WO so the user doesn't double-create.
-  const { data: existingSEs = [] } = useFrappeList<{ name: string }>(
+  // 2O Part 5.1 — idempotency, now SELF-HEALING (2P live-fix). We surface
+  // any existing Material Transfer SE for this WO *with its docstatus* so
+  // the confirm handler can RESOLVE rather than block: a submitted SE means
+  // the transfer is already done (proceed); a draft means resume + submit
+  // it (no duplicate). `orderBy docstatus desc` prefers a submitted (1)
+  // over a stray draft (0) when both somehow exist.
+  const { data: existingSEs = [], refetch: refetchExisting } = useFrappeList<{
+    name: string;
+    docstatus: number;
+  }>(
     "Stock Entry",
     {
-      fields: ["name"],
+      fields: ["name", "docstatus"],
       filters: [
         ["work_order", "=", workOrderName],
         ["purpose", "=", "Material Transfer for Manufacture"],
         ["docstatus", "!=", 2],
       ],
+      orderBy: { field: "docstatus", order: "desc" },
       limit: 1,
     },
     { enabled: open && !!workOrderName },
   );
   const existingSE = existingSEs.length > 0 ? existingSEs[0] : null;
+  const existingSubmitted = existingSE?.docstatus === 1;
+
+  // Whether the WO has ACTUALLY started. ERPNext flips a submitted WO to
+  // "In Process"/"Completed" once a Material Transfer for Manufacture
+  // advances it. We use this to detect a STALE transfer: a submitted SE
+  // that (because of the old `fg_completed_qty: 0` bug) moved stock but
+  // never started the WO. Such a transfer must be cancelled + redone — a
+  // "Continue" would silently no-op.
+  const { data: woRows = [] } = useFrappeList<{ status: string }>(
+    "Work Order",
+    {
+      fields: ["status"],
+      filters: [["name", "=", workOrderName]],
+      limit: 1,
+    },
+    { enabled: open && !!workOrderName },
+  );
+  const woStarted = ["In Process", "Completed"].includes(woRows[0]?.status ?? "");
+  // A submitted transfer that left the WO un-started is stale (old bug).
+  const staleTransfer = existingSubmitted && woRows.length > 0 && !woStarted;
 
   // 2O Part 5.1 — shortfall detection. We compare required qty to
   // Bin actual_qty. For items without a snapshot, we mark them as
@@ -185,57 +221,118 @@ export function StartProductionModal({
   const hasShortfall = summaryLines.some((l) => l.short);
 
   // -- Mutations -----------------------------------------------------------
-  const createMutation = useFrappeCreate<
-    { data: { name: string } },
-    Record<string, unknown>
-  >("Stock Entry", { showToast: false });
+  // We no longer HAND-BUILD the Stock Entry (that path moved stock but left
+  // the WO "Not Started" — see app/api/.../make-stock-entry/route.ts). The
+  // canonical transfer is created + submitted server-side by ERPNext's own
+  // `make_stock_entry`. These mutations are only for CLEANING UP a prior
+  // buggy SE so the canonical one is the single doc crediting the WO:
+  //   • a stale SUBMITTED transfer (old fg=0 bug) → cancel (docstatus: 2)
+  //   • a leftover DRAFT transfer                 → delete (can't cancel a 0)
   const updateMutation = useFrappeUpdate<{ data: { name: string } }>(
     "Stock Entry",
     { showToast: false },
   );
+  const deleteMutation = useFrappeDelete("Stock Entry", { showToast: false });
 
-  // -- Confirm handler ----------------------------------------------------
+  // -- Confirm handler (SELF-HEALING) -------------------------------------
+  // The only true blocker is a real material shortfall. Otherwise:
+  //   • WO already advanced  → nothing to do, hand back to the WO page
+  //   • stale submitted SE   → cancel it, then run the canonical transfer
+  //   • leftover draft SE    → delete it, then run the canonical transfer
+  //   • nothing yet          → run the canonical transfer
+  const finish = (name: string, message: string) => {
+    // Surface the SE name (with a link) but keep the operator in the
+    // production flow: hand control back to the WO page so it refetches
+    // and shows "In Process" + Finish Production. Only fall back to the
+    // SE detail when no completion callback is wired.
+    toast.success(
+      message,
+      name
+        ? {
+            action: {
+              label: "View entry",
+              onClick: () =>
+                router.push(`/stock/stock-entry/${encodeURIComponent(name)}`),
+            },
+          }
+        : undefined,
+    );
+    onOpenChange(false);
+    if (onCompleted) {
+      onCompleted();
+    } else if (name) {
+      router.push(`/stock/stock-entry/${encodeURIComponent(name)}`);
+    }
+  };
+
+  // The DEFINITIVE transfer: POST to the server route that calls ERPNext's
+  // `make_stock_entry(work_order, "Material Transfer for Manufacture", qty)`
+  // and submits the result. Because ERPNext builds the doc, every linkage
+  // field is present and the WO actually flips to "In Process". Same-origin
+  // fetch carries the `sid` cookie, so RBAC is enforced (DocPerm for the user).
+  const runCanonicalTransfer = async (): Promise<string> => {
+    const res = await fetch(
+      `/api/manufacturing/work-order/${encodeURIComponent(
+        workOrderName,
+      )}/make-stock-entry`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "Material Transfer for Manufacture",
+          qty: workOrderQty,
+        }),
+      },
+    );
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      // Re-shape the route's error so the guided dialog shows the real cause.
+      throw new Error(
+        (json?.details as string) ||
+          (json?.error as string) ||
+          "Couldn't start production. Please try again.",
+      );
+    }
+    return (json.data?.name as string) ?? "";
+  };
+
   const handleConfirm = async () => {
     if (hasShortfall) return; // Defensive — the button is also disabled.
     setIsCreating(true);
     try {
-      const items = summaryLines.map((l) => ({
-        item_code: l.item_code,
-        item_name: l.item_name,
-        qty: l.required,
-        uom: undefined,
-        s_warehouse: l.source_warehouse || sourceWh,
-        t_warehouse: targetWh,
-        basic_rate: 0,
-      }));
-      const payload: Record<string, unknown> = {
-        naming_series: "MAT-STE-.YYYY.-",
-        stock_entry_type: "Material Transfer for Manufacture",
-        purpose: "Material Transfer for Manufacture",
-        company: getActiveCompany(),
-        posting_date: new Date().toISOString().split("T")[0],
-        from_warehouse: sourceWh,
-        to_warehouse: targetWh,
-        work_order: workOrderName,
-        fg_completed_qty: 0,
-        items,
-      };
-      const created = await createMutation.mutateAsync(payload);
-      const name = (created as { data?: { name?: string } })?.data?.name;
-      if (!name) {
-        throw new Error("Server did not return a Stock Entry name");
+      // 0) WO already advanced (In Process / Completed) → nothing to do.
+      //    Hand control back to the WO page so it reflects the live state.
+      if (woStarted) {
+        finish(
+          existingSE?.name ?? "",
+          `Production already underway for ${workOrderName}`,
+        );
+        return;
       }
-      // Submit the new SE so the transfer is locked immediately. The
-      // prior code left drafts visible to other operators, which
-      // risked double-pick when the modal was double-clicked.
-      await updateMutation.mutateAsync({
-        name,
-        data: { docstatus: 1 },
-      });
-      toast.success(`Material transferred for ${workOrderName}`);
-      onOpenChange(false);
-      router.push(`/stock/stock-entry/${encodeURIComponent(name)}`);
+
+      // 1) Clean up any prior HAND-BUILT SE so the canonical transfer is the
+      //    only doc crediting the WO. A stale submitted one is cancelled; a
+      //    leftover draft is deleted. (Both were made by the old buggy path
+      //    that didn't carry BOM linkage, so neither can advance the WO.)
+      if (existingSE) {
+        if (existingSubmitted) {
+          await updateMutation.mutateAsync({
+            name: existingSE.name,
+            data: { docstatus: 2 },
+          });
+        } else {
+          await deleteMutation.mutateAsync(existingSE.name);
+        }
+      }
+
+      // 2) Canonical path — ERPNext builds + submits the transfer; the WO
+      //    flips to "In Process".
+      const seName = await runCanonicalTransfer();
+      finish(seName, `Production started for ${workOrderName}`);
     } catch (err) {
+      // Surface the REAL error (e.g. genuine stock validation). Refresh the
+      // existing-SE probe first so the modal reflects current state.
+      refetchExisting();
       showError(resolveFrappeError(err, { doctype: "Stock Entry" }));
     } finally {
       setIsCreating(false);
@@ -260,18 +357,57 @@ export function StartProductionModal({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* Idempotency notice */}
+          {/* Idempotency notice — informational, NOT a blocker. The confirm
+              button resolves the existing SE (continue if submitted, resume
+              if draft) so the user is never dead-ended. */}
           {existingSE && (
-            <div className="rounded-xl border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
-              <strong>Material Transfer already exists:</strong>{" "}
-              <a
-                href={`/stock/stock-entry/${encodeURIComponent(existingSE.name)}`}
-                className="underline"
-              >
-                View {existingSE.name}
-              </a>
-              . Cancelling and re-creating would risk duplication. Open the
-              existing entry to amend if needed.
+            <div
+              className={cn(
+                "rounded-xl border px-3 py-2 text-xs",
+                staleTransfer
+                  ? "border-warning/30 bg-warning/5 text-warning"
+                  : existingSubmitted
+                    ? "border-success/30 bg-success/5 text-success"
+                    : "border-info/30 bg-info/5 text-info",
+              )}
+            >
+              {staleTransfer ? (
+                <>
+                  <strong>A submitted transfer exists but didn&apos;t start
+                  this Work Order</strong> (
+                  <a
+                    href={`/stock/stock-entry/${encodeURIComponent(existingSE.name)}`}
+                    className="underline"
+                  >
+                    {existingSE.name}
+                  </a>
+                  ). We&apos;ll cancel it and re-transfer so production
+                  actually starts — your net stock position is unchanged.
+                </>
+              ) : existingSubmitted ? (
+                <>
+                  <strong>Materials already transferred.</strong>{" "}
+                  <a
+                    href={`/stock/stock-entry/${encodeURIComponent(existingSE.name)}`}
+                    className="underline"
+                  >
+                    View {existingSE.name}
+                  </a>
+                  . Continue to proceed with production.
+                </>
+              ) : (
+                <>
+                  <strong>A draft transfer exists</strong> (
+                  <a
+                    href={`/stock/stock-entry/${encodeURIComponent(existingSE.name)}`}
+                    className="underline"
+                  >
+                    {existingSE.name}
+                  </a>
+                  ). We&apos;ll replace it with a correct transfer so
+                  production actually starts.
+                </>
+              )}
             </div>
           )}
 
@@ -410,21 +546,30 @@ export function StartProductionModal({
               disabled={
                 isCreating ||
                 hasShortfall ||
-                !!existingSE ||
-                requiredItems.length === 0 ||
-                !sourceWh ||
-                !targetWh
+                // Wait for the WO-status probe before acting on a submitted
+                // SE, so we correctly distinguish "done" from "stale".
+                (existingSubmitted && woRows.length === 0) ||
+                // A fresh transfer needs required items to act on. Warehouses
+                // are resolved server-side by ERPNext's make_stock_entry, so
+                // we don't gate on them here.
+                (!existingSE && requiredItems.length === 0)
               }
             >
               {isCreating ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Creating…
+                  {existingSE ? "Resolving…" : "Creating…"}
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                  Transfer &amp; start
+                  {staleTransfer
+                    ? "Re-transfer & start"
+                    : woStarted
+                      ? "Continue"
+                      : existingSE
+                        ? "Re-transfer & start"
+                        : "Transfer & start"}
                 </>
               )}
             </Button>

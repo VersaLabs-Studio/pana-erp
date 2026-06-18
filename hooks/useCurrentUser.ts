@@ -33,7 +33,12 @@ export function useCurrentUser(options?: { enabled?: boolean }) {
       return json?.data ?? null;
     },
     enabled,
-    staleTime: 5 * 60 * 1000, // 5 min — role changes need a reload
+    // Short stale window + refetch-on-focus so a role change (or an admin
+    // fixing permissions) reflects in the UI within ~30s / on tab refocus,
+    // instead of being trapped behind a long cache. The call is cheap and
+    // the server enforces RBAC regardless of what the UI believes.
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
   return {
     user: q.data ?? null,

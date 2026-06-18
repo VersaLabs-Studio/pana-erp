@@ -253,15 +253,15 @@ export default function CrmDashboardPage() {
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={leadTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                 <XAxis
                   dataKey="month"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={32}
@@ -269,18 +269,18 @@ export default function CrmDashboardPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border) / 0.4)",
+                    background: "var(--color-popover)",
+                    border: "1px solid color-mix(in oklch, var(--color-border) 40%, transparent)",
                     borderRadius: 12,
                     fontSize: 12,
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="leads" name="Leads" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
                 <Bar
                   dataKey="converted"
                   name="Converted"
-                  fill="hsl(var(--success))"
+                  fill="var(--color-success)"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
