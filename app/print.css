@@ -1,0 +1,49 @@
+/* app/print.css
+ * Obsidian ERP v4.0 — Print stylesheet (2Q Part 8).
+ *
+ * Imported only when the user clicks Print on a transactional doc.
+ * The PrintShare component sets `data-print-doctype` and
+ * `data-print-name` on <body> just before `window.print()`, plus the
+ * `is-printing` class. The afterprint listener cleans up.
+ *
+ * The letterhead is intentionally minimal — Pana's name, currency
+ * (ETB), and the doc title. A future iteration can pull a Company
+ * letterhead from `/api/accounting/company/letterhead`.
+ */
+
+@media print {
+  /* Hide the app chrome (sidebar, topbar, etc.) when printing. */
+  body.is-printing aside,
+  body.is-printing header,
+  body.is-printing nav,
+  body.is-printing button,
+  body.is-printing [data-no-print] {
+    display: none !important;
+  }
+  body.is-printing {
+    background: white !important;
+    color: black !important;
+  }
+  body.is-printing main {
+    padding: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  /* Letterhead — appears above the doc content. */
+  body.is-printing::before {
+    content: "Pana (" attr(data-print-doctype) " " attr(data-print-name) ")";
+    display: block;
+    padding: 0 0 1.5rem 0;
+    border-bottom: 2px solid #000;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Force a single-column layout for the printed page. */
+  body.is-printing * {
+    grid-template-columns: 1fr !important;
+  }
+}

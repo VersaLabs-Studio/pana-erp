@@ -27,6 +27,7 @@ import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { getActiveCompany } from "@/lib/settings/company";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RequirePermission } from "@/components/auth/permission-gate";
 import {
   FormInput,
   FormFrappeSelect,
@@ -294,7 +295,8 @@ export default function NewSalesOrderPage() {
   }, [createMutation, getValues]);
 
   return (
-    <div className="space-y-6 pb-12">
+    <RequirePermission doctype="Sales Order" perm="create">
+      <div className="space-y-6 pb-12">
       <PageHeader
         title="New Sales Order"
         subtitle={
@@ -600,7 +602,8 @@ export default function NewSalesOrderPage() {
       </Form>
 
       <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
-    </div>
+      </div>
+    </RequirePermission>
   );
 }
 

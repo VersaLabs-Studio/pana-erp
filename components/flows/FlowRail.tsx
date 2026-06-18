@@ -109,16 +109,23 @@ const STATUS_TEXT: Record<FlowStageStatus, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Progress ring (20px SVG)
+// Progress ring (20px SVG) — 2Q Part 9 adds the percentage label inside
+// the ring for at-a-glance completion (the B1 container language keeps
+// the ring subtle, no black borders).
 // ---------------------------------------------------------------------------
 function ProgressRing({ completed, total }: { completed: number; total: number }) {
   const r = 8;
   const circumference = 2 * Math.PI * r;
   const ratio = total > 0 ? completed / total : 0;
   const dash = ratio * circumference;
+  const pct = Math.round(ratio * 100);
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div
+      className="flex items-center gap-1.5"
+      data-testid="flow-progress"
+      data-pct={pct}
+    >
       <svg width={20} height={20} className="shrink-0 -rotate-90" aria-hidden="true">
         <circle
           cx={10}
@@ -142,7 +149,7 @@ function ProgressRing({ completed, total }: { completed: number; total: number }
         />
       </svg>
       <span className="text-xs font-medium text-muted-foreground tabular-nums">
-        {completed}/{total}
+        {pct}%
       </span>
     </div>
   );

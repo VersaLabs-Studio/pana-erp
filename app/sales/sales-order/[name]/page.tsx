@@ -25,6 +25,7 @@ import { PageHeader, LoadingState, ConfirmDialog } from "@/components/smart";
 import { StatusBadge } from "@/components/smart/status-badge";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
+import { PrintShare } from "@/components/ui/print-share";
 import { FlowRail } from "@/components/flows/FlowRail";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
 import { isModuleBuilt } from "@/lib/flows/module-availability";
@@ -306,6 +307,7 @@ export default function SalesOrderDetailPage() {
         backHref="/sales/sales-order"
         actions={
           <div className="flex items-center gap-2">
+            <PrintShare doctype="Sales Order" name={order.name} />
             {isDraft && (
               <>
                 <Button variant="outline" size="sm" asChild>

@@ -94,21 +94,44 @@ export type StagePlan =
       stageIndex: number;
       stage: string;
     }
+  | {
+      kind: "current-child";
+      link: FlowLinkDef;
+      childTable: string;
+      childField: string;
+      childWhere?: [string, string, unknown];
+      verifyDoctype: string;
+      stageIndex: number;
+      stage: string;
+    }
   | { kind: "none"; stageIndex: number; stage: string };
 
 /**
  * Build a per-stage resolution plan for the current doctype.
  * The order of plans is the same as `stages` in the flow definition.
  *
- * Algorithm per non-current stage:
- *   1. Look for a DIRECT edge in `flow-link-map` from current → stage.
- *   2. Otherwise, walk every other stage X in the flow looking for a chain
- *      of TWO registered edges: current → X and X → stage. The first match
- *      wins (deterministic, slot order).
- *   3. Otherwise, if a HEADER_LINK is registered from current → stage
- *      (CRM upstream, e.g. `Quotation.party_name → Customer`), use that
- *      and the plan records the headerField to read from the current doc.
- *   4. Otherwise, NONE — the rail shows pending.
+ * Algorithm per non-current stage (2Q Part 1 — RC1 fix: classify by
+ * `pattern`; the prior version caught header_link + current_child edges
+ * in the "direct" branch and silently resolved them with the wrong
+ * filter — e.g. Quotation→Customer header_link was queried as
+ * `["Customer", "name", "=", quotationName]`, matching nothing):
+ *
+ *   1. BACK_LINK edge: resolve via parent/child-table filter on the
+ *      target doctype. (Forward back-link = "what was created FROM this";
+ *      backward back-link = child-pointer inversion — see 2Q-RC3/RC4.)
+ *   2. HEADER_LINK edge: read `currentDoc[headerField]` and verify the
+ *      candidate exists in the target. CHECKED BEFORE the two-hop
+ *      search — the two-hop can find `Quotation → SO → Customer` paths
+ *      using the new SO→Customer edge, which is correct in principle
+ *      but resolves nothing in practice (no SO exists for every
+ *      Quotation). The header_link is the direct, faithful path.
+ *   3. CURRENT_CHILD edge: read `currentDoc[childTable]`, find the first
+ *      row matching `childWhere`, take `row[childField]`, and verify the
+ *      candidate exists in `verifyDoctype`.
+ *   4. Two-hop: walk every other stage X in the flow with current→X
+ *      AND X→stage. The first match wins (deterministic, slot order).
+ *      Header_link + current_child intermediates are considered.
+ *   5. NONE — the rail shows pending.
  */
 function buildStagePlans(
   doctype: string,
@@ -119,9 +142,10 @@ function buildStagePlans(
     if (i === currentIndex) {
       return { kind: "current" as const, stageIndex: i, stage: stage.doctype };
     }
-    // 1. Direct edge from current → stage.
+    // 1. BACK_LINK direct edge. The other two patterns (header_link,
+    //    current_child) go to their dedicated branches below.
     const direct = findFlowLink(doctype, stage.doctype);
-    if (direct) {
+    if (direct && direct.pattern === "back_link") {
       return {
         kind: "direct" as const,
         link: direct,
@@ -129,7 +153,44 @@ function buildStagePlans(
         stage: stage.doctype,
       };
     }
-    // 2. Two-hop: find some X with current→X AND X→stage.
+    // 2. HEADER_LINK edge (CRM upstream + SO/DN/SI → Customer). Read
+    //    currentDoc[headerField] and verify. MUST come before the
+    //    two-hop search so the direct path wins over any indirect
+    //    chain that happens to share an intermediate.
+    const headerLink = findFlowLink(doctype, stage.doctype);
+    if (
+      headerLink &&
+      headerLink.pattern === "header_link" &&
+      headerLink.headerField
+    ) {
+      return {
+        kind: "header-link" as const,
+        link: headerLink,
+        field: headerLink.headerField,
+        stageIndex: i,
+        stage: stage.doctype,
+      };
+    }
+    // 3. CURRENT_CHILD edge (SO→Quotation, DN→SO, PE→SI/PI). Read
+    //    currentDoc[childTable] and verify. Also before the two-hop
+    //    search so the direct child-row read wins.
+    const childLink = findFlowLink(doctype, stage.doctype);
+    if (childLink && childLink.pattern === "current_child" && childLink.childField) {
+      return {
+        kind: "current-child" as const,
+        link: childLink,
+        childTable: childLink.childTable ?? "items",
+        childField: childLink.childField,
+        childWhere: childLink.childWhere,
+        verifyDoctype: childLink.verifyDoctype ?? childLink.to,
+        stageIndex: i,
+        stage: stage.doctype,
+      };
+    }
+    // 4. Two-hop: find some X with current→X AND X→stage. Header_link
+    //    and current_child intermediates are considered (the only way
+    //    to reach a stage that has no direct edge from the current
+    //    doctype).
     for (let x = 0; x < stages.length; x++) {
       if (x === currentIndex || x === i) continue;
       const xLink = findFlowLink(doctype, stages[x].doctype);
@@ -145,22 +206,7 @@ function buildStagePlans(
         };
       }
     }
-    // 3. Header link (CRM upstream).
-    const headerLink = findFlowLink(doctype, stage.doctype);
-    if (
-      headerLink &&
-      headerLink.pattern === "header_link" &&
-      headerLink.headerField
-    ) {
-      return {
-        kind: "header-link" as const,
-        link: headerLink,
-        field: headerLink.headerField,
-        stageIndex: i,
-        stage: stage.doctype,
-      };
-    }
-    // 4. No resolvable edge.
+    // 5. No resolvable edge.
     return { kind: "none" as const, stageIndex: i, stage: stage.doctype };
   });
 }
@@ -223,27 +269,28 @@ export function useFlowChain(
     [doctype, stages, currentIndex],
   );
 
-  // Gather the headerField names we need from the current doc (for the
-  // header-link plans). One fetch of the current doc covers them all.
-  const headerLinkFields = useMemo(() => {
-    const out: string[] = [];
+  // Gather the headerField names AND current-child row reads we need from
+  // the current doc. One fetch of the current doc covers them all.
+  const needsCurrentDoc = useMemo(() => {
+    let needs = false;
     for (const p of plans) {
-      if (p.kind === "header-link" && !out.includes(p.field)) {
-        out.push(p.field);
+      if (p.kind === "header-link" || p.kind === "current-child") {
+        needs = true;
+        break;
       }
     }
-    return out;
+    return needs;
   }, [plans]);
 
-  // Fetch the current doc ONLY if we have header-link plans. The page's
-  // own `useFrappeDoc` call (e.g. SO detail) hits the same TanStack key
-  // so this is a no-op network-wise. (useFrappeDoc doesn't expose a
-  // `fields` option — it returns the full document — so the
-  // headerLinkFields list is purely for the `enabled` gate.)
+  // Fetch the current doc ONLY if we have header-link or current-child
+  // plans. The page's own `useFrappeDoc` call (e.g. SO detail) hits the
+  // same TanStack key so this is a no-op network-wise. (useFrappeDoc
+  // doesn't expose a `fields` option — it returns the full document — so
+  // the needsCurrentDoc flag is purely for the `enabled` gate.)
   const { data: currentDoc } = useFrappeDoc<Record<string, unknown>>(
     doctype,
     name,
-    { enabled: headerLinkFields.length > 0 },
+    { enabled: needsCurrentDoc },
   );
 
   // -------------------------------------------------------------------------
@@ -266,8 +313,8 @@ export function useFlowChain(
       [plans[0], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[0]), staleTime: FLOW_STALE_MS }),
-      [plans[0]],
+      () => ({ enabled: pickPrimaryEnabled(plans[0], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[0], currentDoc],
     ),
   );
   const slot1 = useFrappeList<{ name: string; parent?: string }>(
@@ -277,8 +324,8 @@ export function useFlowChain(
       [plans[1], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[1]), staleTime: FLOW_STALE_MS }),
-      [plans[1]],
+      () => ({ enabled: pickPrimaryEnabled(plans[1], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[1], currentDoc],
     ),
   );
   const slot2 = useFrappeList<{ name: string; parent?: string }>(
@@ -288,8 +335,8 @@ export function useFlowChain(
       [plans[2], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[2]), staleTime: FLOW_STALE_MS }),
-      [plans[2]],
+      () => ({ enabled: pickPrimaryEnabled(plans[2], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[2], currentDoc],
     ),
   );
   const slot3 = useFrappeList<{ name: string; parent?: string }>(
@@ -299,8 +346,8 @@ export function useFlowChain(
       [plans[3], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[3]), staleTime: FLOW_STALE_MS }),
-      [plans[3]],
+      () => ({ enabled: pickPrimaryEnabled(plans[3], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[3], currentDoc],
     ),
   );
   const slot4 = useFrappeList<{ name: string; parent?: string }>(
@@ -310,8 +357,8 @@ export function useFlowChain(
       [plans[4], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[4]), staleTime: FLOW_STALE_MS }),
-      [plans[4]],
+      () => ({ enabled: pickPrimaryEnabled(plans[4], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[4], currentDoc],
     ),
   );
   const slot5 = useFrappeList<{ name: string; parent?: string }>(
@@ -321,8 +368,8 @@ export function useFlowChain(
       [plans[5], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[5]), staleTime: FLOW_STALE_MS }),
-      [plans[5]],
+      () => ({ enabled: pickPrimaryEnabled(plans[5], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[5], currentDoc],
     ),
   );
   const slot6 = useFrappeList<{ name: string; parent?: string }>(
@@ -332,8 +379,8 @@ export function useFlowChain(
       [plans[6], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[6]), staleTime: FLOW_STALE_MS }),
-      [plans[6]],
+      () => ({ enabled: pickPrimaryEnabled(plans[6], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[6], currentDoc],
     ),
   );
   const slot7 = useFrappeList<{ name: string; parent?: string }>(
@@ -343,8 +390,8 @@ export function useFlowChain(
       [plans[7], name, currentDoc],
     ),
     useMemo(
-      () => ({ enabled: pickPrimaryEnabled(plans[7]), staleTime: FLOW_STALE_MS }),
-      [plans[7]],
+      () => ({ enabled: pickPrimaryEnabled(plans[7], currentDoc ?? null), staleTime: FLOW_STALE_MS }),
+      [plans[7], currentDoc],
     ),
   );
   const primary = [slot0, slot1, slot2, slot3, slot4, slot5, slot6, slot7];
@@ -572,6 +619,10 @@ function pickPrimaryDoctype(plan: StagePlan | undefined): string {
   if (plan.kind === "direct" || plan.kind === "header-link") {
     return resolveQueryDoctype(plan.link);
   }
+  if (plan.kind === "current-child") {
+    // The verify doctype is the doc whose existence we confirm.
+    return plan.verifyDoctype;
+  }
   // current / two-hop / none: not used by the primary slot
   return "";
 }
@@ -617,14 +668,72 @@ function pickPrimaryOptions(
       limit: 1,
     };
   }
+  if (plan.kind === "current-child") {
+    // 2Q Part 1: read the candidate off the current doc's child table.
+    // The candidate is the first child row's value at childField (filtered
+    // by childWhere if set). We then build a "name = candidate" filter on
+    // the verify doctype — a `["name", "=", candidate]` 3-tuple shorthand,
+    // which is identical to the header_link verify filter.
+    const candidate = readCurrentChildCandidate(plan, currentDoc);
+    if (!candidate) return EMPTY_OPTIONS;
+    return {
+      filters: [["name", "=", candidate]],
+      fields: ["name"],
+      limit: 1,
+    };
+  }
   return EMPTY_OPTIONS;
 }
 
-function pickPrimaryEnabled(plan: StagePlan | undefined): boolean {
+function pickPrimaryEnabled(
+  plan: StagePlan | undefined,
+  currentDoc: Record<string, unknown> | null,
+): boolean {
   if (!plan) return false;
   if (plan.kind === "direct") return true;
-  if (plan.kind === "header-link") return true;
+  // 2Q Part 1 fix: the header-link and current-child primaries are gated
+  // on `currentDoc` having the candidate we need. Without this gate the
+  // slot fires with `EMPTY_OPTIONS` (no filter) before the doc is
+  // loaded — TanStack would return the first arbitrary row in the
+  // target doctype, then refire once the doc lands. Disabling until the
+  // candidate is known avoids the spurious request and the window where
+  // the rail shows the wrong name.
+  if (plan.kind === "header-link") {
+    return currentDoc != null && currentDoc[plan.field] != null;
+  }
+  if (plan.kind === "current-child") {
+    return readCurrentChildCandidate(plan, currentDoc) !== null;
+  }
   return false;
+}
+
+/**
+ * For a `current-child` plan, read the candidate name from the current
+ * doc's child table. Returns the first row's `childField` value where
+ * `childWhere` matches (or the first row's value if no filter is set).
+ * Returns null when there is no current doc, the child table is missing,
+ * no row matches, or the resolved value is empty.
+ */
+function readCurrentChildCandidate(
+  plan: Extract<StagePlan, { kind: "current-child" }>,
+  currentDoc: Record<string, unknown> | null,
+): string | null {
+  if (!currentDoc) return null;
+  const rows = currentDoc[plan.childTable];
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    if (plan.childWhere) {
+      const [wField, wOp, wVal] = plan.childWhere;
+      if (wOp === "=" && r[wField] !== wVal) continue;
+      if (wOp === "!=" && r[wField] === wVal) continue;
+    }
+    const value = r[plan.childField];
+    if (value === undefined || value === null || value === "") continue;
+    return String(value);
+  }
+  return null;
 }
 
 function pickSecondaryDoctype(plan: StagePlan | undefined): string {
