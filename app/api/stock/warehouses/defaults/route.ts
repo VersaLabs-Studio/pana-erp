@@ -55,6 +55,10 @@ interface WarehouseList {
 const STORES = (abbr: string) => `Stores - ${abbr}`;
 const WIP = (abbr: string) => `Work In Progress - ${abbr}`;
 const FG = (abbr: string) => `Finished Goods - ${abbr}`;
+// 2R Part 4 — Raw Materials is provisioned like the others; some tenants
+// (Pana) have it, others don't. We best-effort provision and surface
+// it to the Receive Materials modal as a secondary warehouse option.
+const RAW_MATERIALS = (abbr: string) => `Raw Materials - ${abbr}`;
 
 async function fetchCompanyAbbr(company: string): Promise<string> {
   // The Company doc carries `abbr` — the suffix ERPNext appends to
@@ -162,13 +166,25 @@ export async function GET(request: NextRequest) {
   const company = getActiveCompany();
   const abbr = await fetchCompanyAbbr(company);
 
-  // Provision (idempotent) the three canonical warehouses. We use a
-  // best-effort create-if-missing — a create that fails (e.g. on a
-  // multi-tenant instance where the Warehouse route is the only
-  // allowed entry point) leaves the resolution to the client fallback.
+  // Provision (idempotent) the canonical warehouses. We use a best-
+  // effort create-if-missing — a create that fails (e.g. on a multi-
+  // tenant instance where the Warehouse route is the only allowed
+  // entry point) leaves the resolution to the client fallback.
   const storesName = await createWarehouseIfMissing(company, abbr, STORES(abbr));
   const wipName = await createWarehouseIfMissing(company, abbr, WIP(abbr));
   const fgName = await createWarehouseIfMissing(company, abbr, FG(abbr));
+  // 2R Part 4 — Raw Materials is best-effort (we wrap in try/catch so a
+  // failure doesn't block the three canonical names).
+  let rawMaterialsName: string | undefined;
+  try {
+    rawMaterialsName = await createWarehouseIfMissing(
+      company,
+      abbr,
+      RAW_MATERIALS(abbr),
+    );
+  } catch {
+    rawMaterialsName = undefined;
+  }
 
   return NextResponse.json({
     success: true,
@@ -177,6 +193,7 @@ export async function GET(request: NextRequest) {
       stores: storesName,
       wip: wipName,
       fg: fgName,
+      rawMaterials: rawMaterialsName,
     },
   });
 }

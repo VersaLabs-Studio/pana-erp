@@ -75,27 +75,33 @@ vi.mock("@/hooks/useCurrentUser", () => ({
 // 1. Static: code-shape assertions for RC1–RC5
 // =============================================================================
 
-describe("Part 1.RC1 — buildStagePlans classifies by pattern (header_link no longer dead)", () => {
-  it("use-flow-chain.ts: the 'direct' branch only matches back_link", async () => {
-    const src = await fs.readFile(
+describe("Part 1.RC1 — server-side flow graph handles header_link + current_child", () => {
+  // 2R Part 1 — the client-side buildStagePlans ladder is GONE. The
+  // server-side BFS (lib/flows/flow-graph.ts) walks every registered
+  // edge pattern in both directions. Header_link + current_child are
+  // resolved server-side; they no longer need a dedicated client-side
+  // branch because the client issues exactly one server call.
+  it("the client hook hits the server-side resolver; the server does the pattern dispatch", async () => {
+    const clientSrc = await fs.readFile(
       "hooks/flows/use-flow-chain.ts",
       "utf-8",
     );
-    // The direct branch is gated on pattern === "back_link".
-    // The prior version had no such gate and caught all patterns.
-    expect(src).toMatch(/direct\s*&&\s*direct\.pattern\s*===\s*["']back_link["']/);
-    // A dedicated header-link branch exists (was dead code in 2P).
-    expect(src).toMatch(/headerLink\.pattern\s*===\s*["']header_link["']/);
-    // A dedicated current-child branch exists (new in 2Q).
-    expect(src).toMatch(/childLink\.pattern\s*===\s*["']current_child["']/);
-  });
+    expect(clientSrc).toMatch(/\/api\/flows\/resolve/);
+    expect(clientSrc).toMatch(/useQuery/);
 
-  it("the StagePlan union has current-child as a kind", async () => {
-    const src = await fs.readFile(
-      "hooks/flows/use-flow-chain.ts",
+    const serverSrc = await fs.readFile(
+      "lib/flows/flow-graph.ts",
       "utf-8",
     );
-    expect(src).toMatch(/kind:\s*["']current-child["']/);
+    // The BFS dispatches on the three edge patterns.
+    expect(serverSrc).toMatch(/header_link/);
+    expect(serverSrc).toMatch(/current_child/);
+    expect(serverSrc).toMatch(/back_link/);
+    // resolveHeaderLink + resolveCurrentChild + resolveBackLink helpers
+    // (the per-pattern dispatch).
+    expect(serverSrc).toMatch(/resolveHeaderLink/);
+    expect(serverSrc).toMatch(/resolveCurrentChild/);
+    expect(serverSrc).toMatch(/resolveBackLink/);
   });
 });
 
@@ -105,15 +111,21 @@ describe("Part 1.RC2 — SO → Quotation is current_child (was a phantom header
       "lib/flows/flow-link-map.ts",
       "utf-8",
     );
-    // The block from SO to Quotation uses current_child, not header_link.
-    // Match the `from: "Sales Order"` block whose `to: "Quotation"`.
+    // 2R Part 1 — RELAX the discriminator. The 2Q block was:
+    //   childWhere: ["prevdoc_doctype","=","Quotation"]
+    // ERPNext's Quotation→SO mapping sets prevdoc_docname but often
+    // leaves prevdoc_doctype EMPTY, so the strict filter matched zero
+    // rows. We dropped the discriminator; the verify step confirms
+    // the candidate IS a Quotation.
     const soQuotationBlock = src.match(
       /\{\s*from:\s*["']Sales Order["'],\s*to:\s*["']Quotation["'][\s\S]{0,400}?\}/,
     );
     expect(soQuotationBlock).not.toBeNull();
     expect(soQuotationBlock![0]).toMatch(/pattern:\s*["']current_child["']/);
     expect(soQuotationBlock![0]).toMatch(/childField:\s*["']prevdoc_docname["']/);
-    expect(soQuotationBlock![0]).toMatch(/prevdoc_doctype["']/);
+    expect(soQuotationBlock![0]).toMatch(/verifyDoctype:\s*["']Quotation["']/);
+    // The strict discriminator is gone (was breaking real Pana data).
+    expect(soQuotationBlock![0]).not.toMatch(/childWhere:\s*\[\s*["']prevdoc_doctype["']/);
     // And the phantom `headerField: "quotation"` is gone.
     expect(soQuotationBlock![0]).not.toMatch(/headerField:\s*["']quotation["']/);
   });
@@ -306,7 +318,11 @@ type FetchHandler = (
 ) => Promise<Response>;
 
 function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify({ success: true, data }), {
+  // The hook reads `json.data` directly (no success wrapper). The legacy
+  // helper wrapped `data` inside `{ success: true, data }`; the new
+  // `/api/flows/resolve` endpoint returns the same shape but the hook
+  // does `json.data` either way (we always strip the wrapper in tests).
+  return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json" },
   });
@@ -316,55 +332,70 @@ function jsonResponse(data: unknown, status = 200): Response {
  * Build a fetch handler that returns:
  *   - currentDoc for useFrappeDoc's GET (URL ends with /{name})
  *   - targetDoc for useFrappeList's GET (URL is /api/{path}?filters=[...])
+ *   - resolvedMap for the new `/api/flows/resolve` endpoint (2R Part 1)
+ *
+ * Argument order matches the test call sites:
+ *   buildFetchMock(currentDoc, byCandidate, resolvedMap)
+ * The legacy `byBackLinkChildDoctype` slot is dropped — no test was
+ * using it post-2R (the server does the dispatch, not the client).
  */
 function buildFetchMock(
   currentDoc: Record<string, unknown> | null,
   byCandidate: Record<string, Array<{ name: string }>>,
-  byBackLinkChildDoctype?: Record<string, Array<{ name: string; parent: string }>>,
+  resolvedMap?: Record<string, string | null>,
 ): FetchHandler {
   return async (input: string | URL | Request) => {
     const url = typeof input === "string" ? input : input.toString();
     const u = new URL(url, "http://localhost");
     const path = u.pathname;
     const params = u.searchParams;
+
+    // 2R Part 1 — /api/flows/resolve?doctype=X&name=Y returns the
+    // server-side-resolved map for the anchor's flow. Tests pre-compute
+    // the resolved map and return it directly.
+    if (path === "/api/flows/resolve" && resolvedMap) {
+      const doctype = params.get("doctype") ?? "";
+      const name = params.get("name") ?? "";
+      // Build the response shape the new hook expects.
+      const stages = Object.entries(resolvedMap).map(([d, n]) => ({
+        doctype: d,
+        stage: {
+          status:
+            d === doctype
+              ? "current"
+              : n
+                ? "completed"
+                : "pending",
+          documentName: n ?? (d === doctype ? name : undefined),
+        },
+      }));
+      // jsonResponse passes data through unwrapped, so the hook reads
+      // `json.data` to get the inner shape.
+      return jsonResponse({
+        data: { doctype, name, flowId: null, stages, map: resolvedMap },
+      });
+    }
+
     // useFrappeDoc: GET /api/{apiPath}/{name} (no query string)
     // useFrappeList: GET /api/{apiPath}?... (always has a query string)
-    // The discriminator is the query string — if `?` is present, it's a
-    // list call; if not, it's a doc call. (A list URL like
-    // `/api/sales/sales-order` is 3 path segments; a doc URL like
-    // `/api/sales/sales-order/SO-001` is 4. We use the query string as
-    // the more reliable signal because useFrappeList always sets at
-    // least one of fields/filters/limit/orderBy/search.)
     const isDoc = url.indexOf("?") === -1;
     if (isDoc && currentDoc) {
-      return jsonResponse(currentDoc);
+      return jsonResponse({ data: currentDoc });
     }
     // useFrappeList: GET /api/{path}?...
     const filters = params.get("filters");
     if (filters) {
       const parsed = JSON.parse(filters) as Array<unknown[]>;
-      // Direct name-equals filter
       const nameFilter = parsed.find(
         (f) => Array.isArray(f) && f[0] === "name" && f[1] === "=",
       ) as [string, string, unknown] | undefined;
       if (nameFilter) {
         const candidate = String(nameFilter[2]);
         const rows = byCandidate[candidate] ?? [];
-        return jsonResponse(rows);
-      }
-      // Child-table back-link: 4-tuple [childDoctype, field, "=", value]
-      const childFilter = parsed.find(
-        (f) =>
-          Array.isArray(f) && f.length === 4 && f[2] === "=" &&
-          typeof f[0] === "string" && f[0].includes(" "),
-      ) as [string, string, string, unknown] | undefined;
-      if (childFilter && byBackLinkChildDoctype) {
-        const childDoctype = childFilter[0];
-        const rows = byBackLinkChildDoctype[childDoctype] ?? [];
-        return jsonResponse(rows);
+        return jsonResponse({ data: rows });
       }
     }
-    return jsonResponse([]);
+    return jsonResponse({ data: [] });
   };
 }
 
@@ -403,6 +434,21 @@ describe("Part 1.RENDER — useFlowChain resolves the right stages with mocked F
       { name: "QTN-001", party_name: "CUST-001" },
       // by candidate (Customer) — exists
       { "CUST-001": [{ name: "CUST-001" }] },
+      // 2R Part 1 — pre-computed server-side resolved map. The
+      // Quotation→Customer header_link resolves via party_name → verify.
+      // Quotation's flow stages: Lead, Opportunity, Customer, Quotation, SO, WO, DN, SI, PE.
+      // Only Customer is reachable from this QTN; the rest stay null.
+      {
+        Lead: null,
+        Opportunity: null,
+        Customer: "CUST-001",
+        Quotation: "QTN-001",
+        "Sales Order": null,
+        "Work Order": null,
+        "Delivery Note": null,
+        "Sales Invoice": null,
+        "Payment Entry": null,
+      },
     );
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -446,6 +492,21 @@ describe("Part 1.RENDER — useFlowChain resolves the right stages with mocked F
         "QTN-001": [{ name: "QTN-001" }],
         "CUST-001": [{ name: "CUST-001" }],
       },
+      // 2R Part 1 — server-side resolved map for the SO's flow. From this
+      // SO the BFS reaches: SO (anchor), Quotation (via items[].prevdoc_docname),
+      // Customer (via header_field customer). WO/DN/SI/PE are not reachable
+      // in this fixture.
+      {
+        Lead: null,
+        Opportunity: null,
+        Customer: "CUST-001",
+        Quotation: "QTN-001",
+        "Sales Order": "SO-001",
+        "Work Order": null,
+        "Delivery Note": null,
+        "Sales Invoice": null,
+        "Payment Entry": null,
+      },
     );
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -483,6 +544,20 @@ describe("Part 1.RENDER — useFlowChain resolves the right stages with mocked F
         "SO-001": [{ name: "SO-001" }],
         "CUST-001": [{ name: "CUST-001" }],
       },
+      // 2R Part 1 — server-side resolved map for the DN. From DN: SO
+      // (items[].against_sales_order → current_child → verify),
+      // Customer (header_link).
+      {
+        Lead: null,
+        Opportunity: null,
+        Customer: "CUST-001",
+        Quotation: null,
+        "Sales Order": "SO-001",
+        "Work Order": null,
+        "Delivery Note": "DN-001",
+        "Sales Invoice": null,
+        "Payment Entry": null,
+      },
     );
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -517,6 +592,20 @@ describe("Part 1.RENDER — useFlowChain resolves the right stages with mocked F
       {
         "CUST-001": [{ name: "CUST-001" }],
       },
+      // 2R Part 1 — server-side resolved map for SI. From SI: Customer
+      // (header_link). SO is reachable via items[].sales_order but
+      // not asserted in this test (Customer only).
+      {
+        Lead: null,
+        Opportunity: null,
+        Customer: "CUST-001",
+        Quotation: null,
+        "Sales Order": null,
+        "Work Order": null,
+        "Delivery Note": null,
+        "Sales Invoice": "SINV-001",
+        "Payment Entry": null,
+      },
     );
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -542,6 +631,18 @@ describe("Part 1.RENDER — useFlowChain resolves the right stages with mocked F
     global.fetch = buildFetchMock(
       { name: "QTN-002", party_name: "CUST-DELETED" },
       { "CUST-DELETED": [] },
+      // 2R Part 1 — server-side resolved map. No Customer match → null.
+      {
+        Lead: null,
+        Opportunity: null,
+        Customer: null,
+        Quotation: "QTN-002",
+        "Sales Order": null,
+        "Work Order": null,
+        "Delivery Note": null,
+        "Sales Invoice": null,
+        "Payment Entry": null,
+      },
     );
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -790,7 +891,10 @@ describe("Part 3 (F-A2): <RequirePermission> fail-FAST capability gate", () => {
     expect(getByText("wizard body")).toBeTruthy();
   });
 
-  it("<RequirePermission> renders the denied state when useCan returns false", async () => {
+  // 2R Part 9 — the proactive capability gate is INERT for v4. The
+  // server is the sole enforcement point; the cosmetic gate would
+  // only hurt legitimate users. Assert the new inert behavior.
+  it("<RequirePermission> is inert for v4: always renders children when no fallback is passed", async () => {
     currentUserMock = {
       user: {
         userId: "hannah@x", userRole: "Sales User", roles: ["Sales User"],
@@ -802,8 +906,38 @@ describe("Part 3 (F-A2): <RequirePermission> fail-FAST capability gate", () => {
     const { RequirePermission } = await import(
       "@/components/auth/permission-gate"
     );
-    const { queryByText, getByTestId } = render(
+    // With NO `fallback`, the gate renders children regardless of the
+    // user's boot perms. The server (factory's per-request sid
+    // forwarding) is the only enforcement point.
+    const { getByText, queryByTestId } = render(
       <RequirePermission doctype="Sales Order" perm="create">
+        <p>wizard body</p>
+      </RequirePermission>,
+    );
+    expect(getByText("wizard body")).toBeTruthy();
+    expect(queryByTestId("permission-denied")).toBeNull();
+  });
+
+  it("<RequirePermission> still exposes the deny state via explicit `fallback` (v4.1 persona tools)", async () => {
+    currentUserMock = {
+      user: {
+        userId: "hannah@x", userRole: "Sales User", roles: ["Sales User"],
+        tenantId: "default", frappeSession: "x",
+        canCreate: ["Quotation"], // not "Sales Order"
+      },
+      isLoading: false, error: null,
+    };
+    const { RequirePermission } = await import(
+      "@/components/auth/permission-gate"
+    );
+    // With an explicit `fallback`, the gate DOES render the deny state
+    // (admin tools, v4.1 persona UX).
+    const { queryByText, getByTestId } = render(
+      <RequirePermission
+        doctype="Sales Order"
+        perm="create"
+        fallback={<div data-testid="permission-denied">denied</div>}
+      >
         <p>wizard body</p>
       </RequirePermission>,
     );
@@ -832,14 +966,21 @@ describe("Part 3 (F-A2): <RequirePermission> fail-FAST capability gate", () => {
     expect(src).toMatch(/canCreate:\s*user\.canCreate/);
   });
 
-  it("the SO /new page is wrapped in <RequirePermission doctype='Sales Order' perm='create'>", async () => {
+  // 2R Part 9 — the SO /new page is NO LONGER wrapped in
+  // <RequirePermission>. The gate is inert for v4. The SO /new page
+  // serves the wizard body directly; permission rejections on submit
+  // render the calm PERMISSION guided message via resolveFrappeError.
+  it("the SO /new page is NOT wrapped in a proactive <RequirePermission> gate (v4 inert)", async () => {
     const src = await fs.readFile(
       "app/sales/sales-order/new/page.tsx",
       "utf-8",
     );
-    expect(src).toMatch(/<RequirePermission\s+doctype="Sales Order"\s+perm="create">/);
-    // And it imports the component.
-    expect(src).toMatch(/import\s*\{\s*RequirePermission\s*\}\s*from\s*"@\/components\/auth\/permission-gate"/);
+    // The wrapper is gone.
+    expect(src).not.toMatch(/<RequirePermission\s+doctype="Sales Order"/);
+    // And the import is gone (no unused import lint noise).
+    expect(src).not.toMatch(
+      /import\s*\{\s*RequirePermission\s*\}\s*from\s*"@\/components\/auth\/permission-gate"/,
+    );
   });
 });
 
@@ -987,17 +1128,25 @@ describe("Part 6 (F-B2): Customer new/edit is on V4 golden template + Lead prefi
 // before firing.
 
 describe("Part 7 (F-B3): useFlowChain perf — request count is bounded", () => {
-  it("the hook calls exactly MAX_STAGES (8) primary + 8 secondary slots", async () => {
+  // 2R Part 1 — the 16-slot cascade is GONE. The hook now fires exactly
+  // ONE `useQuery` against `/api/flows/resolve` plus one `useFrappeDoc`
+  // for the anchor doc — 2 fetches per detail page, not 16. The whole
+  // server-side BFS happens off the client (in the resolver endpoint).
+  it("the hook makes ONE server resolver call + ONE anchor doc fetch (no 16-slot storm)", async () => {
     const src = await fs.readFile(
       "hooks/flows/use-flow-chain.ts",
       "utf-8",
     );
-    // 8 primary slot declarations.
-    const primarySlots = (src.match(/const slot\d+ = useFrappeList/g) ?? []).length;
-    expect(primarySlots).toBe(8);
-    // 8 secondary slot declarations.
-    const secondarySlots = (src.match(/const hop\d+ = useFrappeList/g) ?? []).length;
-    expect(secondarySlots).toBe(8);
+    // One useQuery against the resolver endpoint (replaces 8 primary +
+    // 8 secondary useFrappeList slots).
+    expect(src).toMatch(/\/api\/flows\/resolve/);
+    expect(src).toMatch(/useQuery/);
+    // No per-stage slot declarations — the pairwise ladder is gone.
+    expect(src).not.toMatch(/const slot\d+ = useFrappeList/);
+    expect(src).not.toMatch(/const hop\d+ = useFrappeList/);
+    // No EMPTY_OPTIONS / DISABLED singletons (no per-stage slot caching).
+    expect(src).not.toMatch(/EMPTY_OPTIONS.*Object\.freeze/);
+    expect(src).not.toMatch(/DISABLED.*Object\.freeze/);
   });
 
   it("staleTime is 5 minutes for flow-resolution (back-link cache, not live query)", async () => {
@@ -1008,21 +1157,10 @@ describe("Part 7 (F-B3): useFlowChain perf — request count is bounded", () => 
     expect(src).toMatch(/FLOW_STALE_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/);
   });
 
-  it("disabled slots use frozen EMPTY_OPTIONS + DISABLED singletons (no re-key)", async () => {
-    const src = await fs.readFile(
-      "hooks/flows/use-flow-chain.ts",
-      "utf-8",
-    );
-    expect(src).toMatch(/EMPTY_OPTIONS.*Object\.freeze/);
-    expect(src).toMatch(/DISABLED.*Object\.freeze/);
-  });
-
-  it("render test: a fresh SO page with a 4-stage flow fires no more than 10 network requests (8 primary + 1 doc + 1 sub-doc)", async () => {
-    // We mount useFlowChain on a Sales Order, drive the doc + 8 primary
-    // queries, and count the fetches. The expected count is bounded by
-    // MAX_STAGES (8) primary + 1 useFrappeDoc for the current doc + 0
-    // secondary (no two-hop paths) = 9. The test asserts <= 10 (a tiny
-    // slack for any TanStack internal requests).
+  it("render test: a fresh SO page fires <= 2 network requests (1 resolver + 1 anchor doc)", async () => {
+    // The server-side BFS walks the graph in N+1 round-trips where N =
+    // distinct docs reached (server-side, off the client). The CLIENT
+    // itself fires exactly 2 fetches: the anchor doc + the resolver.
     const originalFetch = global.fetch;
     let count = 0;
     global.fetch = vi.fn(async (input: string | URL | Request) => {
@@ -1031,25 +1169,47 @@ describe("Part 7 (F-B3): useFlowChain perf — request count is bounded", () => 
       const u = new URL(url, "http://localhost");
       const path = u.pathname;
       const params = u.searchParams;
-      if (url.indexOf("?") === -1) {
-        // Doc fetch
+      // The resolver returns the pre-computed map.
+      if (path === "/api/flows/resolve") {
         return jsonResponse({
-          name: "SO-001",
-          customer: "CUST-001",
-          items: [{ prevdoc_docname: "QTN-001", prevdoc_doctype: "Quotation" }],
+          data: {
+            doctype: "Sales Order",
+            name: "SO-001",
+            flowId: null,
+            stages: [
+              { doctype: "Lead", stage: { status: "pending" } },
+              { doctype: "Customer", stage: { status: "completed", documentName: "CUST-001" } },
+              { doctype: "Quotation", stage: { status: "completed", documentName: "QTN-001" } },
+              { doctype: "Sales Order", stage: { status: "current", documentName: "SO-001" } },
+              { doctype: "Work Order", stage: { status: "pending" } },
+              { doctype: "Delivery Note", stage: { status: "pending" } },
+              { doctype: "Sales Invoice", stage: { status: "pending" } },
+              { doctype: "Payment Entry", stage: { status: "pending" } },
+            ],
+            map: {
+              Lead: null,
+              Customer: "CUST-001",
+              Quotation: "QTN-001",
+              "Sales Order": "SO-001",
+              "Work Order": null,
+              "Delivery Note": null,
+              "Sales Invoice": null,
+              "Payment Entry": null,
+            },
+          },
         });
       }
-      const filters = params.get("filters");
-      if (filters) {
-        const parsed = JSON.parse(filters) as Array<unknown[]>;
-        const nameFilter = parsed.find(
-          (f) => Array.isArray(f) && f[0] === "name" && f[1] === "=",
-        ) as [string, string, unknown] | undefined;
-        if (nameFilter) {
-          return jsonResponse([{ name: String(nameFilter[2]) }]);
-        }
+      // The anchor-doc fetch.
+      if (url.indexOf("?") === -1) {
+        return jsonResponse({
+          data: {
+            name: "SO-001",
+            customer: "CUST-001",
+            items: [{ prevdoc_docname: "QTN-001", prevdoc_doctype: "Quotation" }],
+          },
+        });
       }
-      return jsonResponse([]);
+      return jsonResponse({ data: [] });
     }) as typeof global.fetch;
 
     const { useFlowChain } = await import("@/hooks/flows/use-flow-chain");
@@ -1061,9 +1221,10 @@ describe("Part 7 (F-B3): useFlowChain perf — request count is bounded", () => 
       expect(result.current.isLoading).toBe(false);
     });
     global.fetch = originalFetch;
-    // The exact count is <= MAX_STAGES (8) primary + 1 doc = 9. We
-    // allow a tiny slack for any internal TanStack probes.
-    expect(count).toBeLessThanOrEqual(10);
+    // 2R Part 1 — exactly 2 fetches: 1 anchor doc + 1 server resolver.
+    // The server-side BFS does its own N+1 round-trips server-side; the
+    // client does NOT participate in the per-stage resolve.
+    expect(count).toBeLessThanOrEqual(2);
   });
 });
 

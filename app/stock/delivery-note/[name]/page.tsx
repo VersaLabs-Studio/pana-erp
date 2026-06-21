@@ -31,6 +31,7 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
+import { PrintShare } from "@/components/ui/print-share";
 import { useFlowChain } from "@/hooks/flows/use-flow-chain";
 import { useFrappeDoc, useFrappeList, useFrappeUpdate, useFrappeDelete } from "@/hooks/generic";
 import type { DeliveryNote } from "@/types/doctype-types";
@@ -148,6 +149,7 @@ export default function DeliveryNoteDetailPage() {
         backHref="/stock/delivery-note"
         actions={
           <div className="flex items-center gap-2">
+            <PrintShare doctype="Delivery Note" name={dn.name} />
             {isDraft && (
               <>
                 <Button variant="outline" size="sm" asChild>

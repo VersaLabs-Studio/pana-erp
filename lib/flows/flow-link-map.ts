@@ -222,6 +222,17 @@ const LINKS: FlowLinkDef[] = [
   // "quotation"` resolved to nothing for every SO). Re-expressed as
   // current_child: read `so.items[].prevdoc_docname` and verify the Quotation
   // exists.
+  //
+  // 2R Part 1 — RELAX the discriminator. ERPNext's Quotation→SO mapping
+  // sets `prevdoc_docname` but often leaves `prevdoc_doctype` EMPTY on
+  // the SO item; the strict `prevdoc_doctype = "Quotation"` filter then
+  // matches zero rows. We drop the discriminator and rely on the
+  // `verifyDoctype: "Quotation"` verify step to confirm the back-pointer
+  // is a real Quotation. (A SO can have items from MR + Quotation +
+  // other sources; reading the first non-empty prevdoc_docname that
+  // verifies as a Quotation is the correct canonical "source Quotation"
+  // lookup — and if a non-Quotation doc happens to be the first row,
+  // the verify step returns no match and the rail stays pending.)
   {
     from: "Sales Order",
     to: "Quotation",
@@ -229,7 +240,6 @@ const LINKS: FlowLinkDef[] = [
     pattern: "current_child",
     childTable: "items",
     childField: "prevdoc_docname",
-    childWhere: ["prevdoc_doctype", "=", "Quotation"],
     verifyDoctype: "Quotation",
   },
   // SO/DN/SI → Customer: each carries its own `customer` header field. These
@@ -329,6 +339,29 @@ const LINKS: FlowLinkDef[] = [
     field: "sales_order",
     returnParent: true,
     selectFields: ["name", "parent"],
+  },
+  // 2R Part 1 — SI → SO backward (the missing 2R edge). ERPNext stores
+  // the back-pointer on Sales Invoice Item.sales_order, NOT on a SI
+  // header field. Read `si.items[].sales_order` and verify the SO.
+  {
+    from: "Sales Invoice",
+    to: "Sales Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "sales_order",
+    verifyDoctype: "Sales Order",
+  },
+  // 2R Part 1 — SI → DN backward (also missing pre-2R). ERPNext stores
+  // the back-pointer on Sales Invoice Item.delivery_note.
+  {
+    from: "Sales Invoice",
+    to: "Delivery Note",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "delivery_note",
+    verifyDoctype: "Delivery Note",
   },
   // SI → Payment Entry: child-table link on PE Reference.reference_name.
   {
@@ -436,6 +469,52 @@ const LINKS: FlowLinkDef[] = [
     queryDoctype: "Purchase Invoice",
     field: "purchase_order",
     returnParent: false,
+  },
+  // 2R Part 1 — buying backward edges. Without these, PR/PI/PE rails
+  // can never light up their upstream docs (no header_field carries the
+  // back-pointer on PR/PI; the live Pana instance keeps it on the child
+  // table only).
+  // PR → PO: Purchase Receipt Item.purchase_order.
+  {
+    from: "Purchase Receipt",
+    to: "Purchase Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_order",
+    verifyDoctype: "Purchase Order",
+  },
+  // PI → PO: Purchase Invoice Item.purchase_order.
+  {
+    from: "Purchase Invoice",
+    to: "Purchase Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_order",
+    verifyDoctype: "Purchase Order",
+  },
+  // PI → PR: Purchase Invoice Item.purchase_receipt (the canonical ERPNext
+  // back-pointer; `pr_detail` is the row-level pointer but for a single-
+  // PR bill, purchase_receipt is set on the parent and surfaces here).
+  {
+    from: "Purchase Invoice",
+    to: "Purchase Receipt",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_receipt",
+    verifyDoctype: "Purchase Receipt",
+  },
+  // PO → MR backward: Purchase Order Item.material_request.
+  {
+    from: "Purchase Order",
+    to: "Material Request",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "material_request",
+    verifyDoctype: "Material Request",
   },
 ];
 

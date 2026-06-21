@@ -33,6 +33,7 @@ import { FieldWrap } from "@/components/form/field-wrap";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import { useMakeFrom } from "@/hooks/flows/use-make-from";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { getActiveCompany } from "@/lib/settings/company";
@@ -158,7 +159,42 @@ export default function NewPurchaseReceiptPage() {
       enabled: !!purchaseOrderId,
     });
 
+  // 2R Part 2 — canonical make-from (server mapper). Takes priority over
+  // the hand-mapping registry below; the registry remains as a silent
+  // fallback for the route-error case.
+  const { draft: poDraft } = useMakeFrom({
+    sourceDoctype: "Purchase Order",
+    sourceName: purchaseOrderId,
+    targetDoctype: "Purchase Receipt",
+    enabled: !!purchaseOrderId,
+  });
+
+  // 2R Part 2 — hydrate from the canonical draft when it arrives.
+  // The mapped doc carries the supplier, all item lines with
+  // `purchase_order` + `purchase_order_item` back-links, and any
+  // pricing-rule applied amounts ERPNext's mapper computed.
   useEffect(() => {
+    if (!poDraft) return;
+    const d = poDraft.doc as Partial<PRForm> & { items?: PRItem[] };
+    reset({
+      ...getValues(),
+      ...d,
+      items: Array.isArray(d.items) && d.items.length > 0 ? d.items : [{ ...EMPTY_ITEM }],
+    });
+    const filled = new Set<string>(
+      Object.keys(d).filter((k) => k !== "items"),
+    );
+    filled.add("items");
+    setAutoFilledFields(filled);
+    toast.success(`Loaded from Purchase Order ${purchaseOrderId}`, {
+      description: "Review items and set warehouse to continue.",
+    });
+  }, [poDraft, purchaseOrderId, reset, getValues]);
+
+  useEffect(() => {
+    // 2R Part 2 — skip the hand-mapping fallback when the canonical draft
+    // already hydrated the form.
+    if (poDraft) return;
     if (!purchaseOrder) return;
     const mapping = getAutoFillMapping("Purchase Order", "Purchase Receipt");
     if (!mapping) return;
@@ -192,7 +228,7 @@ export default function NewPurchaseReceiptPage() {
     toast.success(`Loaded from Purchase Order ${purchaseOrderId}`, {
       description: "Review items and set warehouse to continue.",
     });
-  }, [purchaseOrder, purchaseOrderId, reset, getValues]);
+  }, [poDraft, purchaseOrder, purchaseOrderId, reset, getValues]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),
@@ -320,16 +356,6 @@ export default function NewPurchaseReceiptPage() {
                         label="Posting Date"
                         required
                       />
-                      <FieldWrap
-                        error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.posting_date : undefined}
-                      >
-                        <FormDatePicker
-                          control={control}
-                          name="posting_date"
-                          label="Posting Date"
-                          required
-                        />
-                      </FieldWrap>
                       <FormInput
                         control={control}
                         name="posting_time"

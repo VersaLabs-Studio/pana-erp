@@ -562,6 +562,49 @@ const strategies: ErrorStrategy[] = [
       };
     },
   },
+  // 2R Part 9 — PERMISSION. A 403/PermissionError on submit (e.g. a
+  // Sales User hitting Save on a doc their role can't create) used to
+  // fall through to the GENERIC_FALLBACK "Something went wrong" dialog.
+  // The handoff: extend the 2Q list-error grace (ListErrorState) to
+  // action rejections — the same calm guided message, the same
+  // permission reason verbatim, no scary generic dialog. We surface the
+  // server's permission reason (e.g. "You do not have permission to
+  // create Sales Order") so the operator can ask an admin for the role
+  // or check the workspace.
+  {
+    code: "PERMISSION",
+    match: (m) =>
+      /permission\s+to\s+(?:read|create|write|delete|submit|cancel|access|view)/i.test(m) ||
+      /not\s+have\s+(?:permission|access)/i.test(m) ||
+      /\bpermission\s+denied\b/i.test(m) ||
+      /\bpermissionerror\b/i.test(m) ||
+      /\bforbidden\b/i.test(m),
+    resolve: (msg) => {
+      // Strip Frappe's `_("...")` i18n wrapper if present.
+      const reason = msg.replace(/^_\(["']|["']\)$/g, "").trim() || msg;
+      return {
+        title: "You don't have permission for this action",
+        explanation:
+          "Your role is missing the permission for this doctype. The server rejected the request before any change was made — nothing was saved.",
+        details: [reason],
+        severity: "warning",
+        actions: [
+          {
+            label: "Ask an admin to grant access",
+            kind: "info" as const,
+            variant: "secondary" as const,
+            run: () => {},
+          },
+          {
+            label: "Dismiss",
+            kind: "dismiss" as const,
+            variant: "ghost" as const,
+            run: () => {},
+          },
+        ],
+      };
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -44,6 +44,7 @@ import {
 import {
   useFrappeCreate,
   useFrappeList,
+  useFrappeOptions,
   useFrappeUpdate,
 } from "@/hooks/generic";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
@@ -74,16 +75,31 @@ export function ReceiveMaterialsModal({
 }: ReceiveMaterialsModalProps) {
   const router = useRouter();
   const { resolution, showError, dismiss } = useGuidedError();
-  const [wh, setWh] = useState<{ stores: string } | null>(null);
+  const [wh, setWh] = useState<{ stores: string; rawMaterials?: string } | null>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // -- Resolve Stores warehouse (implicit) -----------------------------------
+  // -- Resolve default warehouses (Stores + Raw Materials when present) ------
+  // 2R Part 4: surface a warehouse selector so the operator can route raw
+  // materials to Raw Materials - PAN instead of Stores - PAN. Defaults to
+  // Stores; user can override before submit.
   useEffect(() => {
     if (!open) return;
     resolveCompanyWarehouses()
-      .then((w) => setWh({ stores: w.stores }))
+      .then((w) => {
+        setWh({ stores: w.stores, rawMaterials: w.rawMaterials });
+        setSelectedWarehouse(w.stores);
+      })
       .catch(() => setWh(null));
   }, [open]);
+
+  // -- Resolve a warehouse selector list (all leaf warehouses of the active
+  //    company). Only used as a fallback so the operator can pick anything
+  //    beyond the two defaults. --------------------------------------------
+  const { data: warehouseOptions = [] } = useFrappeOptions("Warehouse", {
+    filters: [["is_group", "=", 0]],
+    limit: 200,
+  });
 
   // -- PO-source: load PO + items, per-item received vs ordered --------------
   const { data: po = [], isLoading: loadingPO } = useFrappeList<{
@@ -193,6 +209,8 @@ export function ReceiveMaterialsModal({
     }
     setIsCreating(true);
     try {
+      // 2R Part 4 — use the selected warehouse (defaults to Stores).
+      const targetWh = selectedWarehouse || wh.stores;
       const items = lines
         .filter((l) => Number(l.receiveQty) > 0)
         .map((l) => ({
@@ -202,7 +220,7 @@ export function ReceiveMaterialsModal({
           rate: l.rate ?? 0,
           amount: (Number(l.receiveQty) || 0) * (l.rate ?? 0),
           uom: l.uom,
-          warehouse: l.warehouse || wh.stores,
+          warehouse: l.warehouse || targetWh,
           purchase_order: poDoc.name,
           purchase_order_item: l.name,
         }));
@@ -212,6 +230,7 @@ export function ReceiveMaterialsModal({
         posting_date: new Date().toISOString().split("T")[0],
         supplier: (poDoc as { supplier?: string }).supplier,
         purchase_order: poDoc.name,
+        set_warehouse: targetWh,
         items,
       };
       const created = await createPRMutation.mutateAsync(payload);
@@ -219,7 +238,7 @@ export function ReceiveMaterialsModal({
       if (!name) throw new Error("Server did not return a Purchase Receipt name");
       // Submit immediately so the receipt is locked.
       await updatePRMutation.mutateAsync({ name, data: { docstatus: 1 } });
-      toast.success(`Received ${items.length} item(s) into ${wh.stores}`);
+      toast.success(`Received ${items.length} item(s) into ${targetWh}`);
       onOpenChange(false);
       router.push(`/stock/purchase-receipt/${encodeURIComponent(name)}`);
     } catch (err) {
@@ -243,18 +262,20 @@ export function ReceiveMaterialsModal({
     }
     setIsCreating(true);
     try {
+      // 2R Part 4 — use the selected warehouse (defaults to Stores).
+      const targetWh = selectedWarehouse || wh.stores;
       const payload: Record<string, unknown> = {
         naming_series: "MAT-STE-.YYYY.-",
         stock_entry_type: "Material Receipt",
         purpose: "Material Receipt",
         company: getActiveCompany(),
         posting_date: new Date().toISOString().split("T")[0],
-        to_warehouse: wh.stores,
+        to_warehouse: targetWh,
         items: [
           {
             item_code: standItem,
             qty: standQty,
-            t_warehouse: wh.stores,
+            t_warehouse: targetWh,
             basic_rate: 0,
           },
         ],
@@ -263,7 +284,7 @@ export function ReceiveMaterialsModal({
       const name = (created as { data?: { name?: string } })?.data?.name;
       if (!name) throw new Error("Server did not return a Stock Entry name");
       await updateSEMutation.mutateAsync({ name, data: { docstatus: 1 } });
-      toast.success(`Received ${standQty} × ${standItem} into ${wh.stores}`);
+      toast.success(`Received ${standQty} × ${standItem} into ${targetWh}`);
       onOpenChange(false);
       router.push(`/stock/stock-entry/${encodeURIComponent(name)}`);
     } catch (err) {
@@ -293,15 +314,44 @@ export function ReceiveMaterialsModal({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          {/* Warehouse auto-fill */}
-          <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+          {/* Warehouse selector (2R Part 4 — was a fixed "Stores - PAN" Row).
+              Default = Stores; user can pick Raw Materials (when present) or
+              any other leaf warehouse via the dropdown. */}
+          <div className="rounded-xl border border-border/40 bg-secondary/20 p-3 space-y-2">
             <Row icon={Boxes} label="Target warehouse" tone="primary">
               {!wh ? (
-                <SkeletonLine className="h-5 w-32" />
+                <SkeletonLine className="h-9 w-48" />
               ) : (
-                <span className="font-mono text-xs">{wh.stores}</span>
+                <select
+                  value={selectedWarehouse}
+                  onChange={(e) => setSelectedWarehouse(e.target.value)}
+                  data-testid="warehouse-selector"
+                  className="h-9 w-full rounded-lg border border-border/40 bg-background px-2 text-xs font-mono outline-none focus:border-primary/40"
+                >
+                  <option value={wh.stores}>{wh.stores} (default)</option>
+                  {wh.rawMaterials && wh.rawMaterials !== wh.stores && (
+                    <option value={wh.rawMaterials}>{wh.rawMaterials}</option>
+                  )}
+                  {warehouseOptions
+                    .filter(
+                      (opt) =>
+                        opt.value !== wh.stores &&
+                        (!wh.rawMaterials || opt.value !== wh.rawMaterials),
+                    )
+                    .map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label || opt.value}
+                      </option>
+                    ))}
+                </select>
               )}
             </Row>
+            {wh?.rawMaterials && selectedWarehouse === wh.rawMaterials && (
+              <p className="text-[10px] text-muted-foreground pl-5">
+                Stock will be routed to <strong>Raw Materials</strong> instead of
+                Stores.
+              </p>
+            )}
           </div>
 
           {/* Idempotency notice (PO source) */}
