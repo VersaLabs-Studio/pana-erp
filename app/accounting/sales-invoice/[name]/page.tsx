@@ -10,7 +10,6 @@ import {
   Edit3,
   Send,
   Ban,
-  Printer,
   Loader2,
   Package,
 } from "lucide-react";
@@ -180,9 +179,6 @@ export default function SalesInvoiceDetailPage() {
                 <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-            <Button variant="ghost" size="icon" disabled title="Print (coming soon)">
-              <Printer className="h-4 w-4" />
-            </Button>
           </div>
         }
       />
@@ -203,6 +199,9 @@ export default function SalesInvoiceDetailPage() {
               />
               <DataPoint label="Posting Date" value={invoice.posting_date} />
               <DataPoint label="Due Date" value={invoice.due_date ?? "\u2014"} />
+              {(invoice as { po_no?: string }).po_no && (
+                <DataPoint label="Customer PO" value={(invoice as { po_no?: string }).po_no} />
+              )}
               <DataPoint label="Company" value={invoice.company} />
               <DataPoint label="Currency" value={invoice.currency} />
               <DataPoint label="Debit To" value={invoice.debit_to ?? "\u2014"} />

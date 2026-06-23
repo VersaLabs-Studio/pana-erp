@@ -14,7 +14,6 @@ import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErr
 import {
   Send,
   Ban,
-  Printer,
   Loader2,
   Package,
   CheckCircle2,
@@ -286,9 +285,6 @@ export default function PurchaseOrderDetailPage() {
                 <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-            <Button variant="ghost" size="icon" disabled title="Print (coming soon)">
-              <Printer className="h-4 w-4" />
-            </Button>
           </div>
         }
       />
