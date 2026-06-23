@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Plus, Ruler, MoreVertical, Pencil, Trash2, Check, X } from "lucide-react";
@@ -22,6 +22,7 @@ import {
 } from "@/components/smart";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { useFrappeList, useFrappeDelete } from "@/hooks/generic";
+import { frappeClient } from "@/lib/frappe-client";
 import { ListErrorState } from "@/components/ui/list-error-state";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,32 @@ export default function UomListPage() {
       setDeleteTarget(null);
     },
   });
+
+  // 2S Part 1 — inline toggle for must_be_whole_number. PUT to the UOM
+  // endpoint and optimistically update the local list.
+  const [toggling, setToggling] = useState<string | null>(null);
+  const toggleWholeNumber = useCallback(
+    async (uom: UomRow) => {
+      const current = Number(uom.must_be_whole_number ?? 0);
+      const next = current === 1 ? 0 : 1;
+      setToggling(uom.name);
+      try {
+        await frappeClient.call.put("frappe.client.set_value", {
+          doctype: "UOM",
+          name: uom.name,
+          fieldname: "must_be_whole_number",
+          value: next,
+        });
+        // Optimistic update
+        refetch();
+      } catch {
+        // Silently fail — the user can retry
+      } finally {
+        setToggling(null);
+      }
+    },
+    [refetch],
+  );
 
   const filtered = useMemo(() => {
     if (!search) return uoms;
@@ -186,9 +213,41 @@ export default function UomListPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {Number(u.enabled ?? 1) === 1 ? "enabled" : "disabled"}
-                    {Number(u.must_be_whole_number ?? 0) === 1 ? " · whole numbers" : ""}
                   </p>
                 </div>
+              </div>
+              {/* 2S Part 1 — inline toggle for must_be_whole_number */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={toggling === u.name}
+                  onClick={() => toggleWholeNumber(u)}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                    Number(u.must_be_whole_number ?? 0) === 1
+                      ? "bg-primary"
+                      : "bg-input",
+                    toggling === u.name && "opacity-50 cursor-wait",
+                  )}
+                  title={
+                    Number(u.must_be_whole_number ?? 0) === 1
+                      ? "Whole numbers only — click to allow fractions"
+                      : "Allows fractions — click to require whole numbers"
+                  }
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out",
+                      Number(u.must_be_whole_number ?? 0) === 1
+                        ? "translate-x-4"
+                        : "translate-x-0",
+                    )}
+                  />
+                </button>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {Number(u.must_be_whole_number ?? 0) === 1 ? "whole" : "fraction"}
+                </span>
               </div>
               <div onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>

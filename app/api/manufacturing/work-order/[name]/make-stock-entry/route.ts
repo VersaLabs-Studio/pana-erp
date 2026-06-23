@@ -143,6 +143,34 @@ export async function POST(
       { status: 201 },
     );
   } catch (error) {
+    // 2S Part 1 — graceful error for UOM fraction constraint. ERPNext raises
+    // "Quantity (0.6) cannot be a fraction. To allow this, disable 'Must be
+    // Whole Number' in UOM." when a BOM raw material has a fractional qty but
+    // its UOM has must_be_whole_number = 1. Surface a guided error with a deep
+    // link to Stock → Settings → UOM instead of the generic "Something went wrong."
+    const errMessage = error instanceof Error ? error.message : String(error);
+    if (
+      errMessage.includes("cannot be a fraction") ||
+      errMessage.includes("Must be Whole Number")
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "UOMMustBeIntegerError",
+          details:
+            "A raw material's quantity is fractional but its UOM requires whole numbers. " +
+            "Open Stock → Settings → UOM and untick 'Whole Number' for the affected UOM.",
+          actions: [
+            {
+              label: "Open UOM Settings",
+              href: "/stock/settings/uom",
+            },
+          ],
+          statusCode: 422,
+        },
+        { status: 422 },
+      );
+    }
     const err = frappeClient.handleError(error);
     return NextResponse.json(err, { status: err.statusCode ?? 500 });
   }
