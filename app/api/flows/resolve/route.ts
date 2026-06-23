@@ -35,7 +35,17 @@ async function serverGetDoc(
   doctype: string,
   name: string,
 ): Promise<Record<string, unknown> | null> {
-  if (!client) return null;
+  // 2S Part 0.1 — guard empty doctype: a misconfigured edge that produces
+  // an empty queryDoctype must not call Frappe (which would 404 with
+  // "DocType  not found"). Return null and let the BFS skip this edge.
+  if (!client || !doctype || !name) {
+    if (!doctype || !name) {
+      console.warn(
+        `[flow-graph] serverGetDoc skipped: empty doctype=${JSON.stringify(doctype)} name=${JSON.stringify(name)}`,
+      );
+    }
+    return null;
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await (client.call as any).get("frappe.client.get", {
     doctype,
@@ -57,7 +67,15 @@ async function serverListDoc(
   fields: string[],
   limit: number,
 ): Promise<Array<{ name: string; parent?: string }>> {
-  if (!client) return [];
+  // 2S Part 0.1 — guard empty doctype: same as serverGetDoc above.
+  if (!client || !doctype) {
+    if (!doctype) {
+      console.warn(
+        `[flow-graph] serverListDoc skipped: empty doctype=${JSON.stringify(doctype)}`,
+      );
+    }
+    return [];
+  }
   const params: Record<string, unknown> = {
     doctype,
     fields: ["name", ...fields.filter((f) => f !== "name")],

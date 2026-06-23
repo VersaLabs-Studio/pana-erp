@@ -192,7 +192,18 @@ export async function resolveFlowGraph(
       // graph expansion is undirected at this layer).
       const outgoing = getOutgoingEdges(node.doctype);
       for (const edge of outgoing) {
-        const candidate = await resolveEdge(edge, doc, listDoc);
+        // 2S Part 0.1 — fault isolation: one malformed edge must NEVER
+        // abort the whole graph. Log + skip so the rest of the rail stays lit.
+        let candidate: string | null = null;
+        try {
+          candidate = await resolveEdge(edge, doc, listDoc);
+        } catch (e) {
+          console.warn(
+            `[flow-graph] edge ${edge.from}→${edge.to} failed:`,
+            e,
+          );
+          continue;
+        }
         if (!candidate) continue;
 
         const neighbourKey = keyOf(edge.to, candidate);
@@ -311,24 +322,46 @@ async function resolveBackLink(
   //   - Header field on the queried parent (e.g. "Work Order",
   //     "Purchase Order"): the filter is `[field, "=", anchorName]`.
   //   - Child-table back-link (`returnParent: true`): the filter is
-  //     `[childDoctype, field, "=", anchorName]` (4-tuple).
+  //     `[childDoctype, field, "=", anchorName]` (4-tuple) against the
+  //     parent doctype — Frappe resolves child-table filters on the parent.
   const filters: Array<unknown> = [];
   if (edge.returnParent && edge.queryDoctype) {
     filters.push([edge.queryDoctype, edge.field, "=", _fromDoc?.name ?? ""]);
   } else {
     filters.push([edge.field, "=", _fromDoc?.name ?? ""]);
   }
+  // 2S Part 0.1 — normalize extraFilters: the link map stores extra
+  // filters as ["", field, op, value] (4-tuple with empty doctype).
+  // For child-table queries (returnParent: true), the extra filter lives
+  // on the SAME child table as the main filter, so we must prefix it
+  // with the child doctype (matching buildLinkFilter's fillChildExtraFilter).
+  // For parent-field queries, collapse to 3-tuple [field, op, value].
   if (edge.extraFilters) {
-    for (const f of edge.extraFilters) filters.push(f);
+    const childDoctype = edge.returnParent ? edge.queryDoctype : undefined;
+    for (const f of edge.extraFilters) {
+      if (f[0] === "") {
+        if (childDoctype) {
+          // Child-table extra filter: [childDoctype, field, op, value]
+          filters.push([childDoctype, f[1], f[2], f[3]]);
+        } else {
+          // Parent-field extra filter: [field, op, value]
+          filters.push([f[1], f[2], f[3]]);
+        }
+      } else {
+        filters.push(f);
+      }
+    }
   }
   const parentDoctype = edge.returnParent ? edge.to : (edge.queryDoctype ?? edge.to);
-  const fields = edge.returnParent ? ["name", "parent"] : ["name"];
+  const fields = ["name"];
   const rows = await listDoc(parentDoctype, filters, fields, 1);
   if (rows.length === 0) return null;
-  // For child-table back-links, the resolved doc is the matched row's
-  // `parent` (the parent name in the matched child table row). For
-  // header back-links, it's the row's `name`.
-  return edge.returnParent ? (rows[0].parent ?? null) : (rows[0].name ?? null);
+  // 2S Part 0.2 FIX — always return rows[0].name. When filtering a parent
+  // doctype by a child-table field, Frappe returns the parent rows, so
+  // rows[0].name IS the parent name. The previous code returned
+  // rows[0].parent which is empty for parent rows (the `parent` column on
+  // a parent row is always blank).
+  return rows[0].name ?? null;
 }
 
 // ---------------------------------------------------------------------------
