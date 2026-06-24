@@ -61,6 +61,8 @@ const HEADER_FIELDS: Record<string, string[]> = {
     "company",
     "docstatus",
     "status",
+    "outstanding_amount",
+    "grand_total",
   ],
   "Delivery Note": [
     "name",
@@ -85,6 +87,7 @@ const HEADER_FIELDS: Record<string, string[]> = {
     "bom_no",
     "company",
     "status",
+    "sales_order",
   ],
   "Stock Entry": ["name", "work_order", "docstatus"],
   Quotation: [
@@ -158,22 +161,52 @@ async function mockListDoc(
     // 4-tuple child-table filters are valid Frappe — pass through.
   }
 
-  // Simple in-memory filter: find docs matching all 3-tuple filters.
+  // Simple in-memory filter: find docs matching all 3-tuple AND 4-tuple filters.
   const results: ResolvedLinkRow[] = [];
   for (const [, doc] of DOCS) {
     if (doc.doctype !== doctype) continue;
     let match = true;
     for (const f of filters) {
-      if (!Array.isArray(f) || f.length !== 3) continue;
-      const [field, op, value] = f as [string, string, unknown];
-      const docVal = doc[field];
-      if (op === "=" && docVal !== value) {
-        match = false;
-        break;
+      if (!Array.isArray(f)) continue;
+
+      // 3-tuple [field, op, value]: direct header field match
+      if (f.length === 3) {
+        const [field, op, value] = f as [string, string, unknown];
+        const docVal = doc[field];
+        if (op === "=" && docVal !== value) {
+          match = false;
+          break;
+        }
+        if (op === "!=" && docVal === value) {
+          match = false;
+          break;
+        }
       }
-      if (op === "!=" && docVal === value) {
-        match = false;
-        break;
+
+      // 4-tuple [childDoctype, field, op, value]: child-table filter.
+      // 9R.13: Apply against the parent doc's `items[]` array (the child
+      // table rows), joining on the child field. This catches wrong child
+      // field names — a previously silent-pass hole.
+      if (f.length === 4) {
+        const [childDoctype, field, op, value] = f as [string, string, string, unknown];
+        // Only match if the childDoctype slug matches the parent doctype
+        // pattern (e.g. "Sales Order Item" matches parent "Sales Order").
+        const parentFromChild = childDoctype.replace(/\s+Item$/, "");
+        if (parentFromChild !== doctype) {
+          // The child doctype doesn't belong to this parent — skip
+          continue;
+        }
+        const items = (doc.items ?? []) as Record<string, unknown>[];
+        const childMatch = items.some((item) => {
+          const childVal = item[field];
+          if (op === "=") return childVal === value;
+          if (op === "!=") return childVal !== value;
+          return true;
+        });
+        if (!childMatch) {
+          match = false;
+          break;
+        }
       }
     }
     if (match) {

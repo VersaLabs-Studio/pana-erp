@@ -320,6 +320,10 @@ export default function NewSalesOrderPage() {
     createMutation.mutate({
       ...values,
       company: getActiveCompany(),
+      // 9R.1: Explicitly clear payment_terms_template to prevent ERPNext
+      // from inheriting the Customer's default terms, which can produce a
+      // payment schedule whose due_date precedes the SO transaction_date.
+      payment_terms_template: "",
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),

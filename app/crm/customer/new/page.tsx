@@ -37,6 +37,7 @@ import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
 import type { Customer } from "@/types/doctype-types";
 import { FieldWrap } from "@/components/form/field-wrap";
+import { Form } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ function CreateCustomerForm() {
         </div>
       )}
 
+      <Form {...form}>
       <InfoCard>
         <FlowWizard
           steps={WIZARD_STEPS}
@@ -354,6 +356,7 @@ function CreateCustomerForm() {
           }}
         />
       </InfoCard>
+      </Form>
       <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
     </div>
   );

@@ -562,6 +562,95 @@ const strategies: ErrorStrategy[] = [
       };
     },
   },
+  // 9R.6 — DOCSTATUS_REQUIRED. ERPNext's mapper (make_sales_order,
+  // make_delivery_note, etc.) refuses to build a target from a draft
+  // source: "Cannot map because following condition fails: docstatus=1".
+  {
+    code: "DOCSTATUS_REQUIRED",
+    match: (m) =>
+      /Cannot map because following condition fails:\s*docstatus=1/i.test(m) ||
+      /docstatus\s*=\s*1/i.test(m),
+    resolve: (msg) => {
+      // Try to extract the source doctype name
+      const docMatch = msg.match(/([A-Z][A-Za-z\s]+)\s+([A-Z]{2,}-[\w-]+-\d+)/i);
+      const docType = docMatch?.[1]?.trim() ?? "Source document";
+      const docName = docMatch?.[2]?.trim() ?? "";
+      return {
+        title: "Document must be submitted first",
+        explanation: `${docType}${docName ? ` ${docName}` : ""} must be submitted before you can create a downstream document from it. The source is currently a draft.`,
+        details: [
+          "Submit this document first, then try again.",
+          "You can find the Submit button on the document's detail page.",
+        ],
+        severity: "warning",
+        actions: docName
+          ? [
+              {
+                label: `Open ${docType} to submit it`,
+                kind: "navigate" as const,
+                variant: "default" as const,
+                run: () => {},
+              },
+              {
+                label: "Dismiss",
+                kind: "dismiss" as const,
+                variant: "ghost" as const,
+                run: () => {},
+              },
+            ]
+          : [
+              {
+                label: "Dismiss",
+                kind: "dismiss" as const,
+                variant: "ghost" as const,
+                run: () => {},
+              },
+            ],
+      };
+    },
+  },
+
+  // 9R.1 — PAYMENT_TERMS_DATE_CONFLICT. ERPNext's
+  // `accounts_controller.validate_payment_schedule_dates` raises
+  // "Row N: Due Date in the Payment Terms table cannot be before Posting
+  // Date" when a Customer's default Payment Terms Template produces a
+  // schedule whose due_date precedes the document's transaction_date.
+  {
+    code: "PAYMENT_TERMS_DATE_CONFLICT",
+    match: (m) =>
+      /Due Date in the Payment Terms table cannot be before/i.test(m) ||
+      /Payment Terms.*due date.*before.*posting date/i.test(m),
+    resolve: (msg) => {
+      // Try to extract the row number
+      const rowMatch = msg.match(/Row\s+(\d+)/i);
+      const row = rowMatch?.[1] ?? "N";
+      return {
+        title: "Payment terms date conflict",
+        explanation: `Row ${row}: The payment schedule due date falls before the order date. This usually happens when the customer's default Payment Terms Template produces a due date that's too early for this document.`,
+        details: [
+          `Row: ${row}`,
+          "The customer's default Payment Terms Template may need adjustment.",
+          "You can also remove payment terms on this order and add them later.",
+        ],
+        severity: "warning",
+        actions: [
+          {
+            label: "Remove payment terms from this order",
+            kind: "dismiss",
+            variant: "default",
+            run: () => {},
+          },
+          {
+            label: "Dismiss",
+            kind: "dismiss",
+            variant: "ghost",
+            run: () => {},
+          },
+        ],
+      };
+    },
+  },
+
   // 2R Part 9 — PERMISSION. A 403/PermissionError on submit (e.g. a
   // Sales User hitting Save on a doc their role can't create) used to
   // fall through to the GENERIC_FALLBACK "Something went wrong" dialog.

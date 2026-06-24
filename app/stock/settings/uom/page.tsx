@@ -22,7 +22,6 @@ import {
 } from "@/components/smart";
 import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { useFrappeList, useFrappeDelete } from "@/hooks/generic";
-import { frappeClient } from "@/lib/frappe-client";
 import { ListErrorState } from "@/components/ui/list-error-state";
 import { cn } from "@/lib/utils";
 
@@ -66,12 +65,15 @@ export default function UomListPage() {
       const next = current === 1 ? 0 : 1;
       setToggling(uom.name);
       try {
-        await frappeClient.call.put("frappe.client.set_value", {
-          doctype: "UOM",
-          name: uom.name,
-          fieldname: "must_be_whole_number",
-          value: next,
+        // 9R.3: Use the dedicated UOM API route instead of importing the
+        // server-only frappe-client singleton (which crashes on the client
+        // because ERP_API_KEY/SECRET are not exposed to the browser).
+        const res = await fetch(`/api/stock/settings/uom/${encodeURIComponent(uom.name)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ must_be_whole_number: next }),
         });
+        if (!res.ok) throw new Error("Failed to update UOM");
         // Optimistic update
         refetch();
       } catch {

@@ -196,9 +196,10 @@ const LINKS: FlowLinkDef[] = [
   // link is `Sales Order Item.prevdoc_docname` (with `prevdoc_doctype =
   // "Quotation"`). Model as child-table back_link with returnParent:true.
   //
-  // RELAX the discriminator: ERPNext's Quotation→SO mapping often leaves
-  // `prevdoc_doctype` EMPTY on the SO item. We include the discriminator
-  // as an extraFilter but the BFS fallback logic handles zero-row matches.
+  // 9R.4: REMOVED the prevdoc_doctype discriminator — ERPNext often leaves
+  // it EMPTY on the SO item, and the filter itself is not query-permitted
+  // on the child table (causes 417 DataError on live). The prevdoc_docname
+  // match alone is sufficient to identify the Quotation→SO link.
   {
     from: "Quotation",
     to: "Sales Order",
@@ -208,7 +209,6 @@ const LINKS: FlowLinkDef[] = [
     field: "prevdoc_docname",
     returnParent: true,
     selectFields: ["name", "parent"],
-    extraFilters: [["Sales Order Item", "prevdoc_doctype", "=", "Quotation"]],
   },
   // Quotation → Lead / Customer: read `party_name` from the quotation
   // and verify a Lead/Customer with that name exists. Same conditional
