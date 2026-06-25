@@ -42,6 +42,7 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import type { SalesOrder } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/smart/status-badge";
+import { ListErrorState } from "@/components/ui/list-error-state";
 
 function getDisplayStatus(order: SalesOrder): string {
   if (order.docstatus === 2) return "Cancelled";
@@ -299,9 +300,10 @@ export default function SalesOrderListPage() {
   if (isLoading) return <LoadingState type="cards" count={6} />;
   if (error)
     return (
-      <div className="p-8 text-center text-destructive">
-        Failed to load sales orders
-      </div>
+      <ListErrorState
+        error={error}
+        label="sales orders"
+      />
     );
 
   return (

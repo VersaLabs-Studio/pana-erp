@@ -30,6 +30,7 @@ import { FlowRail } from "@/components/flows/FlowRail";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
+import { PrintShare } from "@/components/ui/print-share";
 import { useFlowChain } from "@/hooks/flows/use-flow-chain";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
 import type { PaymentEntry } from "@/types/doctype-types";
@@ -188,6 +189,7 @@ export default function PaymentEntryDetailPage() {
         }}
         actions={
           <div className="flex items-center gap-2">
+            <PrintShare doctype="Payment Entry" name={name} />
             {/* 2M Part 3A: draft-only Edit affordance. The PE detail page was
                 the only transactional sibling missing the Edit button that
                 SO/SI/Quotation/DN/SE/SR/PI/PR/Lead/Opp all have. Draft only

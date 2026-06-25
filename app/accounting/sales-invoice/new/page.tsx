@@ -80,6 +80,7 @@ interface SIForm {
   posting_date: string;
   due_date: string;
   delivery_note?: string;
+  po_no?: string; // 2S Part 5 — Customer's PO / reference number
   currency: string;
   conversion_rate: number;
   selling_price_list?: string;
@@ -104,7 +105,7 @@ const WIZARD_STEPS: WizardStep[] = [
     label: "Customer & Source",
     description: "Confirm the customer and invoice dates",
     schema: null,
-    fields: ["customer", "posting_date", "due_date", "delivery_note"],
+    fields: ["customer", "posting_date", "due_date", "po_no", "delivery_note"],
     icon: "UserRound",
   },
   {
@@ -558,6 +559,12 @@ export default function NewSalesInvoicePage() {
                         name="due_date"
                         label="Due Date"
                         required
+                      />
+                      <FormInput
+                        control={control}
+                        name="po_no"
+                        label="Customer PO No"
+                        placeholder="Customer's purchase order number"
                       />
                       <FormFrappeSelect
                         control={control}

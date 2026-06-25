@@ -6,8 +6,8 @@
 // Reactive validation gate: useWatch({ control }) → [watchedAll].
 // OKLCH semantic tokens only. No @ts-nocheck, no any.
 
-import { useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -30,7 +30,8 @@ import {
 import { QuickAddField } from "@/components/quick-add/QuickAddField";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
-import { useFrappeCreate } from "@/hooks/generic";
+import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import { useMakeFrom } from "@/hooks/flows/use-make-from";
 import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErrorDialog";
 import { getActiveCompany } from "@/lib/settings/company";
@@ -82,7 +83,7 @@ const WIZARD_STEPS: WizardStep[] = [
     label: "Supplier & Source",
     description: "Set the supplier and billing details",
     schema: null,
-    fields: ["supplier", "posting_date", "bill_no", "bill_date"],
+    fields: ["supplier", "posting_date", "bill_no", "bill_date", "credit_to", "payment_terms_template"],
     icon: "Truck",
   },
   {
@@ -110,8 +111,24 @@ const ETB = new Intl.NumberFormat("en-ET", {
 
 export default function NewPurchaseInvoicePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const purchaseOrderId = searchParams.get("purchase_order");
+  const purchaseReceiptId = searchParams.get("purchase_receipt");
+
   const [step, setStep] = useState(0);
   const [triedNextSteps, setTriedNextSteps] = useState<Set<number>>(new Set());
+
+  // 2R Part 3 — default credit_to from the active company's
+  // default_payable_account so the common path is zero-click. We still
+  // render the field as an editable Payable-Account select (scoped to the
+  // active company) — operator can override before submit.
+  const activeCompany = getActiveCompany();
+  const { data: companyDoc } = useFrappeDoc<{ default_payable_account?: string }>(
+    "Company",
+    activeCompany,
+    { enabled: !!activeCompany },
+  );
+  const defaultPayableAccount = companyDoc?.default_payable_account ?? "";
 
   const form = useForm<PIForm>({
     defaultValues: {
@@ -133,6 +150,60 @@ export default function NewPurchaseInvoicePage() {
       items: [{ ...EMPTY_ITEM }],
     },
   });
+
+  // Once the company doc resolves, hydrate credit_to with the default if
+  // the operator hasn't touched it. We only set on first resolution so a
+  // manual override is never overwritten.
+  useEffect(() => {
+    if (!defaultPayableAccount) return;
+    const current = form.getValues("credit_to");
+    if (!current) {
+      form.setValue("credit_to", defaultPayableAccount, { shouldDirty: false });
+    }
+  }, [defaultPayableAccount, form]);
+
+  // 2R Part 2 — canonical make-from for PO→PI and PR→PI. The server
+  // mapper returns a fully-mapped draft (supplier, items with
+  // purchase_order/purchase_receipt back-links, taxes, etc.); we
+  // hydrate the form from it. PO takes priority over PR (a PR-sourced
+  // bill is rare; if both are set, PO wins).
+  const { draft: piDraftPO } = useMakeFrom({
+    sourceDoctype: "Purchase Order",
+    sourceName: purchaseOrderId,
+    targetDoctype: "Purchase Invoice",
+    enabled: !!purchaseOrderId,
+  });
+  const { draft: piDraftPR } = useMakeFrom({
+    sourceDoctype: "Purchase Receipt",
+    sourceName: purchaseReceiptId,
+    targetDoctype: "Purchase Invoice",
+    enabled: !!purchaseReceiptId,
+  });
+  const canonicalPiDraft = piDraftPO ?? piDraftPR;
+  const canonicalPiSource = purchaseOrderId
+    ? `Purchase Order ${purchaseOrderId}`
+    : purchaseReceiptId
+      ? `Purchase Receipt ${purchaseReceiptId}`
+      : null;
+
+  // 2R Part 2 — hydrate from the canonical draft. The mapped doc carries
+  // the supplier, all item lines with `purchase_order` /
+  // `purchase_order_item` / `purchase_receipt` / `pr_detail` back-links
+  // that ERPNext's mapper computes (those links are what propagate the
+  // status to the upstream PO/PR on submit).
+  useEffect(() => {
+    if (!canonicalPiDraft || !canonicalPiSource) return;
+    const d = canonicalPiDraft.doc as Partial<PIForm> & { items?: PIItem[] };
+    form.reset({
+      ...form.getValues(),
+      ...d,
+      items: Array.isArray(d.items) && d.items.length > 0 ? d.items : [{ ...EMPTY_ITEM }],
+    });
+    toast.success(`Loaded from ${canonicalPiSource}`, {
+      description: "Review items and the credit_to default to continue.",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canonicalPiDraft, canonicalPiSource]);
 
   const { control, getValues, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
@@ -269,6 +340,37 @@ export default function NewPurchaseInvoicePage() {
                         control={control}
                         name="bill_date"
                         label="Supplier Bill Date"
+                      />
+                      {/* 2R Part 3 — credit_to was declared in the form model but never
+                          rendered (step1.fields omitted it), so submit raised
+                          "credit_to — Credit To (Payable Account) is required" with
+                          no UI to set it. Now it is a Payable-Account select
+                          scoped to the active company, defaulted from
+                          Company.default_payable_account. */}
+                      <FormFrappeSelect
+                        control={control}
+                        name="credit_to"
+                        label="Credit To (Payable Account)"
+                        required
+                        doctype="Account"
+                        labelField="account_name"
+                        placeholder="Select payable account..."
+                        filters={[
+                          ["account_type", "=", "Payable"],
+                          ["company", "=", getActiveCompany()],
+                          ["is_group", "=", 0],
+                        ]}
+                      />
+                      {/* 2S Part 4 — Payment Terms Template. Allows setting
+                          installment-based payment schedules on the invoice.
+                          ERPNext applies the template's payment_schedule entries
+                          to auto-populate due dates and amounts. */}
+                      <FormFrappeSelect
+                        control={control}
+                        name="payment_terms_template"
+                        label="Payment Terms"
+                        doctype="Payment Terms Template"
+                        placeholder="Select payment terms..."
                       />
                     </div>
                   </div>
@@ -417,6 +519,7 @@ export default function NewPurchaseInvoicePage() {
                       <Summary label="Posting Date" value={v.posting_date} />
                       <Summary label="Due Date" value={v.due_date} />
                       <Summary label="Bill No" value={v.bill_no} />
+                      <Summary label="Credit To" value={v.credit_to} />
                     </div>
                     <div className="mt-4 border-t border-border/60 pt-4">
                       <div className="flex items-center justify-between">

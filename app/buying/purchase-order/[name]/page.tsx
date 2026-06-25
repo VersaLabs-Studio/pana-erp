@@ -14,7 +14,6 @@ import { GuidedErrorDialog, useGuidedError } from "@/components/errors/GuidedErr
 import {
   Send,
   Ban,
-  Printer,
   Loader2,
   Package,
   CheckCircle2,
@@ -30,6 +29,7 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
+import { PrintShare } from "@/components/ui/print-share";
 import { ReceiveMaterialsModal } from "@/components/stock/ReceiveMaterialsModal";
 import { useFlowChain } from "@/hooks/flows/use-flow-chain";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
@@ -224,6 +224,7 @@ export default function PurchaseOrderDetailPage() {
         backHref="/buying/purchase-order"
         actions={
           <div className="flex items-center gap-2">
+            <PrintShare doctype="Purchase Order" name={order.name} />
             {isDraft && (
               <Button
                 size="sm"
@@ -284,9 +285,6 @@ export default function PurchaseOrderDetailPage() {
                 <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-            <Button variant="ghost" size="icon" disabled title="Print (coming soon)">
-              <Printer className="h-4 w-4" />
-            </Button>
           </div>
         }
       />

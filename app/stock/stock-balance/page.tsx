@@ -36,6 +36,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { cn } from "@/lib/utils";
 import { computeStockKPIs } from "@/lib/kpi/compute-stock-kpis";
 import { StockCountModal } from "@/components/stock/StockCountModal";
+import { ListErrorState } from "@/components/ui/list-error-state";
 
 interface Bin {
   name: string;
@@ -176,9 +177,10 @@ export default function StockBalancePage() {
 
   if (error) {
     return (
-      <div className="p-8 text-center text-destructive">
-        Failed to load stock balance
-      </div>
+      <ListErrorState
+        error={error}
+        label="stock balance"
+      />
     );
   }
 
