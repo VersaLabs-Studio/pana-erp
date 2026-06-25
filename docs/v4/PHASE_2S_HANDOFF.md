@@ -17,7 +17,7 @@ The mesh model is less able to reason about ERPNext field placement, so **every 
 1. **Part 0** (flow resolver P0) → deploy → **retest the rail on 6 live docs (QTN, SO, DN, SI, PO, PR, PI)** → rail must light up upstream+downstream before continuing.
 2. Parts 1–9 (the smaller P0/P1 fixes) in any order.
 3. **Re-run the §C procure-to-pay + §B lead-to-cash live passes.** Confirm no regressions.
-4. **Part 9R FIRST** — Half A live-retest remediation (3 P0 blockers: SO create, Customer page crash, UOM page crash; plus rail/prefill/edit-page gaps). Land + retest 9R green before any new feature work.
+4. **Part 9R FIRST** — Half A live-retest remediation. Now includes the 2nd-retest residuals: **9R.14** (SO-from-Quotation make-from payment-schedule 417 — distinct from the scratch fix), **9R.15** (UOM toggle right-align), and the re-confirmed rail features (**9R.7** rail below header, **9R.12** per-doc CTA). Land + retest 9R green before any new feature work.
 5. Half B features (Parts 10–17). Part 15 (configurator) is the largest — see its note; confirm the chosen approach with Kidus before building if anything is unclear.
 
 ---
@@ -313,6 +313,28 @@ Half A passed `tsc`/`vitest` and the **SO / DN / SI / PE rails light up correctl
 
 ### 9R.13 — [TEST] Harden the resolver mock (close the silent-pass hole)
 The new `tests/flow-resolver.test.ts` correctly **throws** on the old parent-by-child-field pattern (good — anti-regression intact). But its in-memory matcher **ignores 4-tuple child-table filters** (`:166–167`), so the forward "resolves to X" assertions pass only because each seeded doctype has one candidate — a wrong child **field name** would still pass. Make the mock apply 4-tuple child filters against the seeded child rows (join on `parent`) so a wrong child field fails the suite. Keep all existing assertions green.
+
+### 9R.14 — [P0] SO **from a Quotation** still 417s on payment schedule (make-from path; scratch is fixed)
+**Symptom (2nd live retest):** creating an SO **from scratch now works** (9R.1 landed) — but **Create Sales Order from a Quotation** still fails: `POST /api/sales/sales-order` → 417 `ValidationError: Row 1: Due Date in the Payment Terms table cannot be before Posting Date`. The guided "Remove payment terms from this order" button does nothing.
+**Root cause (verified):** this is a **different data source** than 9R.1. The make-from path calls ERPNext's `make_sales_order` mapper (`app/api/erpnext/make-from/route.ts:193`, key `"Quotation->Sales Order"` `:76–79`), which copies the **source Quotation's `payment_schedule` rows verbatim** — their `due_date` was computed against the Quotation's **earlier** `transaction_date`. The route returns `doc` unaltered (`:208–211`); the SO new page hydrates the wizard from it and POSTs those **stale schedule rows** → `due_date < posting_date` → 417. 9R.1 only sanitized the *scratch* payload, so the make-from hydration still carries the bad rows.
+**Fix (do all three):**
+1. **Clear rows, keep the template — centrally, in the route.** In `make-from/route.ts`, after unwrapping `doc` (`:194`), for date-validated targets (Sales Order, Purchase Invoice, Sales Invoice, Delivery Note, Purchase Receipt) set `doc.payment_schedule = []` and null out `doc.due_date` / `doc.payment_due_date`, **while keeping `doc.payment_terms_template`**. ERPNext's `set_payment_schedule()` rebuilds the schedule from the template against the **new** doc's posting/transaction date during `validate` *only when `payment_schedule` is empty* — so zeroing the rows makes ERPNext recompute fresh dates. This is the single canonical choke point and also protects PO→PI, DN→SI, PR→PI from the identical staleness.
+2. **Make the guided "Remove payment terms" button actually work.** Its handler must clear **both** `payment_terms_template` **and** `payment_schedule` from the submit payload and re-POST (today it likely only clears the template field in form state, not the hydrated schedule rows — hence "does nothing"). This is the operator's escape hatch; after fix #1 it is rarely needed but must function.
+3. **Same guided message as 9R.1** already covers the raw 417 text — verify it also fires on the make-from submit, not only the scratch submit.
+**Retest:** open a **submitted** Quotation that carries payment terms → Create Sales Order → SO is created with a freshly-computed schedule (no 417); the rail lights Quotation upstream.
+
+### 9R.15 — [P2] UOM list: whole-number toggle floats mid-row; pin it right
+**Symptom (live retest):** on `/stock/settings/uom`, the `must_be_whole_number` toggle sits at a different horizontal position per row — its x-position tracks the **UOM name length** instead of being right-aligned.
+**Root cause (verified):** the row is `flex … justify-between` with **three** children — identity block (`page.tsx:208`), toggle group (`:222`), dropdown (`:254`). `justify-between` pins only the first and last to the edges and centers the **middle** child (the toggle) in the leftover space, so its position depends on the identity block's width (the name).
+**Fix:** add `flex-1` to the identity block wrapper at `:208` (`"flex items-center gap-3 min-w-0"` → `"flex items-center gap-3 min-w-0 flex-1"`). That collapses the free space so the toggle + dropdown form a fixed cluster pinned hard right on every row. (Equivalent alternative: wrap toggle+dropdown in one `ml-auto` group — pick the `flex-1` one, it's the minimal diff.) No behavior change; cosmetic only.
+**Retest:** all toggles align on a single right-hand column regardless of name length.
+
+---
+
+### Features re-confirmed for this gate (no new items — already specified above)
+Kidus re-emphasized two flow-rail changes on the 2nd retest. **They are already in 9R and stay in this build-first gate:**
+- **Flow rail rendered below the page header on every detail page** → **9R.7** (adds the rail under the header on DN/SI/PI/MR to match the SO/PO/PE golden placement).
+- **A CTA to each doc in the rail** → **9R.12** (completed stages become clickable and navigate to that document's detail; uncreated stages already route to *create*; current stage is non-navigating). Visuals stay locked (2P-FINAL off-limits) — affordance only.
 
 ---
 
