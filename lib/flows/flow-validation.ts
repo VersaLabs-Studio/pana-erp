@@ -200,6 +200,10 @@ export const purchaseInvoiceStepSchemas = {
   step1: z.object({
     supplier: z.string().min(1, "Supplier is required"),
     posting_date: z.string().min(1, "Posting date is required"),
+    // 2R Part 3 — credit_to is required server-side. The wizard now renders
+    // the field (defaulted from Company.default_payable_account); the step
+    // gate fails fast when it's empty.
+    credit_to: z.string().min(1, "Credit To (Payable Account) is required"),
   }),
   step2: z.object({
     items: z
@@ -444,17 +448,42 @@ export const purchaseReceiptStepSchemas = {
     supplier: z.string().min(1, "Supplier is required"),
     posting_date: z.string().min(1, "Posting date is required"),
   }),
+  // 2R Part 5 — step2 requires warehouse per item. ERPNext's Purchase
+  // Receipt Item table requires `warehouse` server-side; the wizard now
+  // enforces it client-side too so submit doesn't fail late.
   step2: z.object({
     items: z
       .array(
         z.object({
           item_code: z.string().min(1, "Item code is required"),
           qty: z.number().min(0.01, "Quantity must be greater than 0"),
-          rate: z.number().min(0, "Rate must be non-negative").optional(),
+          rate: z.number().min(0, "Rate must be non-negative"),
           warehouse: z.string().min(1, "Warehouse is required"),
         })
       )
       .min(1, "At least one item is required"),
+  }),
+  step3: z.object({
+    confirmed: z.boolean().optional(),
+  }),
+};
+
+// 2R Part 6 — Item step schemas (V4 golden wizard). Items are master
+// docs; step1 requires the canonical identifier, step2 covers stock
+// defaults, step3 is configuration (no validation — toggles are
+// optional). Submitted payload still carries the full field set; this
+// gate is just the wizard's Next-button + Submit-button lock.
+export const itemStepSchemas = {
+  step1: z.object({
+    item_code: z.string().min(1, "Item code is required"),
+    item_name: z.string().min(1, "Item name is required"),
+    item_group: z.string().min(1, "Item group is required"),
+    stock_uom: z.string().min(1, "Stock UOM is required"),
+  }),
+  step2: z.object({
+    // Optional fields — valuation defaults to 0 via the form; we only
+    // require that the field exists, not that it is non-empty.
+    valuation_method: z.string().optional(),
   }),
   step3: z.object({
     confirmed: z.boolean().optional(),
@@ -523,6 +552,7 @@ export const WIZARD_STEP_SCHEMAS: Record<string, Record<string, z.ZodType>> = {
   "Opportunity": opportunityStepSchemas,
   "Purchase Receipt": purchaseReceiptStepSchemas,
   "Stock Reconciliation": stockReconciliationStepSchemas,
+  "Item": itemStepSchemas,
 };
 
 /**

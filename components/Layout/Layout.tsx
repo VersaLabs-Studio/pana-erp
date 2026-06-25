@@ -47,6 +47,8 @@ import {
   Cog,
   BookOpen,
   Tag,
+  FolderTree,
+  Ruler,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useNotifications } from "@/lib/stores/use-notifications";
@@ -129,6 +131,10 @@ const navigation = [
         icon: ClipboardList,
       },
       { title: "Item Price", href: "/stock/settings/item-price", icon: Tag },
+      // 2R Part 7 — Item Group + UOM settings pages (their API routes
+      // already existed; the UI is now built).
+      { title: "Item Groups", href: "/stock/settings/item-group", icon: FolderTree },
+      { title: "Units of Measure", href: "/stock/settings/uom", icon: Ruler },
       { title: "Settings", href: "/stock/settings", icon: Settings },
     ],
   },
@@ -146,6 +152,15 @@ const navigation = [
         title: "Purchase Orders",
         href: "/buying/purchase-order",
         icon: ClipboardList,
+      },
+      // 2R Part 8 — RFQ: the module is implemented (list/new/detail pages
+      // exist) but absent from the sidebar. Wire it in between PO and PR
+      // (the natural procure-to-pay order: request quotations → order →
+      // receive → invoice).
+      {
+        title: "Requests for Quotation",
+        href: "/buying/request-for-quotation",
+        icon: FileText,
       },
       // Procure-to-pay continues: receive goods, then bill them. Both
       // pages live in their owning modules (stock / accounting) but the

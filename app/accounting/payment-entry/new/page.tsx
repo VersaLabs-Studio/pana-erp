@@ -43,7 +43,7 @@ import {
 import { validateWizardStep } from "@/lib/flows/flow-validation";
 import type { StepValidationResult } from "@/lib/flows/flow-validation";
 import type { WizardStep } from "@/types/flow-types";
-import type { PaymentEntry, SalesInvoice } from "@/types/doctype-types";
+import type { PaymentEntry, SalesInvoice, PurchaseInvoice } from "@/types/doctype-types";
 import { cn } from "@/lib/utils";
 import { FieldWrap } from "@/components/form/field-wrap";
 
@@ -112,8 +112,17 @@ function CreatePaymentEntryForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const salesInvoiceId = searchParams.get("sales_invoice");
+  const purchaseInvoiceId = searchParams.get("purchase_invoice");
+  const invoiceParam = searchParams.get("invoice");
   const partyTypeParam = searchParams.get("party_type");
   const partyParam = searchParams.get("party");
+  const amountParam = searchParams.get("amount");
+  const paymentTypeParam = searchParams.get("payment_type");
+
+  // 2S Part 3 — resolve the invoice source: explicit sales_invoice param,
+  // explicit purchase_invoice param, or generic "invoice" param from the PI
+  // detail page's WhatsNext card (which sends ?invoice=PINV-xxx).
+  const resolvedPIId = purchaseInvoiceId ?? (invoiceParam && partyTypeParam === "Supplier" ? invoiceParam : null);
 
   const [step, setStep] = useState(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
@@ -206,6 +215,58 @@ function CreatePaymentEntryForm() {
       description: "Set the payment amount and mode to continue.",
     });
   }, [salesInvoice, salesInvoiceId, reset, getValues]);
+
+  // -- 2S Part 3 — Auto-fill from upstream Purchase Invoice via the registry -
+  const { data: purchaseInvoice, isLoading: loadingPI } =
+    useFrappeDoc<PurchaseInvoice>("Purchase Invoice", resolvedPIId ?? "", {
+      enabled: !!resolvedPIId,
+    });
+
+  useEffect(() => {
+    if (!purchaseInvoice) return;
+    const mapping = getAutoFillMapping("Purchase Invoice", "Payment Entry");
+    if (!mapping) return;
+
+    const header = applyAutoFill(
+      purchaseInvoice as unknown as Record<string, unknown>,
+      mapping,
+    );
+
+    // Build a reference from the invoice
+    const outstandingAmt = purchaseInvoice.outstanding_amount ?? purchaseInvoice.grand_total ?? 0;
+    const ref: PEReference = {
+      reference_doctype: "Purchase Invoice",
+      reference_name: purchaseInvoice.name,
+      allocated_amount: outstandingAmt,
+      total_amount: purchaseInvoice.grand_total ?? 0,
+      outstanding_amount: purchaseInvoice.outstanding_amount ?? 0,
+    };
+
+    reset({
+      ...getValues(),
+      ...(header as Partial<PEForm>),
+      party_type: "Supplier",
+      payment_type: "Pay",
+      paid_amount: outstandingAmt,
+      received_amount: outstandingAmt,
+      references: [ref],
+    });
+
+    const filled = new Set<string>([
+      ...mapping.headerMappings
+        .filter((m) => m.isReadOnly)
+        .map((m) => m.targetField),
+      "references",
+      "paid_amount",
+      "party_type",
+      "payment_type",
+    ]);
+    setAutoFilledFields(filled);
+
+    toast.success(`Loaded from Purchase Invoice ${resolvedPIId}`, {
+      description: "Review the payment details to continue.",
+    });
+  }, [purchaseInvoice, resolvedPIId, reset, getValues]);
 
   // Sync received_amount with paid_amount for ETB
   useEffect(() => {
@@ -371,7 +432,9 @@ function CreatePaymentEntryForm() {
         subtitle={
           salesInvoiceId
             ? `From Sales Invoice ${salesInvoiceId}`
-            : "Record a payment in three steps"
+            : resolvedPIId
+              ? `From Purchase Invoice ${resolvedPIId}`
+              : "Record a payment in three steps"
         }
         backHref="/accounting/payment-entry"
       />
@@ -414,7 +477,7 @@ function CreatePaymentEntryForm() {
                       />
                       <FieldWrap
                         auto={isAuto("party_type")}
-                        loading={loadingInvoice}
+                        loading={loadingInvoice || loadingPI}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.party_type : undefined}
                       >
                         <FormSelect
@@ -435,7 +498,7 @@ function CreatePaymentEntryForm() {
                       </FieldWrap>
                       <FieldWrap
                         auto={isAuto("party")}
-                        loading={loadingInvoice}
+                        loading={loadingInvoice || loadingPI}
                         error={triedNextSteps.has(step) ? validationResults?.step1?.errors?.party : undefined}
                       >
                         {/* 2M Part 4B: Quick-Add enabled Party. Doctype is

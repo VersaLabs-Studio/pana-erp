@@ -190,14 +190,25 @@ const LINKS: FlowLinkDef[] = [
     pattern: "header_link",
     headerField: "party_name",
   },
+  // 2S Part 0.3 FIX — Quotation→Sales Order. The previous `back_link` with
+  // `queryDoctype:"Sales Order", field:"quotation"` queried the SO header
+  // for a `quotation` field that does not exist on Sales Order. The actual
+  // link is `Sales Order Item.prevdoc_docname` (with `prevdoc_doctype =
+  // "Quotation"`). Model as child-table back_link with returnParent:true.
+  //
+  // 9R.4: REMOVED the prevdoc_doctype discriminator — ERPNext often leaves
+  // it EMPTY on the SO item, and the filter itself is not query-permitted
+  // on the child table (causes 417 DataError on live). The prevdoc_docname
+  // match alone is sufficient to identify the Quotation→SO link.
   {
     from: "Quotation",
     to: "Sales Order",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Sales Order",
-    field: "quotation",
-    returnParent: false,
+    queryDoctype: "Sales Order Item",
+    field: "prevdoc_docname",
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
   // Quotation → Lead / Customer: read `party_name` from the quotation
   // and verify a Lead/Customer with that name exists. Same conditional
@@ -222,6 +233,17 @@ const LINKS: FlowLinkDef[] = [
   // "quotation"` resolved to nothing for every SO). Re-expressed as
   // current_child: read `so.items[].prevdoc_docname` and verify the Quotation
   // exists.
+  //
+  // 2R Part 1 — RELAX the discriminator. ERPNext's Quotation→SO mapping
+  // sets `prevdoc_docname` but often leaves `prevdoc_doctype` EMPTY on
+  // the SO item; the strict `prevdoc_doctype = "Quotation"` filter then
+  // matches zero rows. We drop the discriminator and rely on the
+  // `verifyDoctype: "Quotation"` verify step to confirm the back-pointer
+  // is a real Quotation. (A SO can have items from MR + Quotation +
+  // other sources; reading the first non-empty prevdoc_docname that
+  // verifies as a Quotation is the correct canonical "source Quotation"
+  // lookup — and if a non-Quotation doc happens to be the first row,
+  // the verify step returns no match and the rail stays pending.)
   {
     from: "Sales Order",
     to: "Quotation",
@@ -229,7 +251,6 @@ const LINKS: FlowLinkDef[] = [
     pattern: "current_child",
     childTable: "items",
     childField: "prevdoc_docname",
-    childWhere: ["prevdoc_doctype", "=", "Quotation"],
     verifyDoctype: "Quotation",
   },
   // SO/DN/SI → Customer: each carries its own `customer` header field. These
@@ -330,6 +351,29 @@ const LINKS: FlowLinkDef[] = [
     returnParent: true,
     selectFields: ["name", "parent"],
   },
+  // 2R Part 1 — SI → SO backward (the missing 2R edge). ERPNext stores
+  // the back-pointer on Sales Invoice Item.sales_order, NOT on a SI
+  // header field. Read `si.items[].sales_order` and verify the SO.
+  {
+    from: "Sales Invoice",
+    to: "Sales Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "sales_order",
+    verifyDoctype: "Sales Order",
+  },
+  // 2R Part 1 — SI → DN backward (also missing pre-2R). ERPNext stores
+  // the back-pointer on Sales Invoice Item.delivery_note.
+  {
+    from: "Sales Invoice",
+    to: "Delivery Note",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "delivery_note",
+    verifyDoctype: "Delivery Note",
+  },
   // SI → Payment Entry: child-table link on PE Reference.reference_name.
   {
     from: "Sales Invoice",
@@ -371,25 +415,51 @@ const LINKS: FlowLinkDef[] = [
     childWhere: ["reference_doctype", "=", "Purchase Invoice"],
     verifyDoctype: "Purchase Invoice",
   },
+  // 2S Part 0.6 — PI → Payment Entry: forward edge (missing pre-2S).
+  // Same pattern as SI→PE: query Payment Entry Reference for rows where
+  // reference_name = PI name AND reference_doctype = "Purchase Invoice".
+  {
+    from: "Purchase Invoice",
+    to: "Payment Entry",
+    direction: "forward",
+    pattern: "back_link",
+    queryDoctype: "Payment Entry Reference",
+    field: "reference_name",
+    returnParent: true,
+    selectFields: ["name", "parent"],
+    extraFilters: [
+      ["", "reference_doctype", "=", "Purchase Invoice"],
+    ],
+  },
 
   // ===== PROCURE-TO-PAY =====
+  // 2S Part 0.3 FIX — Material Request→Purchase Order. The previous
+  // `queryDoctype:"Purchase Order", field:"material_request"` queried the
+  // PO header for `material_request` which does not exist there. The actual
+  // link is `Purchase Order Item.material_request`.
   {
     from: "Material Request",
     to: "Purchase Order",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Purchase Order",
+    queryDoctype: "Purchase Order Item",
     field: "material_request",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
+  // 2S Part 0.3 FIX — Material Request→Request for Quotation. The previous
+  // `queryDoctype:"Request for Quotation", field:"material_request"` queried
+  // the RFQ header for `material_request` which does not exist there. The
+  // actual link is `Request for Quotation Item.material_request`.
   {
     from: "Material Request",
     to: "Request for Quotation",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Request for Quotation",
+    queryDoctype: "Request for Quotation Item",
     field: "material_request",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
   {
     from: "Request for Quotation",
@@ -401,41 +471,107 @@ const LINKS: FlowLinkDef[] = [
     returnParent: true,
     selectFields: ["name", "parent"],
   },
+  // 2S Part 0.3 FIX — Supplier Quotation→Purchase Order. The previous
+  // `queryDoctype:"Purchase Order", field:"supplier_quotation"` queried the
+  // PO header for `supplier_quotation` which does not exist there. The
+  // actual link is `Purchase Order Item.supplier_quotation`.
   {
     from: "Supplier Quotation",
     to: "Purchase Order",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Purchase Order",
+    queryDoctype: "Purchase Order Item",
     field: "supplier_quotation",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
+  // 2S Part 0.3 FIX — Purchase Order→Purchase Receipt. The previous
+  // `queryDoctype:"Purchase Receipt", field:"purchase_order"` queried the
+  // PR header for `purchase_order` which does not exist there. The actual
+  // link is `Purchase Receipt Item.purchase_order`.
   {
     from: "Purchase Order",
     to: "Purchase Receipt",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Purchase Receipt",
+    queryDoctype: "Purchase Receipt Item",
     field: "purchase_order",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
+  // 2S Part 0.3 FIX — Purchase Receipt→Purchase Invoice. The previous
+  // `queryDoctype:"Purchase Invoice", field:"purchase_receipt"` queried the
+  // PI header for `purchase_receipt` which does not exist there. The actual
+  // link is `Purchase Invoice Item.purchase_receipt`.
   {
     from: "Purchase Receipt",
     to: "Purchase Invoice",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Purchase Invoice",
+    queryDoctype: "Purchase Invoice Item",
     field: "purchase_receipt",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
   },
+  // 2S Part 0.3 FIX — Purchase Order→Purchase Invoice. The previous
+  // `queryDoctype:"Purchase Invoice", field:"purchase_order"` queried the
+  // PI header for `purchase_order` which does not exist there. The actual
+  // link is `Purchase Invoice Item.purchase_order`.
   {
     from: "Purchase Order",
     to: "Purchase Invoice",
     direction: "forward",
     pattern: "back_link",
-    queryDoctype: "Purchase Invoice",
+    queryDoctype: "Purchase Invoice Item",
     field: "purchase_order",
-    returnParent: false,
+    returnParent: true,
+    selectFields: ["name", "parent"],
+  },
+  // 2R Part 1 — buying backward edges. Without these, PR/PI/PE rails
+  // can never light up their upstream docs (no header_field carries the
+  // back-pointer on PR/PI; the live Pana instance keeps it on the child
+  // table only).
+  // PR → PO: Purchase Receipt Item.purchase_order.
+  {
+    from: "Purchase Receipt",
+    to: "Purchase Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_order",
+    verifyDoctype: "Purchase Order",
+  },
+  // PI → PO: Purchase Invoice Item.purchase_order.
+  {
+    from: "Purchase Invoice",
+    to: "Purchase Order",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_order",
+    verifyDoctype: "Purchase Order",
+  },
+  // PI → PR: Purchase Invoice Item.purchase_receipt (the canonical ERPNext
+  // back-pointer; `pr_detail` is the row-level pointer but for a single-
+  // PR bill, purchase_receipt is set on the parent and surfaces here).
+  {
+    from: "Purchase Invoice",
+    to: "Purchase Receipt",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "purchase_receipt",
+    verifyDoctype: "Purchase Receipt",
+  },
+  // PO → MR backward: Purchase Order Item.material_request.
+  {
+    from: "Purchase Order",
+    to: "Material Request",
+    direction: "backward",
+    pattern: "current_child",
+    childTable: "items",
+    childField: "material_request",
+    verifyDoctype: "Material Request",
   },
 ];
 

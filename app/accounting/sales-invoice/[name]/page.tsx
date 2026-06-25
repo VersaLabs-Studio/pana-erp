@@ -10,7 +10,6 @@ import {
   Edit3,
   Send,
   Ban,
-  Printer,
   Loader2,
   Package,
 } from "lucide-react";
@@ -24,6 +23,7 @@ import { isModuleBuilt } from "@/lib/flows/module-availability";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
+import { PrintShare } from "@/components/ui/print-share";
 import { useFlowChain } from "@/hooks/flows/use-flow-chain";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
 import type { SalesInvoice } from "@/types/doctype-types";
@@ -145,6 +145,7 @@ export default function SalesInvoiceDetailPage() {
         title={invoice.name}
         actions={
           <div className="flex items-center gap-2">
+            <PrintShare doctype="Sales Invoice" name={invoice.name} />
             {isDraft && (
               <>
                 <Button variant="outline" size="sm" asChild>
@@ -178,9 +179,6 @@ export default function SalesInvoiceDetailPage() {
                 <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-            <Button variant="ghost" size="icon" disabled title="Print (coming soon)">
-              <Printer className="h-4 w-4" />
-            </Button>
           </div>
         }
       />
@@ -201,6 +199,9 @@ export default function SalesInvoiceDetailPage() {
               />
               <DataPoint label="Posting Date" value={invoice.posting_date} />
               <DataPoint label="Due Date" value={invoice.due_date ?? "\u2014"} />
+              {(invoice as { po_no?: string }).po_no && (
+                <DataPoint label="Customer PO" value={(invoice as { po_no?: string }).po_no} />
+              )}
               <DataPoint label="Company" value={invoice.company} />
               <DataPoint label="Currency" value={invoice.currency} />
               <DataPoint label="Debit To" value={invoice.debit_to ?? "\u2014"} />

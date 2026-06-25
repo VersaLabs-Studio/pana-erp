@@ -3,9 +3,14 @@
 //
 // 2Q Part 3 (F-A2): a Sales User `hannah@` was able to open
 // `/sales/sales-order/new`, fill the wizard, and was only denied at
-// Submit. Secure (the server denied) but wasteful UX. The fix is a
-// fail-FAST route-level gate that renders a premium "You don't have
-// access to create Sales Order" state immediately, with a Back action.
+// Submit. Secure (the server denied) but wasteful UX.
+//
+// 2R Part 9 (cosmetic capability gates → v4.1): the proactive gate is
+// now FULLY ADVISORY / INERT for v4. The wrapper always renders its
+// children regardless of the user's boot perms; the server is the sole
+// enforcement point. The deny-state UI is preserved (so future ops or
+// tests can force-render it via the `fallback` prop) but the default
+// behavior is "show the form, let the server decide".
 //
 // HONESTY GUARDRAIL: this gate is COSMETIC — exactly like the
 // `useCurrentUser`-driven sidebar. It must NEVER be the security
@@ -29,18 +34,14 @@ export type PermissionKind = "create" | "read" | "write";
 /**
  * Hook: does the current user have `perm` on `doctype`?
  *
- * Falls open (returns true) when the user is not yet loaded — the
- * caller's page is still rendering for the first time and the
- * `<RequirePermission>` should default to "show the page, server
- * enforces". Once the user context resolves, the gate flips to the
- * authoritative answer.
+ * 2R Part 9 — DEFERRED to v4.1. For v4 the cosmetic gate is fully
+ * advisory; this hook still answers the question for callers that
+ * want to render the deny state explicitly (e.g. admin tools, future
+ * v4.1 persona UX), but the default `<RequirePermission>` wrapper
+ * ignores the answer.
  *
- * Falls OPEN when the user is loaded but their capability list is
- * unknown/empty (e.g. the Frappe boot perms were unavailable) — a
- * cosmetic gate must not read absence-of-data as denial. It renders the
- * denied state ONLY on positive evidence (a populated list omitting the
- * doctype) or for a genuinely unauthenticated request (`user` is null →
- * `/api/auth/me` 401 → the page falls open and the server enforces).
+ * Falls open (returns true) when the user is not yet loaded — the
+ * caller's page is still rendering for the first time.
  */
 export function useCan(doctype: string, perm: PermissionKind): boolean {
   const { user } = useCurrentUser();
@@ -155,15 +156,24 @@ function DefaultDeniedState({
 //   ...wizard body...
 // </RequirePermission>
 //
-// Renders the wizard body when the user is allowed, otherwise the denied
-// state. While the user context is loading, renders the children
-// optimistically (the page's own skeleton handles the actual loading UX).
+// 2R Part 9 — INERT for v4. Always renders children. The deny-state UI
+// (the premium "You don't have access" card) is preserved on disk for
+// (a) explicit callers passing a `fallback`, (b) tests asserting the
+// deny state via `checkUserCan`, and (c) the v4.1 persona rollout that
+// will re-enable the cosmetic gate behind a feature flag.
+//
+// Pass `fallback` to force the deny state — e.g. an admin tools screen
+// that wants to show the operator their limits without blocking the
+// form.
 // ---------------------------------------------------------------------------
 export interface RequirePermissionProps {
   doctype: string;
   perm: PermissionKind;
   children: React.ReactNode;
-  /** Optional custom denied state (overrides the default). */
+  /**
+   * Optional override. Pass a node to force-render the deny state
+   * (admin tools, v4.1 personas). Omit (default) for inert behavior.
+   */
   fallback?: React.ReactNode;
   className?: string;
 }
@@ -175,10 +185,13 @@ export function RequirePermission({
   fallback,
   className,
 }: RequirePermissionProps) {
-  const allowed = useCan(doctype, perm);
-  if (allowed) return <>{children}</>;
-  if (fallback) return <>{fallback}</>;
-  return <DefaultDeniedState doctype={doctype} perm={perm} className={className} />;
+  // 2R Part 9 — inert by default. The server is the only enforcement
+  // point. Callers that want the deny state pass `fallback` explicitly.
+  if (fallback !== undefined) {
+    const allowed = useCan(doctype, perm);
+    if (!allowed) return <>{fallback}</>;
+  }
+  return <>{children}</>;
 }
 
 export default RequirePermission;

@@ -16,7 +16,6 @@ import {
   Edit3,
   Send,
   Ban,
-  Printer,
   Loader2,
   Package,
   Truck,
@@ -28,6 +27,7 @@ import { InfoCard, DataPoint } from "@/components/ui/info-card";
 import { Button } from "@/components/ui/button";
 import { FlowRail } from "@/components/flows/FlowRail";
 import { isModuleBuilt } from "@/lib/flows/module-availability";
+import { PrintShare } from "@/components/ui/print-share";
 import { WhatsNext } from "@/components/smart/WhatsNext";
 import { ActivityTimeline } from "@/components/smart/ActivityTimeline";
 import { CrossFlowActionsMenu } from "@/components/cross-flow/CrossFlowActionsMenu";
@@ -197,9 +197,7 @@ export default function PurchaseInvoiceDetailPage() {
                 <Ban className="mr-1.5 h-4 w-4" /> Cancel
               </Button>
             )}
-            <Button variant="ghost" size="icon" disabled title="Print (Phase 2)">
-              <Printer className="h-4 w-4" />
-            </Button>
+            <PrintShare doctype="Purchase Invoice" name={name} />
           </div>
         }
       />

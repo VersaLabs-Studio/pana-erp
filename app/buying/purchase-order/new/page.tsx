@@ -38,6 +38,7 @@ import { ItemRateAutoFill } from "@/lib/flows/item-price-lookup";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import { useMakeFrom } from "@/hooks/flows/use-make-from";
 import {
   getAutoFillMapping,
   applyAutoFill,
@@ -174,7 +175,56 @@ export default function NewPurchaseOrderPage() {
       enabled: !!supplierQuotationId,
     });
 
+  // 2R Part 2 — canonical make-from (server mapper). Takes priority
+  // over the hand-mapping registry below. The registry remains as a
+  // silent fallback for the route-error case (e.g. the user lacks
+  // CREATE on PO, the mapper errors out, or the MR has no supplier).
+  const { draft: mrDraft } = useMakeFrom({
+    sourceDoctype: "Material Request",
+    sourceName: materialRequestId,
+    targetDoctype: "Purchase Order",
+    enabled: !!materialRequestId,
+  });
+  const { draft: sqDraft } = useMakeFrom({
+    sourceDoctype: "Supplier Quotation",
+    sourceName: supplierQuotationId,
+    targetDoctype: "Purchase Order",
+    enabled: !!supplierQuotationId,
+  });
+  const canonicalDraft = mrDraft ?? sqDraft;
+  const canonicalSourceType = materialRequestId
+    ? "Material Request"
+    : supplierQuotationId
+      ? "Supplier Quotation"
+      : null;
+
+  // 2R Part 2 — hydrate from the canonical draft when it arrives.
+  // Runs BEFORE the hand-mapping fallback effect so the canonical path
+  // wins; the fallback only runs when `canonicalDraft` is null.
   useEffect(() => {
+    if (!canonicalDraft || !canonicalSourceType) return;
+    const d = canonicalDraft.doc as Partial<POForm> & { items?: POItem[] };
+    reset({
+      ...getValues(),
+      ...d,
+      items: Array.isArray(d.items) && d.items.length > 0 ? d.items : [{ ...EMPTY_ITEM }],
+      schedule_date: "",
+    });
+    // Mark every header field from the draft as auto-filled.
+    const filled = new Set<string>(
+      Object.keys(d).filter((k) => k !== "items" && k !== "schedule_date"),
+    );
+    filled.add("items");
+    setAutoFilledFields(filled);
+    toast.success(`Loaded from ${canonicalSourceType} ${materialRequestId ?? supplierQuotationId}`, {
+      description: "Set the schedule date to continue.",
+    });
+  }, [canonicalDraft, canonicalSourceType, materialRequestId, supplierQuotationId, reset, getValues]);
+
+  useEffect(() => {
+    // 2R Part 2 — the canonical server-mapper draft takes priority.
+    // Skip the hand-mapping fallback when the draft is already present.
+    if (canonicalDraft) return;
     const source = materialRequest ?? supplierQuotation;
     const sourceType = materialRequest
       ? "Material Request"
@@ -213,7 +263,15 @@ export default function NewPurchaseOrderPage() {
     toast.success(`Loaded from ${sourceType} ${materialRequestId ?? supplierQuotationId}`, {
       description: "Set the schedule date to continue.",
     });
-  }, [materialRequest, supplierQuotation, materialRequestId, supplierQuotationId, reset, getValues]);
+  }, [
+    canonicalDraft,
+    materialRequest,
+    supplierQuotation,
+    materialRequestId,
+    supplierQuotationId,
+    reset,
+    getValues,
+  ]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),

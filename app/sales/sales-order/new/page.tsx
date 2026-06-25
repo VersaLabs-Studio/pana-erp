@@ -27,7 +27,6 @@ import { resolveFrappeError } from "@/lib/errors/frappe-error-resolver";
 import { getActiveCompany } from "@/lib/settings/company";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RequirePermission } from "@/components/auth/permission-gate";
 import {
   FormInput,
   FormFrappeSelect,
@@ -39,6 +38,7 @@ import { useItemPriceRate } from "@/lib/flows/item-price-lookup";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { FlowWizard } from "@/components/flows/FlowWizard";
 import { useFrappeCreate, useFrappeDoc } from "@/hooks/generic";
+import { useMakeFrom } from "@/hooks/flows/use-make-from";
 import {
   getAutoFillMapping,
   applyAutoFill,
@@ -188,7 +188,44 @@ export default function NewSalesOrderPage() {
       enabled: !!quotationId,
     });
 
+  // 2R Part 2 — canonical make-from (Quotation → Sales Order). Takes
+  // priority over the hand-mapping registry below; the registry remains
+  // as a silent fallback for the route-error case.
+  const { draft: soDraft } = useMakeFrom({
+    sourceDoctype: "Quotation",
+    sourceName: quotationId,
+    targetDoctype: "Sales Order",
+    enabled: !!quotationId,
+  });
+
+  // 2R Part 2 — hydrate from the canonical draft. The mapped doc carries
+  // the customer, all item lines with `prevdoc_docname`/`prevdoc_doctype`
+  // back-links, and any pricing-rule applied amounts ERPNext's mapper
+  // computed (those links are what light up the SO→Quotation rail stage
+  // on the new SO's detail page).
   useEffect(() => {
+    if (!soDraft) return;
+    const d = soDraft.doc as Partial<SOForm> & { items?: SOItem[] };
+    reset({
+      ...getValues(),
+      ...d,
+      items: Array.isArray(d.items) && d.items.length > 0 ? d.items : [{ ...EMPTY_ITEM }],
+      delivery_date: "",
+    });
+    const filled = new Set<string>(
+      Object.keys(d).filter((k) => k !== "items" && k !== "delivery_date"),
+    );
+    filled.add("items");
+    setAutoFilledFields(filled);
+    toast.success(`Loaded from Quotation ${quotationId}`, {
+      description: "Set the delivery date to continue.",
+    });
+  }, [soDraft, quotationId, reset, getValues]);
+
+  useEffect(() => {
+    // 2R Part 2 — skip the hand-mapping fallback when the canonical
+    // draft already hydrated the form.
+    if (soDraft) return;
     if (!quotation) return;
     const mapping = getAutoFillMapping("Quotation", "Sales Order");
     if (!mapping) return;
@@ -221,7 +258,7 @@ export default function NewSalesOrderPage() {
     toast.success(`Loaded from Quotation ${quotationId}`, {
       description: "Set the delivery date to continue.",
     });
-  }, [quotation, quotationId, reset, getValues]);
+  }, [soDraft, quotation, quotationId, reset, getValues]);
 
   const isAuto = useCallback(
     (field: string) => autoFilledFields.has(field),
@@ -283,6 +320,10 @@ export default function NewSalesOrderPage() {
     createMutation.mutate({
       ...values,
       company: getActiveCompany(),
+      // 9R.1: Explicitly clear payment_terms_template to prevent ERPNext
+      // from inheriting the Customer's default terms, which can produce a
+      // payment schedule whose due_date precedes the SO transaction_date.
+      payment_terms_template: "",
       items: items.map((it) => ({
         ...it,
         amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
@@ -295,8 +336,11 @@ export default function NewSalesOrderPage() {
   }, [createMutation, getValues]);
 
   return (
-    <RequirePermission doctype="Sales Order" perm="create">
-      <div className="space-y-6 pb-12">
+    // 2R Part 9 — RequirePermission wrapper removed. The cosmetic gate
+    // is fully advisory/inert for v4; the server enforces. (A
+    // permission rejection on submit now renders the calm PERMISSION
+    // guided message via resolveFrappeError → GuidedErrorDialog.)
+    <div className="space-y-6 pb-12">
       <PageHeader
         title="New Sales Order"
         subtitle={
@@ -602,8 +646,7 @@ export default function NewSalesOrderPage() {
       </Form>
 
       <GuidedErrorDialog resolution={resolution} onDismiss={dismiss} />
-      </div>
-    </RequirePermission>
+    </div>
   );
 }
 

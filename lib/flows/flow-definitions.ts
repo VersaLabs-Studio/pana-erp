@@ -152,6 +152,10 @@ export const SALES_ORDER_FLOW: FlowDefinition = {
 
 /**
  * Purchase flow — from material request to payment
+ * 2S Part 0.5 — RFQ and SQ stages removed from the rail (Kidus's request).
+ * The edges remain in flow-link-map.ts for CrossFlow adjacency; they just
+ * don't appear on the procure-to-pay rail. Rail renders:
+ * MR → PO → PR → PI → PE only.
  */
 export const PURCHASE_FLOW: FlowDefinition = {
   id: "purchase",
@@ -167,22 +171,8 @@ export const PURCHASE_FLOW: FlowDefinition = {
       status: "pending",
       icon: "ClipboardList",
     },
-    {
-      id: "request-for-quotation",
-      label: "Request for Quotation",
-      doctype: "Request for Quotation",
-      status: "pending",
-      icon: "FileSearch",
-      isOptional: true,
-    },
-    {
-      id: "supplier-quotation",
-      label: "Supplier Quotation",
-      doctype: "Supplier Quotation",
-      status: "pending",
-      icon: "FileText",
-      isOptional: true,
-    },
+    // 2S Part 0.5 — RFQ and SQ temporarily removed from the rail.
+    // They remain reachable via CrossFlow navigation.
     {
       id: "purchase-order",
       label: "Purchase Order",
