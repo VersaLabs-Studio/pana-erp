@@ -29,7 +29,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFrappeDoc } from "@/hooks/generic";
-import { getFlowForDocType, resolveFlowChain } from "@/lib/flows/flow-chain-resolver";
+import { getFlowForDocType, resolveFlowChain, getDocTypeRoute } from "@/lib/flows/flow-chain-resolver";
 import type { FlowChainResult, FlowStageStatus } from "@/types/flow-types";
 
 // ---------------------------------------------------------------------------
@@ -124,9 +124,16 @@ export function useFlowChain(
     const data = resolveQuery.data;
     if (data?.stages) {
       for (const s of data.stages) {
+        // 9R.12 — compute documentUrl for completed stages so FlowRail
+        // can render clickable <Link> navigations to those documents.
+        const docName = s.stage.documentName;
+        const url = docName
+          ? `/${getDocTypeRoute(s.doctype)}/${encodeURIComponent(docName)}`
+          : undefined;
         out[s.doctype] = {
           status: s.stage.status,
-          documentName: s.stage.documentName,
+          documentName: docName,
+          documentUrl: url,
         };
       }
     }

@@ -69,9 +69,9 @@ export default function SalesOrderDetailPage() {
   );
 
   // -- Downstream resolution: Work Orders linked to this SO (header link) ----
-  const { data: workOrders, isLoading: loadingWO } = useFrappeList<{ name: string }>(
+  const { data: workOrders, isLoading: loadingWO } = useFrappeList<{ name: string; status: string }>(
     "Work Order",
-    { filters: [["sales_order", "=", name]], fields: ["name"], limit: 5 },
+    { filters: [["sales_order", "=", name]], fields: ["name", "status"], limit: 5 },
     { enabled: !isLoading && !!order },
   );
 
@@ -275,20 +275,17 @@ export default function SalesOrderDetailPage() {
       isPrimary: true,
       isLoading: updateMutation.isPending,
     },
+    isSubmitted && (workOrders && workOrders.length > 0) && {
+      label: "View Work Orders",
+      description: `${workOrders.length} Work Order(s) linked`,
+      onClick: () => router.push(`/manufacturing/work-order/${encodeURIComponent(workOrders[0].name)}`),
+    },
     isSubmitted && {
-      label: workOrders && workOrders.length > 0 ? "View Work Orders" : "Create Work Order(s)",
-      description: workOrders && workOrders.length > 0
-        ? `${workOrders.length} Work Order(s) linked`
-        : "Generate production orders for each line item",
-      onClick: () => {
-        if (workOrders && workOrders.length > 0) {
-          router.push(`/manufacturing/work-order/${encodeURIComponent(workOrders[0].name)}`);
-        } else {
-          handleCreateWorkOrders();
-        }
-      },
-      isPrimary: !(workOrders && workOrders.length > 0),
-      isLoading: createWOMutation.isPending,
+      label: "Create Work Order",
+      description: "Manufacture items from this order",
+      onClick: () => router.push(`/manufacturing/work-order/new?sales_order=${encodeURIComponent(name)}`),
+      disabled: !isModuleBuilt("Work Order"),
+      disabledReason: "Work Order module not yet available",
     },
     isSubmitted && {
       label: "Create Delivery Note",
@@ -419,6 +416,23 @@ export default function SalesOrderDetailPage() {
               already exists, else "Create X" prefilled. */}
           <CrossFlowActionsMenu doctype="Sales Order" name={name} />
           <WhatsNext actions={whatsNext} />
+          {isSubmitted && workOrders && workOrders.length > 0 && (
+            <InfoCard title="Linked Work Orders">
+              <div className="space-y-2">
+                {workOrders.map((wo) => (
+                  <div key={wo.name} className="flex items-center justify-between">
+                    <Link
+                      href={`/manufacturing/work-order/${encodeURIComponent(wo.name)}`}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      {wo.name}
+                    </Link>
+                    <StatusBadge status={wo.status} />
+                  </div>
+                ))}
+              </div>
+            </InfoCard>
+          )}
           <ActivityTimeline
             items={[
               {
