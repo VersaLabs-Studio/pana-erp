@@ -366,7 +366,7 @@ export default function SalesOrderListPage() {
   const { exportData, isExporting } = useExport();
 
   // --- Power feature state ---
-  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);

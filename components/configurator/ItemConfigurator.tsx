@@ -18,6 +18,7 @@ import type {
   OptionChoice,
   ConfiguredLine,
 } from "@/lib/configurator/types";
+import { matrixKey } from "@/lib/configurator/types";
 
 const ETB = new Intl.NumberFormat("en-ET", {
   style: "currency",
@@ -26,7 +27,8 @@ const ETB = new Intl.NumberFormat("en-ET", {
 
 interface ItemConfiguratorProps {
   itemCode: string;
-  basePrice: number;
+  /** @deprecated Pricing now comes from the OptionSet's Pricing discriminator. */
+  basePrice?: number;
   onConfirm: (config: ConfiguredLine) => void;
   onCancel: () => void;
 }
@@ -36,7 +38,9 @@ type Selections = Record<string, string | string[]>;
 function getInitialSelections(optionSet: OptionSet): Selections {
   const s: Selections = {};
   for (const group of optionSet.options) {
-    s[group.name] = group.type === "single" ? group.choices[0].label : [];
+    s[group.name] = group.type === "single"
+      ? (group.choices.find((c) => c.is_default)?.label ?? group.choices[0].label)
+      : [];
   }
   return s;
 }
@@ -115,8 +119,22 @@ export function ItemConfigurator({
     [],
   );
 
-  const totalDelta = useMemo(() => {
-    if (!optionSet) return 0;
+  // 2W B2 — Pricing discriminator: matrix table lookup or additive.
+  // Matrix: price = table[key] where key = value tokens joined by "|".
+  // Additive: price = basePrice + Σ price_delta.
+  const { computedRate, pricingWarning, totalDelta } = useMemo(() => {
+    if (!optionSet) return { computedRate: 0, pricingWarning: false, totalDelta: 0 };
+
+    if (optionSet.pricing.mode === "matrix") {
+      const key = matrixKey(optionSet.pricing, optionSet.options, selections);
+      const rate = optionSet.pricing.table[key];
+      if (rate === undefined) {
+        return { computedRate: 0, pricingWarning: true, totalDelta: 0 };
+      }
+      return { computedRate: rate, pricingWarning: false, totalDelta: 0 };
+    }
+
+    // Additive mode
     let delta = 0;
     for (const group of optionSet.options) {
       const sel = selections[group.name];
@@ -127,10 +145,12 @@ export function ItemConfigurator({
         if (choice) delta += choice.price_delta;
       }
     }
-    return delta;
+    return {
+      computedRate: optionSet.pricing.basePrice + delta,
+      pricingWarning: false,
+      totalDelta: delta,
+    };
   }, [optionSet, selections]);
-
-  const computedRate = basePrice + totalDelta;
 
   const handleConfirm = useCallback(() => {
     if (!optionSet) return;
@@ -168,13 +188,26 @@ export function ItemConfigurator({
           ))}
         </div>
 
+        {/* 2W B2 — Min order quantity */}
+        {optionSet.min_qty > 1 && (
+          <p className="text-xs text-muted-foreground text-center -mt-2">
+            Minimum order: <span className="font-semibold">{optionSet.min_qty} units</span>
+          </p>
+        )}
+
         <div className="flex items-center justify-between rounded-lg border border-border/40 bg-card px-4 py-3">
           <span className="text-sm text-muted-foreground">
-            Base price: {ETB.format(basePrice)}
-            {totalDelta > 0 && (
-              <span className="ml-2 text-info">
-                + {ETB.format(totalDelta)}
-              </span>
+            {optionSet.pricing.mode === "matrix" ? (
+              "Matrix pricing"
+            ) : (
+              <>
+                Base price: {ETB.format(optionSet.pricing.basePrice)}
+                {totalDelta > 0 && (
+                  <span className="ml-2 text-info">
+                    + {ETB.format(totalDelta)}
+                  </span>
+                )}
+              </>
             )}
           </span>
           <span className="text-lg font-semibold tabular-nums text-foreground">
@@ -182,11 +215,20 @@ export function ItemConfigurator({
           </span>
         </div>
 
+        {/* 2W B2 — Warning when matrix key doesn't match */}
+        {pricingWarning && (
+          <div className="rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 text-sm text-warning">
+            Price unavailable for this combination — contact sales.
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm}>Confirm</Button>
+          <Button onClick={handleConfirm} disabled={pricingWarning}>
+            Confirm
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

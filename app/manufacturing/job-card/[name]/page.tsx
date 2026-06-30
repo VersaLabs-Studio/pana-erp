@@ -5,7 +5,7 @@
 // Status machine: Open → Work In Progress → Completed.
 // OKLCH tokens only. No @ts-nocheck, no any.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -13,12 +13,9 @@ import {
   Play,
   CheckCircle2,
   Clock,
-  Factory,
   Wrench,
   Loader2,
-  Package,
   Users,
-  Calendar,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -36,6 +33,8 @@ import {
   useGuidedError,
 } from "@/components/errors/GuidedErrorDialog";
 import { useFrappeDoc, useFrappeUpdate } from "@/hooks/generic";
+import { PrintShare } from "@/components/ui/print-share";
+import { FrappeSelect } from "@/components/smart/frappe-select";
 import type { JobCard } from "@/types/doctype-types";
 
 interface TimeLogEntry {
@@ -75,34 +74,110 @@ export default function JobCardDetailPage() {
   });
 
   const status = jc?.status || "Open";
+  const [busy, setBusy] = useState(false);
 
-  const handleStart = () => {
+  // 2W A2 — Job Card lifecycle via frappe.client.set_value (same approach
+  // as the WO detail JC table). useFrappeUpdate (PUT /api/resource/Job Card)
+  // triggers the Frappe controller's validate hook which recomputes status
+  // from time_logs — so writing status: "Work In Progress" gets reset on
+  // save. set_value bypasses the controller for atomic field writes.
+  const setJcFields = useCallback(
+    async (fields: Record<string, unknown>): Promise<void> => {
+      const res = await fetch(`/api/method/frappe.client.set_value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctype: "Job Card",
+          name,
+          fieldname: fields,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          body?.message || body?.exception || `set_value failed (${res.status})`,
+        );
+      }
+    },
+    [name],
+  );
+
+  const handleStart = async () => {
+    setBusy(true);
+    try {
+      await setJcFields({
+        status: "Work In Progress",
+        actual_start_date: new Date().toISOString().slice(0, 19).replace("T", " "),
+      });
+      toast.success("Job Card started");
+      await refetch();
+    } catch (err) {
+      showError(resolveFrappeError(err, { doctype: "Job Card" }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setBusy(true);
+    try {
+      const forQty = Number(jc?.for_quantity ?? 0);
+      await setJcFields({
+        status: "Completed",
+        total_completed_qty: forQty,
+        actual_end_date: new Date().toISOString().slice(0, 19).replace("T", " "),
+      });
+      toast.success("Job Card completed");
+      await refetch();
+    } catch (err) {
+      showError(resolveFrappeError(err, { doctype: "Job Card" }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Employee chip assignment — append to the union row table (Table
+  // MultiSelect child), same shape the WO detail JC row writes.
+  const assignEmployee = (employeeId: string) => {
+    if (!employeeId || !jc) return;
+    const existing = (Array.isArray(jc.employee) ? jc.employee : [])
+      .map((r: unknown) =>
+        typeof r === "object" && r && "employee" in r
+          ? (r as { employee: string }).employee
+          : null,
+      )
+      .filter(Boolean) as string[];
+    if (existing.includes(employeeId)) return;
+    const rows = [...existing, employeeId].map((id) => ({ employee: id }));
+    setBusy(true);
     updateMutation.mutate(
-      { name, data: { status: "Work In Progress" } },
+      { name, data: { employee: rows } },
       {
         onSuccess: () => {
-          toast.success("Job Card started");
+          toast.success(`Employee assigned to ${name}`);
           refetch();
+          setBusy(false);
         },
-        onError: (err) =>
-          showError(resolveFrappeError(err, { doctype: "Job Card" })),
+        onError: (err) => {
+          setBusy(false);
+          showError(resolveFrappeError(err, { doctype: "Job Card" }));
+        },
       },
     );
   };
 
-  const handleComplete = () => {
-    updateMutation.mutate(
-      { name, data: { status: "Completed" } },
-      {
-        onSuccess: () => {
-          toast.success("Job Card completed");
-          refetch();
-        },
-        onError: (err) =>
-          showError(resolveFrappeError(err, { doctype: "Job Card" })),
-      },
-    );
-  };
+  const assignedEmployees = useMemo(() => {
+    if (!jc || !Array.isArray(jc.employee)) return [];
+    return jc.employee
+      .map((r: unknown) =>
+        typeof r === "object" && r && "employee_name" in r
+          ? (r as { employee_name: string; employee?: string }).employee_name
+          : typeof r === "object" && r && "employee" in r
+            ? (r as { employee: string }).employee
+            : null,
+      )
+      .filter(Boolean) as string[];
+  }, [jc]);
 
   const whatsNext = [
     status === "Open" && {
@@ -110,14 +185,14 @@ export default function JobCardDetailPage() {
       description: "Begin working on this job card",
       onClick: handleStart,
       isPrimary: true,
-      isLoading: updateMutation.isPending,
+      isLoading: busy,
     },
     status === "Work In Progress" && {
       label: "Complete Job",
       description: "Mark this job card as completed",
       onClick: handleComplete,
       isPrimary: true,
-      isLoading: updateMutation.isPending,
+      isLoading: busy,
     },
   ].filter(Boolean) as React.ComponentProps<typeof WhatsNext>["actions"];
 
@@ -196,13 +271,10 @@ export default function JobCardDetailPage() {
           backHref="/manufacturing/job-card"
           actions={
             <div className="flex items-center gap-2">
+              <PrintShare doctype="Job Card" name={name} />
               {status === "Open" && (
-                <Button
-                  size="sm"
-                  onClick={handleStart}
-                  disabled={updateMutation.isPending}
-                >
-                  {updateMutation.isPending ? (
+                <Button size="sm" onClick={handleStart} disabled={busy}>
+                  {busy ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                   ) : (
                     <Play className="mr-1.5 h-4 w-4" />
@@ -211,12 +283,8 @@ export default function JobCardDetailPage() {
                 </Button>
               )}
               {status === "Work In Progress" && (
-                <Button
-                  size="sm"
-                  onClick={handleComplete}
-                  disabled={updateMutation.isPending}
-                >
-                  {updateMutation.isPending ? (
+                <Button size="sm" onClick={handleComplete} disabled={busy}>
+                  {busy ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                   ) : (
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
@@ -315,6 +383,43 @@ export default function JobCardDetailPage() {
                     value={`${jc.time_required} min`}
                   />
                 )}
+              </div>
+            </InfoCard>
+          </motion.div>
+
+          {/* Employees */}
+          <motion.div
+            {...fadeInUp}
+            transition={{ ...fadeInUp.transition, delay: 0.13 }}
+          >
+            <InfoCard
+              title="Employees"
+              icon={<Users className="h-5 w-5 text-emerald-500" />}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                {assignedEmployees.length > 0 ? (
+                  assignedEmployees.map((emp) => (
+                    <span
+                      key={emp}
+                      className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                    >
+                      {emp}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    No employees assigned yet.
+                  </span>
+                )}
+                <div className="ml-2 w-48">
+                  <FrappeSelect
+                    doctype="Employee"
+                    labelField="employee_name"
+                    placeholder="Assign employee…"
+                    disabled={busy}
+                    onChange={(val) => assignEmployee(val)}
+                  />
+                </div>
               </div>
             </InfoCard>
           </motion.div>

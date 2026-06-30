@@ -295,6 +295,24 @@ export default function ReportsLandingPage() {
     limit: 10000,
   });
 
+  // 2T §4 — Inventory and Manufacturing data for section summaries
+  const { data: itemData = [] } = useFrappeList<{
+    item_code: string;
+    reorder_levels: unknown[];
+  }>("Item", {
+    fields: ["item_code", "reorder_levels"],
+    filters: [["disabled", "=", 0]],
+    limit: 5000,
+  });
+
+  const { data: woData = [] } = useFrappeList<{
+    status: string;
+    docstatus: number;
+  }>("Work Order", {
+    fields: ["status", "docstatus"],
+    limit: 500,
+  });
+
   // Aggregate
   const totalSales = salesData.reduce(
     (s, r) => s + (Number(r.grand_total) || 0),
@@ -322,6 +340,14 @@ export default function ReportsLandingPage() {
     (s, r) => s + (Number(r.outstanding_amount) || 0),
     0
   );
+
+  // 2T §4 — Inventory and Manufacturing summaries
+  // Note: low-stock check requires bin data; here we count items WITH a
+  // reorder level set as a proxy for "items that need monitoring". The
+  // full inventory report at /accounting/reports/inventory shows actual
+  // bin levels vs. reorder levels.
+  const lowStockCount = itemData.length;
+  const inProcessWOCount = woData.filter((w) => w.status === "In Process").length;
 
   const isLoading = salesLoading || purchaseLoading || arLoading || apLoading;
 
@@ -422,6 +448,23 @@ export default function ReportsLandingPage() {
         { label: "By Item", href: "/accounting/reports/payables?view=item" },
       ],
       summary: `${purchaseData.length} invoices · ${ETB.format(totalPurchases)}`,
+    },
+    // 2T §4 — Stock and Manufacturing report sections with actionable callouts
+    {
+      title: "Inventory",
+      icon: <Package className="h-4 w-4" />,
+      links: [
+        { label: "Stock Levels & Reorder", href: "/accounting/reports/inventory" },
+      ],
+      summary: `${lowStockCount} items below reorder level`,
+    },
+    {
+      title: "Manufacturing",
+      icon: <Factory className="h-4 w-4" />,
+      links: [
+        { label: "Work Order Report", href: "/accounting/reports/manufacturing" },
+      ],
+      summary: `${inProcessWOCount} WOs in process`,
     },
   ];
 

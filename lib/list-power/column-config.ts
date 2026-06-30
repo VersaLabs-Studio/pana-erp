@@ -125,6 +125,80 @@ export function getDefaultColumnConfig(
     "Purchase Invoice": PI_COLUMNS,
     "Delivery Note": DN_COLUMNS,
     "Quotation": QTN_COLUMNS,
+    "Work Order": WO_COLUMNS,
+    "Job Card": JC_COLUMNS,
+    "Item": ITEM_COLUMNS,
+    "Employee": EMPLOYEE_COLUMNS,
+    "Customer": CUSTOMER_COLUMNS,
   };
   return map[doctype];
 }
+
+// ---------------------------------------------------------------------------
+// 2T §5 — Column configs for remaining modules (ready for EnhancedDataTable
+// rollout). These follow the same ListColumn<T> pattern as SO/SI/PI/DN/QTN.
+// ---------------------------------------------------------------------------
+
+export const WO_COLUMNS: ColumnConfig<Record<string, unknown>> = {
+  doctype: "Work Order",
+  defaultVisibleKeys: ["name", "production_item", "qty", "status", "planned_start_date", "sales_order"],
+  columns: [
+    { key: "name", label: "WO #", sortable: true, defaultVisible: true, toggleable: false, category: "identity" },
+    { key: "production_item", label: "Item", sortable: true, defaultVisible: true, toggleable: true, category: "identity" },
+    { key: "qty", label: "Qty", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "status", label: "Status", sortable: true, defaultVisible: true, toggleable: true, category: "status" },
+    { key: "planned_start_date", label: "Planned Start", sortable: true, defaultVisible: true, toggleable: true, category: "dates" },
+    { key: "sales_order", label: "Sales Order", sortable: true, defaultVisible: false, toggleable: true, category: "other" },
+    { key: "company", label: "Company", sortable: true, defaultVisible: false, toggleable: true, category: "other" },
+  ],
+};
+
+export const JC_COLUMNS: ColumnConfig<Record<string, unknown>> = {
+  doctype: "Job Card",
+  defaultVisibleKeys: ["name", "operation", "workstation", "status", "work_order"],
+  columns: [
+    { key: "name", label: "JC #", sortable: true, defaultVisible: true, toggleable: false, category: "identity" },
+    { key: "operation", label: "Operation", sortable: true, defaultVisible: true, toggleable: true, category: "identity" },
+    { key: "workstation", label: "Workstation", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "status", label: "Status", sortable: true, defaultVisible: true, toggleable: true, category: "status" },
+    { key: "work_order", label: "Work Order", sortable: true, defaultVisible: false, toggleable: true, category: "other" },
+    { key: "company", label: "Company", sortable: true, defaultVisible: false, toggleable: true, category: "other" },
+  ],
+};
+
+export const ITEM_COLUMNS: ColumnConfig<Record<string, unknown>> = {
+  doctype: "Item",
+  defaultVisibleKeys: ["item_code", "item_name", "item_group", "stock_uom", "standard_rate", "disabled"],
+  columns: [
+    { key: "item_code", label: "Code", sortable: true, defaultVisible: true, toggleable: false, category: "identity" },
+    { key: "item_name", label: "Name", sortable: true, defaultVisible: true, toggleable: true, category: "identity" },
+    { key: "item_group", label: "Group", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "stock_uom", label: "UOM", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "standard_rate", label: "Rate", sortable: true, defaultVisible: true, toggleable: true, category: "financial" },
+    { key: "disabled", label: "Status", sortable: true, defaultVisible: true, toggleable: true, category: "status" },
+  ],
+};
+
+export const EMPLOYEE_COLUMNS: ColumnConfig<Record<string, unknown>> = {
+  doctype: "Employee",
+  defaultVisibleKeys: ["employee_name", "department", "designation", "status", "date_of_joining"],
+  columns: [
+    { key: "employee_name", label: "Name", sortable: true, defaultVisible: true, toggleable: false, category: "identity" },
+    { key: "department", label: "Department", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "designation", label: "Designation", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "status", label: "Status", sortable: true, defaultVisible: true, toggleable: true, category: "status" },
+    { key: "date_of_joining", label: "Joined", sortable: true, defaultVisible: true, toggleable: true, category: "dates" },
+    { key: "company", label: "Company", sortable: true, defaultVisible: false, toggleable: true, category: "other" },
+  ],
+};
+
+export const CUSTOMER_COLUMNS: ColumnConfig<Record<string, unknown>> = {
+  doctype: "Customer",
+  defaultVisibleKeys: ["customer_name", "customer_group", "territory", "disabled"],
+  columns: [
+    { key: "customer_name", label: "Name", sortable: true, defaultVisible: true, toggleable: false, category: "identity" },
+    { key: "customer_group", label: "Group", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "territory", label: "Territory", sortable: true, defaultVisible: true, toggleable: true, category: "other" },
+    { key: "disabled", label: "Status", sortable: true, defaultVisible: true, toggleable: true, category: "status" },
+  ],
+};

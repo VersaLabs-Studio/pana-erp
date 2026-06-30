@@ -129,11 +129,15 @@ function CreateWorkOrderForm() {
 
   // 2S Part 11 — Resolve implicit warehouses and set defaults. The user
   // should rarely need to pick a warehouse; the implicit model provides
-  // Stores (FG) and WIP automatically.
+  // Stores (FG), WIP, and Source (Raw Materials) automatically.
   useEffect(() => {
     resolveCompanyWarehouses().then((wh) => {
       if (!getValues("fg_warehouse")) setValue("fg_warehouse", wh.fg);
       if (!getValues("wip_warehouse")) setValue("wip_warehouse", wh.wip);
+      // 2W A4 — source_warehouse = Raw Materials (or Stores fallback)
+      if (!getValues("source_warehouse")) {
+        setValue("source_warehouse", wh.rawMaterials ?? wh.stores);
+      }
     });
   }, [getValues, setValue]);
 
